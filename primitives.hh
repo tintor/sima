@@ -271,7 +271,8 @@ void TestLineNearest(segment3 p, segment3 q, std::default_random_engine& rnd) {
 	REQUIRE(dnum >= d * 0.99999);
 }
 
-dvec3 UniVec(std::default_random_engine& rnd) {
+template<typename RandomEngine>
+dvec3 UniVec(RandomEngine& rnd) {
 	std::uniform_real_distribution<real> uni(-1000, 1000);
 	return dvec3(uni(rnd), uni(rnd), uni(rnd));
 }
@@ -330,8 +331,6 @@ struct triangle3 {
 };
 
 dvec3 Normal(const dvec3& a, const dvec3& b, const dvec3& c) {
-	// TODO make sure it works when one edge is very small compared to other two
-	// TODO make sure it works when one edge is almost equal to the sum of other two
 	return glm::cross(b - a, c - a);
 }
 
@@ -447,14 +446,19 @@ private:
 	uint32_t m_rank;
 };
 
-namespace std {
-	// Hash function for matrix and vector.
+template<typename T>
+void hash_combine(size_t& seed, const T& value) {
 	// The code is from `hash_combine` function of the Boost library. See
 	// http://www.boost.org/doc/libs/1_55_0/doc/html/hash/reference.html#boost.hash_combine .
+	seed ^= std::hash<T>()(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+namespace std {
 	template<> struct hash<dvec3> {
 		size_t operator()(const dvec3& a) const {
 			size_t seed = 0;
-			FOR(i, 3) seed ^= std::hash<real>()(a[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+			FOR(i, 3)
+				hash_combine(seed, a[i]);
 			return seed;
 		}
     };
@@ -462,8 +466,8 @@ namespace std {
   template <typename A, typename B> struct hash<pair<A, B>> {
     size_t operator()(const pair<A, B>& x) const {
 		size_t seed = 0;
-		seed ^= std::hash<A>()(x.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<B>()(x.second) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		hash_combine(seed, x.first);
+		hash_combine(seed, x.second);
 	    return seed;
     }
   };
@@ -471,8 +475,8 @@ namespace std {
   template<> struct hash<segment3> {
     size_t operator()(const segment3& x) const {
 		size_t seed = 0;
-		seed ^= std::hash<dvec3>()(x.a) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<dvec3>()(x.b) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		hash_combine(seed, x.a);
+		hash_combine(seed, x.b);
 	    return seed;
     }
   };
@@ -483,8 +487,8 @@ dmat3 full_mat3(real a) {
     return glm::make_mat3(m);
 }
 
-template<typename RND>
-dvec3 random_direction(RND& rnd) {
+template<typename RandomEngine>
+dvec3 random_direction(RandomEngine& rnd) {
 	std::normal_distribution<real> gauss(0.0, 1.0);
 	return glm::normalize(dvec3(gauss(rnd), gauss(rnd), gauss(rnd)));
 }

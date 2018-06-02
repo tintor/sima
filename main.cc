@@ -9,7 +9,7 @@
 #include <functional>
 #include <stdexcept>
 
-//#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "tinyformat.h"
 #include "auto.h"
@@ -75,7 +75,7 @@ Validity is_valid(const Mesh3d& mesh) {
 	// Minimal length of any edge is 10xPlanarEpsilon
 	FOR(i, mesh.size())
 		FOR_EACH_EDGE(a, b, mesh[i])
-			if (squared(*a - *b) <= 100 * squared(PlanarEpsilon))
+			if (squared(*a - *b) <= squared(10 * PlanarEpsilon))
 				return Validity::EdgeTooShort;
 
 	// TODO any two different vertices can't be closer than PlanarEpsilon
