@@ -596,8 +596,7 @@ transform3 combine(const transform3& a, const transform3& b) {
     // TODO figure out combination formula: ie: a * inverse(b)
 	dmat4 c4 = a4 * inverse(b4);
     // TODO convert c4 back to transform3
-
-    return a;
+	throw new std::runtime_error("combine() unimplemented");
 }
 
 // Angle between oriented triangles ABC and BAD.
@@ -605,6 +604,5 @@ transform3 combine(const transform3& a, const transform3& b) {
 // If edge is planar then angle will be =PI
 // If edge is concave than angle will be >PI
 real edge_angle(const dvec3& a, const dvec3& b, const dvec3& c, const dvec3& d) {
-	// TODO
-	return 0;
+	throw new std::runtime_error("edge_angle() unimplemented");
 }
