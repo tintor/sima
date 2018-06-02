@@ -172,10 +172,9 @@ bool is_convex(const Mesh3d& mesh) {
 		vertices.insert(f.begin(), f.begin() + 2);
 
 	FOR_EACH(f, mesh) {
-		// TODO can use the same trick from ConvexHull to avoid computing 1/sqrt()
-		plane plane(f);
+		plane p(f);
 		FOR_EACH(v, vertices)
-			if (plane.distance(v) > PlanarEpsilon)
+			if (p.distance(v) > PlanarEpsilon)
 				return false;
 	}
 	return true;
@@ -423,24 +422,15 @@ public:
 	real sphere_radius() const { return m_sphere_radius; }
 
 private:
-	// TODO move faces / edges / vertices that collide more often to the start of the vector
-	Mesh3d m_mesh; // TODO to save memory: keep unique vertices in separate array and use 16bit pointers
-	std::vector<segment3> m_convex_edges; // non-concave and non-planar
-	std::vector<dvec3> m_convex_vertices; // non-concave and non-planar (needs to have more than a hemisphere around it open)
+	Mesh3d m_mesh;
+	std::vector<segment3> m_convex_edges;
+	std::vector<dvec3> m_convex_vertices;
 
 	dmat3 m_inertia_tensor; // assuming density of 1kg/m^3
 	real m_volume;
 	real m_sphere_radius;
 	dvec3 m_box_min, m_box_max; // object oriented bounding box
-
 	bool m_is_convex;
-	// TODO std::vector<plane> m_convex_planes;
-	// TODO optimize if simple box mesh
-	// TODO maybe plane for each face? (or at least a unit normal)
-	// TODO maybe bounding box: AABB or OBB?
-	// TODO maybe reduced bounding convex hull that fully encloses mesh?
-	// TODO BSP tree for faster vertex VS mesh test
-	// TODO voxel tensor for fastedr vertex VS mesh test
 };
 
 const auto random_directions = [](){
@@ -490,19 +480,42 @@ bool IsVertexPenetratingShape(const dvec3& v, const Shape& shape) {
     throw new std::runtime_error("IsVertexPenetratingMesh failure");
 }
 
+real squared_distance_segment_origin(const segment3& p) {
+	dvec3 d = p.b - p.a;
+	real t = -dot(p.a, d);
+	if (t <= 0)
+		return squared(p.a);
+	real dd = squared(d);
+	if (t >= dd)
+		return squared(p.b);
+	return squared(p.a + d * (t / dd));
+}
+
 bool IsEdgePenetratingShape(const segment3& edge, const Shape& shape) {
 	// TODO TODO At least one of these negative cases is needed for performance
 	// TODO use voxel grid here faster positive and negative cases
 
-	// TODO bounding box / sphere check
-	// TODO optimize for box
+	// Bounding sphere check
+	// TODO precompute right hand side and store in Shape
+	if (squared_distance_segment_origin(edge) > squared(shape.sphere_radius() - ContactEpsilon))
+		return false;
+	//if (!is_edge_intersecting_box())
+	//	return false;
+	// TODO bounding box check
+
+	//if (shape.is_box())
+	//	return true;
 	// TODO optimize for convex mesh
+	if (shape.is_convex()) {
+		// TODO how to check segment vs convex mesh?
+	}
 
 	real edge_length = l2Norm(edge.b - edge.a);
 	// t_min and t_max needed to avoid edge endpoints being too close triangle an merely touching it
 	real t_min = ContactEpsilon / edge_length;
 	real t_max = 1 - t_min;
 
+	loop:
 	FOR_EACH(face, shape.faces()) {
 		// compare edge and triangle
 		dvec3 normal = Normal(face);
@@ -517,15 +530,16 @@ bool IsEdgePenetratingShape(const segment3& edge, const Shape& shape) {
 			continue;
 		dvec3 w = edge.linear(t); // intersection of triangle plane and edge
 
-		FOR_EACH_EDGE(a, b, face) {
-			// if W is outside of triangle
+		// if W is outside of triangle
+		FOR_EACH_EDGE(a, b, face)
 			if (plane::sign(*a, *b, *a + normal, w) > 0)
-				return false;
-			// if edge is too close to triangle edge (could be contact instead)
+				goto next_face;
+		// if edge is too close to triangle edge (could be contact instead)
+		FOR_EACH_EDGE(a, b, face)
 			if (segment3::squared_distance(edge, segment3(*a, *b)) <= squared(ContactEpsilon))
-				return false;
-		}
+				goto next_face;
 		return true;
+		next_face:;
 	}
 
 	// Hard cases:
@@ -534,10 +548,9 @@ bool IsEdgePenetratingShape(const segment3& edge, const Shape& shape) {
 	//   => endpoints can be outside and on the surface
 	// segment can intersect surface at the vertex or interior of edge
 
-	// Ignoring hard cases as they can't happen in simulator (only adversarial examples)
+	// TODO intersect edge with all faces and sort intersection points (w from above, sorted by t from above)
+	// test mid-points between every two intersections -> if any is inside then penetrating!
 
-	// Idea: look at immediate surface around polyhedron vertex or edge that intersects segment
-	// That surface can be convex
 	return false;
 }
 

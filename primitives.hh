@@ -27,6 +27,10 @@ using namespace glm;
 
 static_assert(sizeof(dvec3) == sizeof(real) * 3);
 
+std::ostream& operator<<(std::ostream& os, const dvec3& v) {
+	return os << v.x << ' ' << v.y << ' ' << v.z;
+}
+
 constexpr real squared(real a) { return a * a; }
 real squared(dvec3 a) { return dot(a, a); }
 real squared(vec4 a) { return dot(a, a); }
@@ -88,7 +92,7 @@ struct segment3 {
 		return dot(p - a, d) / dot(d, d);
 	}
 
-	// Return point on line segment that is nearest to P
+	// Return point on segment that is nearest to P
 	dvec3 nearest(dvec3 p) const {
 		dvec3 d = b - a;
 		real t = dot(p - a, d);
@@ -271,10 +275,18 @@ void TestLineNearest(segment3 p, segment3 q, std::default_random_engine& rnd) {
 	REQUIRE(dnum >= d * 0.99999);
 }
 
+// uniform inside a cube
 template<typename RandomEngine>
-dvec3 UniVec(RandomEngine& rnd) {
-	std::uniform_real_distribution<real> uni(-1000, 1000);
-	return dvec3(uni(rnd), uni(rnd), uni(rnd));
+dvec3 random_vector(RandomEngine& rnd) {
+	std::uniform_real_distribution<real> dist(-1.0, 1.0);
+	return dvec3(dist(rnd), dist(rnd), dist(rnd));
+}
+
+// uniform on the unit sphere surface
+template<typename RandomEngine>
+dvec3 random_direction(RandomEngine& rnd) {
+	std::normal_distribution<real> dist(0.0, 1.0);
+	return normalize(dvec3(dist(rnd), dist(rnd), dist(rnd)));
 }
 
 TEST_CASE("LineNearest - random long and short") {
@@ -282,10 +294,10 @@ TEST_CASE("LineNearest - random long and short") {
 	std::uniform_real_distribution<real> uni2(-6, 6);
 	FOR(i, 20) {
 		cout << "Case " << i << endl;
-		dvec3 pa = UniVec(rnd);
-		dvec3 qa = UniVec(rnd);
-		dvec3 pd = UniVec(rnd) * static_cast<real>(pow(10, uni2(rnd)));
-		dvec3 qd = UniVec(rnd) * static_cast<real>(pow(10, uni2(rnd)));
+		dvec3 pa = random_vector(rnd) * 1000.0;
+		dvec3 qa = random_vector(rnd) * 1000.0;
+		dvec3 pd = random_vector(rnd) * 1000.0 * static_cast<real>(pow(10, uni2(rnd)));
+		dvec3 qd = random_vector(rnd) * 1000.0 * static_cast<real>(pow(10, uni2(rnd)));
 		segment3 p(pa, pa + pd);
 		segment3 q(qa, qa + qd);
 		TestLineNearest(p, q, rnd);
@@ -297,8 +309,8 @@ TEST_CASE("LineNearest - random parallel") {
 	std::uniform_real_distribution<real> uni2(-1, 1);
 	FOR(i, 20) {
 		cout << "Case " << i << endl;
-		segment3 p(UniVec(rnd), UniVec(rnd));
-		dvec3 t = UniVec(rnd);
+		segment3 p(random_vector(rnd) * 1000.0, random_vector(rnd) * 1000.0);
+		dvec3 t = random_vector(rnd) * 1000.0;
 		dvec3 dir = p.b - p.a;
 		segment3 q(p.a + t + uni2(rnd) * dir, p.b + t + uni2(rnd) * dir);
 		TestLineNearest(p, q, rnd);
@@ -487,12 +499,6 @@ dmat3 full_mat3(real a) {
     return glm::make_mat3(m);
 }
 
-template<typename RandomEngine>
-dvec3 random_direction(RandomEngine& rnd) {
-	std::normal_distribution<real> gauss(0.0, 1.0);
-	return glm::normalize(dvec3(gauss(rnd), gauss(rnd), gauss(rnd)));
-}
-
 real distance(const dvec3& a, const dvec3& b) { return l2Norm(a - b); }
 
 real distance(const dvec3& a, const segment3& b) { return distance(a, b.nearest(a)); }
@@ -605,4 +611,39 @@ transform3 combine(const transform3& a, const transform3& b) {
 // If edge is concave than angle will be >PI
 real edge_angle(const dvec3& a, const dvec3& b, const dvec3& c, const dvec3& d) {
 	throw new std::runtime_error("edge_angle() unimplemented");
+}
+
+struct sphere {
+	dvec3 center;
+	real radius;
+};
+
+sphere merge_spheres(const sphere& a, const sphere& b) {
+	auto d = b.center - a.center;
+	auto d2 = squared(d);
+
+	if (squared(a.radius - b.radius) >= d2)
+		return (a.radius > b.radius) ? a : b;
+
+	auto dist = sqrt(d2);
+	sphere c;
+	c.radius = (a.radius + b.radius + dist) / 2;
+	// division is safe here for small d, as center will converge to a.center
+	c.center = a.center + ((c.radius - a.radius) / dist) * d;
+	return c;
+}
+
+TEST_CASE("merge_spheres()") {
+	std::default_random_engine rnd;
+	real e = 1;
+	while (e > 1e-10) {
+		sphere a {random_vector(rnd) * 1000.0, 1};
+		sphere b {a.center + e * random_direction(rnd), 1};
+		sphere c = merge_spheres(a, b);
+		REQUIRE(c.radius >= a.radius);
+		REQUIRE(c.radius >= b.radius);
+		REQUIRE(squared(c.center - a.center) <= squared(c.radius - a.radius) * 1.01);
+		REQUIRE(squared(c.center - b.center) <= squared(c.radius - b.radius) * 1.01);
+		e *= 0.9;
+	}
 }
