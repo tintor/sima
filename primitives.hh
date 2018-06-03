@@ -56,10 +56,15 @@ constexpr real clamp(real t, real min = 0, real max = 1) {
 	return t;
 }
 
+// infinite on both sides unlike segment3
+struct line3 {
+	dvec3 a, b;
+};
+
 struct ray3
 {
     // TODO is dir constrained to UnitVector?
-    const dvec3 origin, dir;
+    dvec3 origin, dir;
 };
 
 // infinite line vs. point
@@ -358,8 +363,10 @@ constexpr real PlanarEpsilon = 1e-6;
 constexpr real ContactEpsilon = 10 * PlanarEpsilon;
 
 struct plane {
-	const dvec3 normal; // unit vector
-	const real d;
+	dvec3 normal; // must be unit vector
+	real d;
+
+	plane() { }
 
 	plane(const dvec3& a, const dvec3& b, const dvec3& c)
 		: normal(normalize(Normal(a, b, c))), d(dot(-normal, a)) { }
@@ -373,7 +380,8 @@ struct plane {
 
 	// > 0, if P is on the positive side of plane ABC (right hand rule)
 	static real sign(const dvec3& a, const dvec3& b, const dvec3& c, const dvec3& p) {
-		return dot(Normal(a, b, c), p - a);
+		// TODO this is just a mixed product - which is 3x3 determinant?
+		return dot(cross(b - a, c - a), p - a);
 	}
 };
 
@@ -523,34 +531,174 @@ real distance(const dvec3& p, const triangle3& m) {
 	return abs(dot(n, p - m.a));
 }
 
+real distance(const dvec3& v, const triangle3& m, const plane& p) {
+	FOR_EACH_EDGE(a, b, m)
+		if (plane::sign(*a, *b, *a + p.normal, v) > 0)
+			return distance(v, segment3(*a, *b));
+	return abs(p.distance(v));
+}
+
 real distance(const triangle3& m, const dvec3& v) { return distance(v, m); }
 
-real distance(const segment3& s, const triangle3& m) {
-    real d1 = segment3::squared_distance(s, segment3(m.a, m.b));
-    real d2 = segment3::squared_distance(s, segment3(m.b, m.c));
-    real d3 = segment3::squared_distance(s, segment3(m.c, m.a));
-    real d = sqrt(min(d1, d2, d3));
+// from RealTimeCollisionDetection book
+bool intersects(const line3& e, const triangle3& m) {
+	auto d = e.b - e.a;
+	auto pa = m.a - e.a;
+	auto pb = m.b - e.a;
+	auto pc = m.c - e.a;
 
-    dvec3 n = Normal(m);
-    if (inside_triangle_prism(s.a, m, n))
-        d = std::min(d, abs(dot(n, s.a - m.a)));
-    if (inside_triangle_prism(s.b, m, n))
-        d = std::min(d, abs(dot(n, s.b - m.a)));
+	auto n = cross(d, pc);
+	return dot(pb, n) >= 0 && dot(pa, n) /*intentional*/<= 0 && dot(cross(d, pb), pa) >= 0;
+}
+
+// from RealTimeCollisionDetection book
+bool intersects2(const line3& e, const triangle3& m) {
+	auto d = e.b - e.a;
+	auto n = cross(d, e.b);
+	auto s = dot(n, m.c - m.b);
+	auto t = dot(n, m.a - m.c);
+	// TODO cross products can be precomputed and triangle replaced with plucker!
+	return dot(d, cross(m.c, m.b)) + s >= 0 && dot(d, cross(m.a, m.c)) + t >= 0 && dot(d, cross(m.b, m.a)) - s - t >= 0;
+}
+
+// from RealTimeCollisionDetection book
+bool intersection(const line3& e, const triangle3& m, /*out*/vec3& result) {
+	auto d = e.b - e.a;
+	auto pa = m.a - e.a;
+	auto pb = m.b - e.a;
+	auto pc = m.c - e.a;
+
+	auto n = cross(d, pc);
+	auto u = dot(pb, n);
+	if (u < 0)
+		return false;
+	auto v = -dot(pa, n);
+	if (v < 0)
+	 	return false;
+	auto w = dot(cross(d, pb), pa);
+	if (w < 0)
+		return false;
+
+	auto denom = u + v + w;
+	if (denom < 1e-8)
+		throw new std::runtime_error("planar case");
+	result = (m.a * u + m.b * v + m.c * w) / denom;
+	return true;
+}
+
+// Note: Ignores coplanar case!
+bool intersects_in_point(const segment3& e, const triangle3& m) {
+	auto d = e.b - e.a;
+	auto pa = m.a - e.a;
+	auto pb = m.b - e.a;
+	auto pc = m.c - e.a;
+
+	auto n = cross(d, pc);
+	auto u = dot(pb, n);
+	if (u < 0)
+		return false;
+	auto v = -dot(pa, n);
+	if (v < 0)
+	 	return false;
+	auto w = dot(cross(d, pb), pa);
+	if (w < 0)
+		return false;
+
+	// Note: rejecting parallel case
+	auto denom = u + v + w;
+	if (denom < 1e-8)
+		return false;
+
+	// G is intersection of line with triangle
+	auto g = (m.a * u + m.b * v + m.c * w) / denom;
+
+	// Check if G is on the segment
+	auto t = dot(g - e.a, d);
+	return 0 <= t && t <= dot(d, d);
+}
+
+// Note: Ignores coplanar case!
+bool intersects_in_point(const ray3& e, const triangle3& m) {
+	auto pa = m.a - e.origin;
+	auto pb = m.b - e.origin;
+	auto pc = m.c - e.origin;
+
+	auto n = cross(e.dir, pc);
+	auto u = dot(pb, n);
+	if (u < 0)
+		return false;
+	auto v = -dot(pa, n);
+	if (v < 0)
+	 	return false;
+	auto w = dot(cross(e.dir, pb), pa);
+	if (w < 0)
+		return false;
+
+	// Note: rejecting parallel case
+	auto denom = u + v + w;
+	if (denom < 1e-8)
+		return false;
+
+	// G is intersection of line with triangle
+	auto g = (m.a * u + m.b * v + m.c * w) / denom;
+
+	// Check if G is on the ray
+	return 0 <= dot(g - e.origin, e.dir);
+}
+
+real disjoint_distance(const segment3& e, const triangle3& m) {
+	// Needed to handle a single point intersection case.
+	// Not needed for case when segment overlaps with triangle (coplanar case).
+	if (intersects_in_point(e, m))
+		return 0.0;
+
+    auto d1 = segment3::squared_distance(e, segment3(m.a, m.b));
+    auto d2 = segment3::squared_distance(e, segment3(m.b, m.c));
+    auto d3 = segment3::squared_distance(e, segment3(m.c, m.a));
+    auto d = sqrt(min(d1, d2, d3));
+
+    auto n = Normal(m);
+    if (inside_triangle_prism(e.a, m, n))
+        d = std::min(d, abs(dot(n, e.a - m.a)));
+    if (inside_triangle_prism(e.b, m, n))
+        d = std::min(d, abs(dot(n, e.b - m.a)));
     return d;
 }
 
-real distance(const triangle3 m, const segment3& s) { return distance(s, m); }
+real distance(const segment3& e, const triangle3& m) {
+	// Needed to handle a single point intersection case.
+	// Not needed for case when segment overlaps with triangle (coplanar case).
+	if (intersects_in_point(e, m))
+		return 0.0;
 
-real distance(const triangle3& p, const triangle3& q) {
+    return disjoint_distance(e, m);
+}
+
+real distance(const triangle3 m, const segment3& e) { return distance(e, m); }
+
+// Assuming these two objects do not intersect!
+real disjoint_distance(const triangle3& p, const triangle3& q) {
     real d = std::numeric_limits<real>::max();
     // TODO only compute these 6 distances if inside triangle prisms
     FOR(i, 3)
         d = min(d, distance(p, q[i]), distance(p[i], q));
-    // TODO optimize - accumulate with squared distances
+
+	real ds = 1e100;
 	FOR_EACH_EDGE(pa, pb, p)
-	   FOR_EACH_EDGE(qa, qb, q)
-           d = std::min(d, distance(segment3(*pa, *pb), segment3(*qa, *qb)));
-    return d;
+		FOR_EACH_EDGE(qa, qb, q)
+			ds = std::min(ds, segment3::squared_distance(segment3(*pa, *pb), segment3(*qa, *qb)));
+    return std::min(d, sqrt(ds));
+}
+
+real distance(const triangle3& p, const triangle3& q) {
+	// Needed to handle a single point intersection case.
+	// Not needed for case when one triangle overlaps with another (coplanar case).
+	// TODO here it is worthwhile to precompute cross products of Q
+	FOR_EACH_EDGE(pa, pb, p)
+		if (intersects_in_point(segment3(*pa, *pb), q))
+			return 0.0;
+
+	return disjoint_distance(p, q);
 }
 
 TEST_CASE("distance(triangle3, triangle3)") {
