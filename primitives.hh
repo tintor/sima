@@ -1,17 +1,30 @@
-using namespace tfm;
+#include <vector>
+#include <array>
+#include <unordered_map>
+#include <unordered_set>
+#include <cmath>
+#include <random>
+#include <cassert>
+#include <iostream>
+#include <functional>
+#include <stdexcept>
+#include <cstdint>
+#include <atomic>
+#include <unistd.h>
+#include <execinfo.h>
+
+#include "tinyformat.h"
 
 template<typename T> constexpr
-T min(T a, T b, T c) { return min(a, min(b, c)); }
+T min(T a, T b, T c) { return std::min(a, std::min(b, c)); }
 template<typename T> constexpr
-T max(T a, T b, T c) { return max(a, max(b, c)); }
+T max(T a, T b, T c) { return std::max(a, std::max(b, c)); }
 template<typename T> constexpr
-T min(T a, T b, T c, T d) { return min(min(a, b), min(c, d)); }
+T min(T a, T b, T c, T d) { return std::min(std::min(a, b), std::min(c, d)); }
 template<typename T> constexpr
-T max(T a, T b, T c, T d) { return max(max(a, b), max(c, d)); }
+T max(T a, T b, T c, T d) { return std::max(std::max(a, b), std::max(c, d)); }
 
-#define FOR(I, N) for (decltype(N) I = 0; I < N; I++)
-#define FOR_EACH(A, B) for (auto& A : B)
-#define FOR_EACH_EDGE(A, B, V) for (auto *B = V.begin(), *A = V.begin() + 2; B < V.begin() + 3; A = B++)
+#include "for.hh"
 
 using real = double;
 
@@ -22,25 +35,26 @@ using real = double;
 #include "glm/gtx/quaternion.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/matrix_access.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/norm.hpp"
 using namespace glm;
 
 static_assert(sizeof(dvec3) == sizeof(real) * 3);
 
-std::ostream& operator<<(std::ostream& os, const dvec3& v) {
-	return os << v.x << ' ' << v.y << ' ' << v.z;
+namespace glm {
+	inline std::ostream& operator<<(std::ostream& os, const dvec3& v) { return os << v.x << ' ' << v.y << ' ' << v.z; }
 }
 
-constexpr real squared(real a) { return a * a; }
-real squared(dvec3 a) { return dot(a, a); }
-real squared(vec4 a) { return dot(a, a); }
+inline constexpr real squared(real a) { return a * a; }
+inline real squared(dvec3 a) { return dot(a, a); }
+inline real squared(vec4 a) { return dot(a, a); }
 
-constexpr long double operator "" _deg(long double a) { return a * (M_PI / 180); }
-constexpr long double operator "" _deg(unsigned long long a) { return a * (M_PI / 180); }
+inline constexpr long double operator "" _deg(long double a) { return a * (M_PI / 180); }
+inline constexpr long double operator "" _deg(unsigned long long a) { return a * (M_PI / 180); }
 
-std::string deg(long double r) { return format("%llg deg", r * (180 / M_PI)); }
+inline std::string deg(long double r) { return tfm::format("%llg deg", r * (180 / M_PI)); }
 
-auto angle(dvec3 a, dvec3 b) {
+inline auto angle(dvec3 a, dvec3 b) {
 	// atan2 is numericaly better than acos when angle is very small
 
 	// make the vectors equal length first (without division)
@@ -50,7 +64,7 @@ auto angle(dvec3 a, dvec3 b) {
 	return 2 * atan2(l2Norm(a - b), l2Norm(a + b));
 }
 
-constexpr real clamp(real t, real min = 0, real max = 1) {
+inline constexpr real clamp(real t, real min = 0, real max = 1) {
 	if (t < min) return min;
 	if (t > max) return max;
 	return t;
@@ -68,15 +82,7 @@ struct ray3
 };
 
 // infinite line vs. point
-real line_point_squared_distance(dvec3 a, dvec3 b, dvec3 p) {
-	dvec3 ba = b - a, pa = p - a;
-    real t = dot(pa, ba) / dot(ba, ba);
-    return squared(pa - ba * t);
-}
-
-TEST_CASE("line_point_squared_distance") {
-    REQUIRE(line_point_squared_distance(dvec3(0,0,0), dvec3(9,0,0), dvec3(1,2,0)) == 4);
-}
+real line_point_squared_distance(dvec3 a, dvec3 b, dvec3 p);
 
 // line segment
 struct segment3 {
@@ -119,165 +125,13 @@ struct segment3 {
 		RayPoint = 1,
 		PointPoint = 2,
 	};
-	static pair<segment3, NearestCase> Nearest(segment3 p, segment3 q) {
-		dvec3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
-		real aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
-		constexpr real inf = std::numeric_limits<real>::max();
-		constexpr real tiny = 1e-8;
+	static std::pair<segment3, NearestCase> Nearest(segment3 p, segment3 q);
 
-		// ray/ray
-		real d = aa * bb - ab * ab;
-		real s = ab * bc - bb * ac;
-		real t = aa * bc - ab * ac;
-		// Note: [d >= tiny * aa * bb] is needed to make parallelness test indepent of line lengths
-		if ((d >= tiny && d >= tiny * aa * bb && 0 <= s && s <= d && 0 <= t && t <= d)
-				|| (d <= -tiny && d <= -tiny * aa * bb && d <= s && s <= 0 && d <= t && t <= 0))
-			return pair<segment3, NearestCase>(segment3(p.a + A * (s / d), q.a + B * (t / d)), NearestCase::RayRay);
-
-		// ray/endpoint
-		real s0 = (aa >= tiny) ? -ac / aa : -1;
-		real s1 = (aa >= tiny) ? (ab - ac) / aa : -1;
-		real t0 = (bb >= tiny) ? bc / bb : -1;
-		real t1 = (bb >= tiny) ? (ab + bc) / bb : -1;
-
-		real d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : inf;
-		real d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : inf;
-		real d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : inf;
-		real d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : inf;
-
-		// endpoint/endpoint
-		real d5 = squared(C);
-		real d6 = squared(C + A);
-		real d7 = squared(C - B);
-		real d8 = squared(C + A - B);
-
-		real dm = std::min(min(d1, d2, d3, d4), min(d5, d6, d7, d8));
-
-		if (d1 == dm)
-			return pair(segment3(p.a + A*s0, q.a), NearestCase::RayPoint);
-		if (d2 == dm)
-			return pair(segment3(p.a + A*s1, q.b), NearestCase::RayPoint);
-		if (d3 == dm)
-			return pair(segment3(p.a, q.a + B*t0), NearestCase::RayPoint);
-		if (d4 == dm)
-			return pair(segment3(p.b, q.a + B*t1), NearestCase::RayPoint);
-		if (d5 == dm)
-			return pair(segment3(p.a, q.a), NearestCase::PointPoint);
-		if (d6 == dm)
-			return pair(segment3(p.b, q.a), NearestCase::PointPoint);
-		if (d7 == dm)
-			return pair(segment3(p.a, q.b), NearestCase::PointPoint);
-		if (d8 == dm)
-			return pair(segment3(p.b, q.b), NearestCase::PointPoint);
-
-		throw new std::exception();
-	}
-
-	static real squared_distance(segment3 p, segment3 q) {
-		dvec3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
-		real aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
-		constexpr real inf = std::numeric_limits<real>::max();
-		constexpr real tiny = 1e-8;
-
-		// ray/ray
-		real d = aa * bb - ab * ab;
-		real s = ab * bc - bb * ac;
-		real t = aa * bc - ab * ac;
-		// Note: [d >= tiny * aa * bb] is needed to make parallelness test indepent of line lengths
-		if ((d >= tiny && d >= tiny * aa * bb && 0 <= s && s <= d && 0 <= t && t <= d)
-				|| (d <= -tiny && d <= -tiny * aa * bb && d <= s && s <= 0 && d <= t && t <= 0))
-			return squared(C + A * (s / d) - B * (t / d));
-
-		// ray/endpoint
-		real s0 = (aa >= tiny) ? -ac / aa : -1;
-		real s1 = (aa >= tiny) ? (ab - ac) / aa : -1;
-		real t0 = (bb >= tiny) ? bc / bb : -1;
-		real t1 = (bb >= tiny) ? (ab + bc) / bb : -1;
-
-		real d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : inf;
-		real d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : inf;
-		real d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : inf;
-		real d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : inf;
-
-		// endpoint/endpoint
-		real d5 = squared(C);
-		real d6 = squared(C + A);
-		real d7 = squared(C - B);
-		real d8 = squared(C + A - B);
-
-		return std::min(min(d1, d2, d3, d4), min(d5, d6, d7, d8));
-	}
+	static real squared_distance(segment3 p, segment3 q);
 };
 
-TEST_CASE("segment::nearest") {
-    CHECK(segment3(dvec3(0,0,0), dvec3(9,0,0)).nearest(dvec3(1,2,0)) == dvec3(1,0,0));
-}
-
-auto angle(segment3 p, segment3 q) {
+inline auto angle(segment3 p, segment3 q) {
 	return angle(p.b - p.a, q.b - q.a);
-}
-
-TEST_CASE("Angle") {
-	dvec3 a(1, 0, 0);
-	dvec3 b(1, 1, 0);
-	dvec3 c(cos(M_PI / 6), sin(M_PI / 6), 0);
-	dvec3 d(-1, 0, 0);
-	CHECK((angle(a, b) - 45_deg) <= 1e-20);
-	CHECK((angle(a, c) - 30_deg) <= 1e-20);
-	CHECK((angle(a, a) - 0_deg) <= 1e-20);
-	CHECK((angle(a, d) - 180_deg) <= 1e-20);
-}
-
-TEST_CASE("LineNearest - basic") {
-	segment3 p(dvec3(0, 0, 0), dvec3(0, 0, 0));
-	segment3 q(dvec3(1, 0, 0), dvec3(1, 0, 0));
-	segment3 r(dvec3(1, 0, 0), dvec3(1, 1, 0));
-
-	segment3 pq = segment3::Nearest(p, q).first;
-	REQUIRE(pq.a == dvec3(0, 0, 0));
-	REQUIRE(pq.b == dvec3(1, 0, 0));
-
-	segment3 pr = segment3::Nearest(p, r).first;
-	REQUIRE(pr.a == dvec3(0, 0, 0));
-	REQUIRE(pr.b == dvec3(1, 0, 0));
-
-	segment3 rr = segment3::Nearest(r, r).first;
-	REQUIRE(rr.a == rr.b);
-	REQUIRE(rr.a.x == 1.0);
-	REQUIRE(rr.a.y >= 0.0);
-	REQUIRE(rr.a.y <= 1.0);
-	REQUIRE(rr.a.z == 0.0);
-}
-
-segment3 LineNearestNumeric(segment3 p, segment3 q, std::default_random_engine& rnd) {
-	std::normal_distribution<real> gauss(0.0, 1.0);
-	real snum = 0.5, tnum = 0.5;
-	real dnum = l2Norm(p.linear(snum) - q.linear(tnum));
-	FOR(j, 1000000) {
-		real s = clamp(snum + gauss(rnd));
-		real t = clamp(tnum + gauss(rnd));
-		const dvec3 A = p.linear(s);
-		const dvec3 B = q.linear(t);
-		if (l2Norm(A-B) < dnum) {
-			dnum = l2Norm(A-B);
-			snum = s;
-			tnum = t;
-		}
-	}
-	return segment3(p.linear(snum), q.linear(tnum));
-}
-
-void TestLineNearest(segment3 p, segment3 q, std::default_random_engine& rnd) {
-	segment3 n = segment3::Nearest(p, q).first;
-	cout << p.param(n.a) << " " << q.param(n.b) << " computed Angle " << deg(angle(p, n)) << " " << deg(angle(q, n)) << endl;
-	real d = l2Norm(n.a - n.b);
-
-	segment3 nn = LineNearestNumeric(p, q, rnd);
-	real snum = p.param(nn.a), tnum = q.param(nn.b);
-	real dnum = l2Norm(nn.a-nn.b);
-	if (dnum < d * 0.99999)
-		cout << snum << " " << tnum << " Angle: " << deg(angle(p, nn)) << " " << deg(angle(q, nn)) << endl;
-	REQUIRE(dnum >= d * 0.99999);
 }
 
 // uniform inside a cube
@@ -292,34 +146,6 @@ template<typename RandomEngine>
 dvec3 random_direction(RandomEngine& rnd) {
 	std::normal_distribution<real> dist(0.0, 1.0);
 	return normalize(dvec3(dist(rnd), dist(rnd), dist(rnd)));
-}
-
-TEST_CASE("LineNearest - random long and short") {
-	std::default_random_engine rnd;
-	std::uniform_real_distribution<real> uni2(-6, 6);
-	FOR(i, 20) {
-		cout << "Case " << i << endl;
-		dvec3 pa = random_vector(rnd) * 1000.0;
-		dvec3 qa = random_vector(rnd) * 1000.0;
-		dvec3 pd = random_vector(rnd) * 1000.0 * static_cast<real>(pow(10, uni2(rnd)));
-		dvec3 qd = random_vector(rnd) * 1000.0 * static_cast<real>(pow(10, uni2(rnd)));
-		segment3 p(pa, pa + pd);
-		segment3 q(qa, qa + qd);
-		TestLineNearest(p, q, rnd);
-	}
-}
-
-TEST_CASE("LineNearest - random parallel") {
-	std::default_random_engine rnd;
-	std::uniform_real_distribution<real> uni2(-1, 1);
-	FOR(i, 20) {
-		cout << "Case " << i << endl;
-		segment3 p(random_vector(rnd) * 1000.0, random_vector(rnd) * 1000.0);
-		dvec3 t = random_vector(rnd) * 1000.0;
-		dvec3 dir = p.b - p.a;
-		segment3 q(p.a + t + uni2(rnd) * dir, p.b + t + uni2(rnd) * dir);
-		TestLineNearest(p, q, rnd);
-	}
 }
 
 // 72 bytes (for doubles)
@@ -347,11 +173,11 @@ struct triangle3 {
 	}
 };
 
-dvec3 Normal(const dvec3& a, const dvec3& b, const dvec3& c) {
+inline dvec3 Normal(const dvec3& a, const dvec3& b, const dvec3& c) {
 	return glm::cross(b - a, c - a);
 }
 
-dvec3 Normal(const triangle3& p) {
+inline dvec3 Normal(const triangle3& p) {
 	return Normal(p.a, p.b, p.c);
 }
 
@@ -385,14 +211,14 @@ struct plane {
 	}
 };
 
-constexpr bool intersects(const segment3& q, const plane& p) {
+inline constexpr bool intersects(const segment3& q, const plane& p) {
 	real a = p.distance(q.a);
 	real b = p.distance(q.b);
 	real e = PlanarEpsilon;
 	return (a <= e || b <= e) && (a >= -e || b >= -e);
 }
 
-constexpr bool intersects(const triangle3& q, const plane& p) {
+inline constexpr bool intersects(const triangle3& q, const plane& p) {
 	real a = p.distance(q.a);
 	real b = p.distance(q.b);
 	real c = p.distance(q.c);
@@ -415,21 +241,21 @@ struct plucker {
 	}
 };
 
-dvec3 mini(const triangle3& p) {
+inline dvec3 mini(const triangle3& p) {
 	dvec3 e;
 	FOR(i, 3)
 		e[i] = min(p.a[i], p.b[i], p.c[i]);
 	return e;
 }
 
-dvec3 maxi(const triangle3& p) {
+inline dvec3 maxi(const triangle3& p) {
 	dvec3 e;
 	FOR(i, 3)
 		e[i] = max(p.a[i], p.b[i], p.c[i]);
 	return e;
 }
 
-bool DisjointIntervals(real amin, real amax, real bmin, real bmax) {
+inline bool DisjointIntervals(real amin, real amax, real bmin, real bmax) {
 	return amax + PlanarEpsilon < bmin || bmax + PlanarEpsilon < amin;
 }
 
@@ -502,216 +328,34 @@ namespace std {
   };
 }
 
-dmat3 full_mat3(real a) {
+inline dmat3 full_mat3(real a) {
     const real m[] = { a, a, a, a, a, a, a, a, a};
     return glm::make_mat3(m);
 }
 
-real distance(const dvec3& a, const dvec3& b) { return l2Norm(a - b); }
+real distance(const dvec3& a, const dvec3& b);
+real distance(const dvec3& a, const segment3& b);
+real distance(const segment3& a, const dvec3& b);
+real distance(const segment3& a, const segment3& b);
 
-real distance(const dvec3& a, const segment3& b) { return distance(a, b.nearest(a)); }
-real distance(const segment3& a, const dvec3& b) { return distance(b, a); }
+constexpr bool inside_triangle_prism(const dvec3& p, const triangle3& m, const dvec3& normal);
 
-real distance(const segment3& a, const segment3& b) {
-    return sqrt(segment3::squared_distance(a, b));
-}
+real distance(const dvec3& p, const triangle3& m);
+real distance(const dvec3& v, const triangle3& m, const plane& p);
+real distance(const triangle3& m, const dvec3& v);
 
-constexpr bool inside_triangle_prism(const dvec3& p, const triangle3& m, const dvec3& normal) {
-	FOR_EACH_EDGE(a, b, m)
-		if (plane::sign(*a, *b, *a + normal, p) > 0)
-			return false;
-	return true;
-}
+bool intersects(const line3& e, const triangle3& m);
+bool intersects2(const line3& e, const triangle3& m);
+bool intersection(const line3& e, const triangle3& m, /*out*/vec3& result);
+bool intersects_in_point(const segment3& e, const triangle3& m);
+bool intersects_in_point(const ray3& e, const triangle3& m);
 
-real distance(const dvec3& p, const triangle3& m) {
-    dvec3 n = Normal(m);
-	FOR_EACH_EDGE(a, b, m)
-		if (plane::sign(*a, *b, *a + n, p) > 0)
-			return distance(p, segment3(*a, *b));
-	return abs(dot(n, p - m.a));
-}
+real disjoint_distance(const segment3& e, const triangle3& m);
+real distance(const segment3& e, const triangle3& m);
 
-real distance(const dvec3& v, const triangle3& m, const plane& p) {
-	FOR_EACH_EDGE(a, b, m)
-		if (plane::sign(*a, *b, *a + p.normal, v) > 0)
-			return distance(v, segment3(*a, *b));
-	return abs(p.distance(v));
-}
-
-real distance(const triangle3& m, const dvec3& v) { return distance(v, m); }
-
-// from RealTimeCollisionDetection book
-bool intersects(const line3& e, const triangle3& m) {
-	auto d = e.b - e.a;
-	auto pa = m.a - e.a;
-	auto pb = m.b - e.a;
-	auto pc = m.c - e.a;
-
-	auto n = cross(d, pc);
-	return dot(pb, n) >= 0 && dot(pa, n) /*intentional*/<= 0 && dot(cross(d, pb), pa) >= 0;
-}
-
-// from RealTimeCollisionDetection book
-bool intersects2(const line3& e, const triangle3& m) {
-	auto d = e.b - e.a;
-	auto n = cross(d, e.b);
-	auto s = dot(n, m.c - m.b);
-	auto t = dot(n, m.a - m.c);
-	// TODO cross products can be precomputed and triangle replaced with plucker!
-	return dot(d, cross(m.c, m.b)) + s >= 0 && dot(d, cross(m.a, m.c)) + t >= 0 && dot(d, cross(m.b, m.a)) - s - t >= 0;
-}
-
-// from RealTimeCollisionDetection book
-bool intersection(const line3& e, const triangle3& m, /*out*/vec3& result) {
-	auto d = e.b - e.a;
-	auto pa = m.a - e.a;
-	auto pb = m.b - e.a;
-	auto pc = m.c - e.a;
-
-	auto n = cross(d, pc);
-	auto u = dot(pb, n);
-	if (u < 0)
-		return false;
-	auto v = -dot(pa, n);
-	if (v < 0)
-	 	return false;
-	auto w = dot(cross(d, pb), pa);
-	if (w < 0)
-		return false;
-
-	auto denom = u + v + w;
-	if (denom < 1e-8)
-		throw new std::runtime_error("planar case");
-	result = (m.a * u + m.b * v + m.c * w) / denom;
-	return true;
-}
-
-// Note: Ignores coplanar case!
-bool intersects_in_point(const segment3& e, const triangle3& m) {
-	auto d = e.b - e.a;
-	auto pa = m.a - e.a;
-	auto pb = m.b - e.a;
-	auto pc = m.c - e.a;
-
-	auto n = cross(d, pc);
-	auto u = dot(pb, n);
-	if (u < 0)
-		return false;
-	auto v = -dot(pa, n);
-	if (v < 0)
-	 	return false;
-	auto w = dot(cross(d, pb), pa);
-	if (w < 0)
-		return false;
-
-	// Note: rejecting parallel case
-	auto denom = u + v + w;
-	if (denom < 1e-8)
-		return false;
-
-	// G is intersection of line with triangle
-	auto g = (m.a * u + m.b * v + m.c * w) / denom;
-
-	// Check if G is on the segment
-	auto t = dot(g - e.a, d);
-	return 0 <= t && t <= dot(d, d);
-}
-
-// Note: Ignores coplanar case!
-bool intersects_in_point(const ray3& e, const triangle3& m) {
-	auto pa = m.a - e.origin;
-	auto pb = m.b - e.origin;
-	auto pc = m.c - e.origin;
-
-	auto n = cross(e.dir, pc);
-	auto u = dot(pb, n);
-	if (u < 0)
-		return false;
-	auto v = -dot(pa, n);
-	if (v < 0)
-	 	return false;
-	auto w = dot(cross(e.dir, pb), pa);
-	if (w < 0)
-		return false;
-
-	// Note: rejecting parallel case
-	auto denom = u + v + w;
-	if (denom < 1e-8)
-		return false;
-
-	// G is intersection of line with triangle
-	auto g = (m.a * u + m.b * v + m.c * w) / denom;
-
-	// Check if G is on the ray
-	return 0 <= dot(g - e.origin, e.dir);
-}
-
-real disjoint_distance(const segment3& e, const triangle3& m) {
-	// Needed to handle a single point intersection case.
-	// Not needed for case when segment overlaps with triangle (coplanar case).
-	if (intersects_in_point(e, m))
-		return 0.0;
-
-    auto d1 = segment3::squared_distance(e, segment3(m.a, m.b));
-    auto d2 = segment3::squared_distance(e, segment3(m.b, m.c));
-    auto d3 = segment3::squared_distance(e, segment3(m.c, m.a));
-    auto d = sqrt(min(d1, d2, d3));
-
-    auto n = Normal(m);
-    if (inside_triangle_prism(e.a, m, n))
-        d = std::min(d, abs(dot(n, e.a - m.a)));
-    if (inside_triangle_prism(e.b, m, n))
-        d = std::min(d, abs(dot(n, e.b - m.a)));
-    return d;
-}
-
-real distance(const segment3& e, const triangle3& m) {
-	// Needed to handle a single point intersection case.
-	// Not needed for case when segment overlaps with triangle (coplanar case).
-	if (intersects_in_point(e, m))
-		return 0.0;
-
-    return disjoint_distance(e, m);
-}
-
-real distance(const triangle3 m, const segment3& e) { return distance(e, m); }
-
-// Assuming these two objects do not intersect!
-real disjoint_distance(const triangle3& p, const triangle3& q) {
-    real d = std::numeric_limits<real>::max();
-    // TODO only compute these 6 distances if inside triangle prisms
-    FOR(i, 3)
-        d = min(d, distance(p, q[i]), distance(p[i], q));
-
-	real ds = 1e100;
-	FOR_EACH_EDGE(pa, pb, p)
-		FOR_EACH_EDGE(qa, qb, q)
-			ds = std::min(ds, segment3::squared_distance(segment3(*pa, *pb), segment3(*qa, *qb)));
-    return std::min(d, sqrt(ds));
-}
-
-real distance(const triangle3& p, const triangle3& q) {
-	// Needed to handle a single point intersection case.
-	// Not needed for case when one triangle overlaps with another (coplanar case).
-	// TODO here it is worthwhile to precompute cross products of Q
-	FOR_EACH_EDGE(pa, pb, p)
-		if (intersects_in_point(segment3(*pa, *pb), q))
-			return 0.0;
-
-	return disjoint_distance(p, q);
-}
-
-TEST_CASE("distance(triangle3, triangle3)") {
-    // Planar cases:
-    // vertex-vertex
-    CHECK(distance(triangle3(vec3(0,0,0), vec3(2,0,0), vec3(0,2,0)), triangle3(vec3(5,0,0), vec3(7,0,0), vec3(5,2,0))) == 3);
-    // common edge
-    CHECK(distance(triangle3(vec3(0,0,0), vec3(2,0,0), vec3(0,2,0)), triangle3(vec3(0,0,0), vec3(2,0,0), vec3(0,-2,0))) == 0);
-
-    // Parallel cases:
-    // face-face overlap
-    CHECK(distance(triangle3(vec3(0,0,0), vec3(2,0,0), vec3(0,2,0)), triangle3(vec3(0,0,1), vec3(2,0,1), vec3(0,2,1))) == 1);
-}
+real distance(const triangle3 m, const segment3& e);
+real disjoint_distance(const triangle3& p, const triangle3& q);
+real distance(const triangle3& p, const triangle3& q);
 
 struct transform3 {
 	dmat3 orientation;
@@ -744,54 +388,17 @@ struct transform3 {
 	}
 };
 
-transform3 combine(const transform3& a, const transform3& b) {
-    // TODO create two dmat4 from two transform3
-	dmat4 a4, b4;
-    // TODO figure out combination formula: ie: a * inverse(b)
-	dmat4 c4 = a4 * inverse(b4);
-    // TODO convert c4 back to transform3
-	throw new std::runtime_error("combine() unimplemented");
-}
+transform3 combine(const transform3& a, const transform3& b);
 
 // Angle between oriented triangles ABC and BAD.
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
 // If edge is concave than angle will be >PI
-real edge_angle(const dvec3& a, const dvec3& b, const dvec3& c, const dvec3& d) {
-	throw new std::runtime_error("edge_angle() unimplemented");
-}
+real edge_angle(const dvec3& a, const dvec3& b, const dvec3& c, const dvec3& d);
 
 struct sphere {
 	dvec3 center;
 	real radius;
 };
 
-sphere merge_spheres(const sphere& a, const sphere& b) {
-	auto d = b.center - a.center;
-	auto d2 = squared(d);
-
-	if (squared(a.radius - b.radius) >= d2)
-		return (a.radius > b.radius) ? a : b;
-
-	auto dist = sqrt(d2);
-	sphere c;
-	c.radius = (a.radius + b.radius + dist) / 2;
-	// division is safe here for small d, as center will converge to a.center
-	c.center = a.center + ((c.radius - a.radius) / dist) * d;
-	return c;
-}
-
-TEST_CASE("merge_spheres()") {
-	std::default_random_engine rnd;
-	real e = 1;
-	while (e > 1e-10) {
-		sphere a {random_vector(rnd) * 1000.0, 1};
-		sphere b {a.center + e * random_direction(rnd), 1};
-		sphere c = merge_spheres(a, b);
-		REQUIRE(c.radius >= a.radius);
-		REQUIRE(c.radius >= b.radius);
-		REQUIRE(squared(c.center - a.center) <= squared(c.radius - a.radius) * 1.01);
-		REQUIRE(squared(c.center - b.center) <= squared(c.radius - b.radius) * 1.01);
-		e *= 0.9;
-	}
-}
+sphere merge_spheres(const sphere& a, const sphere& b);

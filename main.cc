@@ -8,11 +8,19 @@
 #include <iostream>
 #include <functional>
 #include <stdexcept>
+#include <cstdint>
+#include <atomic>
+#include <unistd.h>
+#include <execinfo.h>
 
-#define CATCH_CONFIG_MAIN
-#include "catch.hpp"
+#define GLFW_INCLUDE_GLCOREARB
+#ifndef __APPLE_CC__
+    #include <GL/glew.h>
+#endif
+#include <GLFW/glfw3.h>
 #include "tinyformat.h"
 #include "auto.h"
+#include "rendering.hh"
 
 using std::pair;
 using std::cerr;
@@ -22,12 +30,207 @@ using std::size_t;
 using std::min;
 using std::max;
 
+// ============
+
 #include "primitives.hh"
 
 typedef std::vector<triangle3> Mesh3d;
 
+// ============
+
+inline int64_t rdtsc() {
+        uint lo, hi;
+        __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+        return (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
+struct Timestamp {
+    Timestamp() : m_ticks(rdtsc()) { }
+
+    int64_t elapsed(Timestamp a = Timestamp()) const { return a.m_ticks - m_ticks; }
+    double elapsed_ms(Timestamp a = Timestamp()) const { return elapsed(a) * milisec_per_tick; }
+
+    static void init(dvec3 a, i64vec3 b, dvec3 c, i64vec3 d) {
+        glm::dvec3 q = (c - a) / glm::dvec3(d - b);
+        if (q.x > q.y) std::swap(q.x, q.y);
+        if (q.y > q.z) std::swap(q.y, q.z);
+        if (q.x > q.y) std::swap(q.x, q.y);
+        milisec_per_tick = q.y * 1000;
+    }
+
+    static double milisec_per_tick;
+
+private:
+    int64_t m_ticks;
+};
+
+double Timestamp::milisec_per_tick = 0;
+
+
+// ============
+
+struct SolidLeafBSPTree {
+	static const SolidLeafBSPTree* Inside;
+
+	SolidLeafBSPTree() { }
+	SolidLeafBSPTree(SolidLeafBSPTree&) = delete;
+	SolidLeafBSPTree& operator=(SolidLeafBSPTree&) = delete;
+
+	~SolidLeafBSPTree() {
+		destroy(positive);
+		destroy(negative);
+	}
+
+	static void destroy(SolidLeafBSPTree* p) {
+		if (p != nullptr && p != Inside)
+			delete p;
+	}
+
+	plane divider;
+	// nullptr means outside space, 0x0001 means inside space
+	SolidLeafBSPTree* positive = nullptr;
+	SolidLeafBSPTree* negative = nullptr;
+};
+
+const SolidLeafBSPTree* SolidLeafBSPTree::Inside = reinterpret_cast<const SolidLeafBSPTree*>(1);
+
+int classify(dvec3 v, const plane& p) {
+	auto d = p.distance(v);
+	if (d > PlanarEpsilon)
+		return 1;
+	if (d < -PlanarEpsilon)
+		return -1;
+	return 0;
+}
+
+struct SolidBSPTreeBuildData {
+	std::vector<dvec3> vertices;
+	std::vector<dvec3> samples;
+};
+
+// TODO add memoization / add persisted memoization
+// Returns pair of tree node and average query depth across all samples
+pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(const SolidBSPTreeBuildData& data, const std::vector<uint16_t>& mesh, std::vector<uint32_t>& samples) {
+	if (mesh.empty())
+		return pair<SolidLeafBSPTree*, real>(nullptr, 0.0);
+
+	if (mesh.size() / 3 >= 100) {
+		// use heuristics instead of exaustive
+		// TODO dividing plane generation:
+		//      1) from any 3 vertices
+		//      2) from an existing face
+		//      3) major axis aligned to some vertex
+		// TODO dividing plane heuristic ranking:
+		//      1) avoid straddle
+		//      2) equal number of faces on both sides
+		//      3) early out (one side empty)
+
+	}
+
+	std::unordered_set<uint16_t> vertices;
+	FOR_EACH(i, mesh)
+		vertices.insert(i);
+
+	// All possible candidate dividers (includes optimal solution)
+	std::vector<plane> candidates;
+	FOR(a, vertices.size())
+		FOR(b, a)
+			FOR(c, b)
+				candidates.push_back(plane(data.vertices[a], data.vertices[b], data.vertices[c]));
+	vertices.clear();
+
+	SolidLeafBSPTree* tree = new SolidLeafBSPTree;
+	real best_score = 1e100;
+	std::vector<uint16_t> pmesh, nmesh;
+	std::vector<uint32_t> psamples, nsamples;
+	FOR_EACH(candidate, candidates) {
+		// classify faces against divider and build tree recursively
+		// TODO if it can fit repartition mesh array in-place
+		pmesh.clear();
+		nmesh.clear();
+		FOR(f, mesh.size() / 3) {
+			int mn = 1, mx = -1;
+			FOR(i, 3) {
+				int d = classify(data.vertices[mesh[f * 3 + i]], candidate);
+				mn = std::min(mn, d);
+				mx = std::max(mx, d);
+			}
+			if (mx == 1)
+				FOR(i, 3)
+					pmesh.push_back(mesh[f * 3 + i]);
+			if (mn == -1)
+				FOR(i, 3)
+					nmesh.push_back(mesh[f * 3 + i]);
+		}
+		// TODO repartition samples array in place instead
+		psamples.clear();
+		nsamples.clear();
+		FOR_EACH(s, samples)
+			(candidate.distance(data.samples[s]) > 0 ? psamples : nsamples).push_back(s);
+		// TODO handle case when pmesh or nmesh is empty AND set them to EMPTY or FULL properly!
+		auto presult = build_solid_leaf_bsp_tree_internal(data, pmesh, psamples);
+		auto nresult = build_solid_leaf_bsp_tree_internal(data, nmesh, nsamples);
+		real score = 1 + (psamples.size() * presult.second + nsamples.size() * nresult.second) / samples.size();
+
+		if (score < best_score) {
+			tree->divider = candidate;
+			SolidLeafBSPTree::destroy(tree->positive);
+			SolidLeafBSPTree::destroy(tree->negative);
+			tree->positive = presult.first;
+			tree->negative = nresult.first;
+			best_score = score;
+		} else {
+			SolidLeafBSPTree::destroy(presult.first);
+			SolidLeafBSPTree::destroy(nresult.first);
+		}
+	}
+	return pair(tree, best_score);
+}
+
+std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples) {
+	SolidBSPTreeBuildData data;
+
+	// Init samples
+	data.samples.resize(num_samples);
+	std::vector<uint32_t> isamples(num_samples);
+	std::default_random_engine rnd;
+	FOR(i, num_samples) {
+		data.samples[i] = random_vector(rnd); // TODO make sure inside bounding box / sphere
+		isamples[i] = i;
+	}
+
+	// Init vertices and imesh
+	std::unordered_map<dvec3, uint16_t> vec_index;
+	std::vector<uint16_t> imesh;
+	FOR_EACH(face, mesh)
+		FOR(i, 3) {
+			const auto& v = face[i];
+			if (vec_index.count(v) == 0) {
+				vec_index[v] = data.vertices.size();
+				data.vertices.push_back(v);
+			}
+			imesh.push_back(vec_index[v]);
+		}
+
+	auto result = build_solid_leaf_bsp_tree_internal(data, imesh, isamples);
+	return std::unique_ptr<SolidLeafBSPTree>(result.first);
+}
+
+// Note: may return either true or false for boundary!
+bool intersects(const SolidLeafBSPTree* tree, const dvec3& v) {
+	while (true) {
+		if (tree == nullptr)
+			return false;
+		if (tree == SolidLeafBSPTree::Inside)
+			return true;
+		tree = (tree->divider.distance(v) > 0) ? tree->positive : tree->negative;
+	}
+}
+
+// ============
+
 // Valid if triangles are not intersecting, except in one shared edge or one shared vertex
-bool AreValidMeshFaces(const triangle3& a, const triangle3& b) {
+bool are_valid_mesh_faces(const triangle3& a, const triangle3& b) {
 	// Axis check for early exit
 	dvec3 amin = mini(a), amax = maxi(a);
 	dvec3 bmin = mini(b), bmax = maxi(b);
@@ -104,19 +307,19 @@ Validity is_valid(const Mesh3d& mesh) {
 	// No self intersections
 	FOR(i, mesh.size())
 		FOR(j, i)
-			if (!AreValidMeshFaces(mesh[i], mesh[j]))
+			if (!are_valid_mesh_faces(mesh[i], mesh[j]))
 				return Validity::SelfIntersection;
 
 	return Validity::OK;
 }
 
-TEST_CASE("is_valid") {
+/*TEST_CASE("is_valid") {
 	REQUIRE(is_valid(std::vector<triangle3>{}) == Validity::TooFewFaces);
 	dvec3 a(0, 0, 0);
 	dvec3 b(1, 0, 0);
 	dvec3 c(0, 1, 0);
 	dvec3 d(0, 0, 1);
-}
+}*/
 
 // Mesh properties
 // ===============
@@ -184,7 +387,7 @@ bool is_convex(const Mesh3d& mesh) {
 // ===============
 
 // Returns empty vector if no solution (points are coplanar)
-Mesh3d ConvexHullMesh(const std::vector<dvec3>& points) {
+Mesh3d build_convex_hull(const std::vector<dvec3>& points) {
 	// First two points (A and B) on the hull (extremes on X axis)
 	size_t ai = 0, bi = 0;
 	FOR(i, points.size()) {
@@ -291,25 +494,24 @@ Mesh3d BoxMesh(real sx, real sy, real sz) {
 		for (int y = -1; y <= 1; y += 2)
 			for (int z = -1; z <= 1; z += 2)
 				vertices.push_back(dvec3(x * sx, y * sy, z * sz));
-	return ConvexHullMesh(vertices);
+	return build_convex_hull(vertices);
 }
 
 Mesh3d SphereMesh(int vertices) {
-	std::default_random_engine random;
-	std::normal_distribution<real> gauss(0.0, 1.0);
+	std::default_random_engine rnd;
 	std::vector<dvec3> V(vertices);
 	FOR(i, vertices)
-		V[i] = glm::normalize(dvec3(gauss(random), gauss(random), gauss(random)));
-	return ConvexHullMesh(V);
+		V[i] = random_direction(rnd);
+	return build_convex_hull(V);
 }
 
-TEST_CASE("SphereMesh - ConvexHull - IsConvex") {
+/*TEST_CASE("SphereMesh - ConvexHull - IsConvex") {
 	Mesh3d mesh = SphereMesh(100);
 	real v = 4.0 / 3 * M_PI;
 	REQUIRE(abs(volume(mesh) - v) / v < 0.15);
 	REQUIRE(is_valid(mesh) == Validity::OK);
 	REQUIRE(is_convex(mesh));
-}
+}*/
 
 void AddQuad(Mesh3d& mesh, dvec3 a, dvec3 b, dvec3 c, dvec3 d) {
 	mesh.push_back(triangle3(a, b, c));
@@ -333,10 +535,10 @@ Mesh3d CreateCrossMesh(real inner, real outer) {
 	return m;
 }
 
-TEST_CASE("CreateCrossMesh") {
+/*TEST_CASE("CreateCrossMesh") {
 	Mesh3d cross = CreateCrossMesh(0.05, 0.25);
 	//REQUIRE(IsValid(cross) == Validity::OK);
-}
+}*/
 
 bool lexicographical_less(dvec3 a, dvec3 b) {
 	return a.x < b.x || (a.x == b.x && a.y < b.y) || (a.x == b.x && a.y == b.y && a.z < b.z);
@@ -393,11 +595,11 @@ public:
 
 		// Compute radius of bounding sphere and size of object bounding box
 		m_sphere_radius = 0;
-		m_box_min = m_box_max = dvec3(0, 0, 0);
+		m_box.first = m_box.second = m_convex_vertices[0];
 		FOR_EACH(v, m_convex_vertices) {
 			m_sphere_radius = std::max(m_sphere_radius, squared(v));
-			m_box_min = min(m_box_min, v);
-			m_box_max = max(m_box_max, v);
+			m_box.first = min(m_box.first, v);
+			m_box.second = max(m_box.second, v);
 		}
 		m_sphere_radius = sqrt(m_sphere_radius);
 
@@ -419,7 +621,9 @@ public:
 	const auto& convex_edges() const { return m_convex_edges; }
 	const auto& convex_vertices() const { return m_convex_vertices; }
 	bool is_convex() const { return m_is_convex; }
+	bool is_box() const { return false; }
 	real sphere_radius() const { return m_sphere_radius; }
+	pair<dvec3, dvec3> box() const { return m_box; }
 
 private:
 	Mesh3d m_mesh;
@@ -429,17 +633,17 @@ private:
 	dmat3 m_inertia_tensor; // assuming density of 1kg/m^3
 	real m_volume;
 	real m_sphere_radius;
-	dvec3 m_box_min, m_box_max; // object oriented bounding box
+	pair<dvec3, dvec3> m_box; // oriented bounding box
 	bool m_is_convex;
 };
 
-const auto random_directions = [](){
+/*const auto random_directions = [](){
 	std::array<dvec3, 128> dirs;
 	std::default_random_engine rnd;
 	FOR_EACH(d, dirs)
 		d = random_direction(rnd);
 	return dirs;
-}();
+}();*/
 
 struct Body {
 	Shape shape;
@@ -447,37 +651,46 @@ struct Body {
 	dquat orientation;
 };
 
-bool IsVertexPenetratingShape(const dvec3& v, const Shape& shape) {
-	// TODO bounding box / sphere check
+real signed_distance(const dvec3& v, const Shape& shape) {
+	// Can't just take the sdist sign of min_dist as two faces that share the edge can have the same dist but different sgn(sdist)
+	real min_dist = std::numeric_limits<real>::max(), max_sdist = 0;
+	constexpr real eps = ContactEpsilon; // ??? arbitrary, need to account for rounding errors when computing distance(vertex, face)
+	FOR_EACH(face, shape.faces()) {
+		plane p(face); // TODO precompute this
 
-	// TODO optimize for box
-	// TODO optimize for convex mesh
+		real dist, sdist;
+		FOR_EACH_EDGE(a, b, face)
+			if (plane::sign(*a, *b, *a + p.normal, v) > 0) {
+				dist = distance(v, segment3(*a, *b));
+				if (dist > min_dist + eps)
+					goto next;
 
-	// TODO even if mesh is concave we can have a convex bounding shape to quickly test against
-	// (only if convex hull has small number of faces)
+				sdist = p.distance(v);
+				goto rest;
+			}
 
-	// TODO if possible to split concave mesh into small number of convex ones: do it
-	//      (even splitting large concave into smaller concave helps)
-
-	// TODO could be precomputed with a dense voxel table:
-	// each voxel is one of: outside / convex maybe / concave maybe / inside
-	// convex maybe has list of faces that intersect the voxel (1 face in best case)
-	// in case of concave maybe run full ray intersect algorithm
-
-	// TODO optimize convex planar faces with more than 3 vertices (ie. sides of a cube)
-
-	FOR_EACH(dir, random_directions) {
-		int hits = 0;
-		FOR_EACH(face, shape.faces()) {
-			// TODO TODO compare ray (v,dir) and face
-			// if ray strictly goes through the triangle then hits ^= 1
-			// else if ray intersects face plane in point outside of face then continue
-			// else if ray is coplanar with face but far from face bounding circle then continue
-			// else (ray hits edge, vertex or is coplanar with face) then restart while loop
+		sdist = p.distance(v);
+		dist = abs(sdist);
+		if (dist > min_dist + eps)
+			continue;
+		rest:
+		if (dist < min_dist) {
+			if (dist + eps < min_dist)
+				max_sdist = sdist;
+			min_dist = dist;
 		}
-		return hits != 0;
+		if (abs(sdist) > abs(max_sdist))
+			max_sdist = sdist;
+		next:;
 	}
-    throw new std::runtime_error("IsVertexPenetratingMesh failure");
+	return max_sdist < 0 ? -min_dist : min_dist;
+}
+
+// either O(n*logn) SolidLeafBSPTree or O(n) algorithm using nearest face
+bool intersects(const dvec3& v, const Shape& shape) {
+	// TODO bounding box / sphere check
+	// TODO optimize for box
+	return signed_distance(v, shape) < 0;
 }
 
 real squared_distance_segment_origin(const segment3& p) {
@@ -491,104 +704,83 @@ real squared_distance_segment_origin(const segment3& p) {
 	return squared(p.a + d * (t / dd));
 }
 
-bool IsEdgePenetratingShape(const segment3& edge, const Shape& shape) {
-	// TODO TODO At least one of these negative cases is needed for performance
-	// TODO use voxel grid here faster positive and negative cases
-
-	// Bounding sphere check
+// TODO find all faces within epsilon distance from the edge
+//      if any triangle is penetrated internally return true
+//      if
+//		rare_case:
+//      collect at most one intersection point of edge with every nearby triangle
+//		sort these points and check every mid point against the interior of shape
+bool intersects_edge_interior(const segment3& edge, const Shape& shape) {
+	// Quick bounding sphere check
 	// TODO precompute right hand side and store in Shape
-	if (squared_distance_segment_origin(edge) > squared(shape.sphere_radius() - ContactEpsilon))
+	if (squared_distance_segment_origin(edge) > squared(shape.sphere_radius()))
 		return false;
+
+	// Quick bounding box check
 	//if (!is_edge_intersecting_box())
 	//	return false;
-	// TODO bounding box check
-
-	//if (shape.is_box())
-	//	return true;
-	// TODO optimize for convex mesh
-	if (shape.is_convex()) {
-		// TODO how to check segment vs convex mesh?
-	}
-
-	real edge_length = l2Norm(edge.b - edge.a);
-	// t_min and t_max needed to avoid edge endpoints being too close triangle an merely touching it
-	real t_min = ContactEpsilon / edge_length;
-	real t_max = 1 - t_min;
-
-	loop:
-	FOR_EACH(face, shape.faces()) {
-		// compare edge and triangle
-		dvec3 normal = Normal(face);
-		real dd = dot(normal, edge.b - edge.a);
-		// if edge is parallel to triangle plane
-		constexpr real tiny = 1e-8;
-		if (abs(dd) < tiny || abs(dd) < tiny * l2Norm(normal) * edge_length)
-			continue;
-		real t = dot(normal, face.a - edge.a) / dd;
-		// if intersection of infinite edge with triangle plane is outside of edge interior
-		if (t < t_min || t > t_max)
-			continue;
-		dvec3 w = edge.linear(t); // intersection of triangle plane and edge
-
-		// if W is outside of triangle
-		FOR_EACH_EDGE(a, b, face)
-			if (plane::sign(*a, *b, *a + normal, w) > 0)
-				goto next_face;
-		// if edge is too close to triangle edge (could be contact instead)
-		FOR_EACH_EDGE(a, b, face)
-			if (segment3::squared_distance(edge, segment3(*a, *b)) <= squared(ContactEpsilon))
-				goto next_face;
+	if (shape.is_box())
 		return true;
-		next_face:;
-	}
 
-	// Hard cases:
-	// - edges don't go through interior of any triangles
-	// - endpoints aren't inside polyhedron
-	//   => endpoints can be outside and on the surface
-	// segment can intersect surface at the vertex or interior of edge
-
-	// TODO intersect edge with all faces and sort intersection points (w from above, sorted by t from above)
-	// test mid-points between every two intersections -> if any is inside then penetrating!
-
-	return false;
+	// Note: assumes edge vertices are outside of shape
+	constexpr real eps = 1e-8; // TODO
+	/*std::vector<triangle3> nearest;
+	FOR_EACH(face, shape.faces()) {
+		// if edge goes strictly through interior of triangle TODO and edge vertices are not on the plane
+		if (intersects_in_point(edge, face)
+				&& distance(edge, segment3(face[0], face[1])) > eps
+				&& distance(edge, segment3(face[1], face[2])) > eps
+				&& distance(edge, segment3(face[2], face[0])) > eps)
+			return true;
+		real dist = disjoint_distance(edge, face);
+		if (dist < eps) {
+			nearest.push_back(face);
+		}
+	}*/
+	throw new std::runtime_error("unfinished");
 }
-
-struct OBB {
-    dvec3 size;
-};
 
 pair<real, real> project_obb(dvec3 obb_position, dvec3 obb_size, dmat3 obb_orientation, dvec3 dir) {
     // TODO
 	return pair<real, real>(0.0, 0.0);
 }
 
-bool intersects_obb(const Body& body_a, const Body& body_b) {
-    // TODO
-	return false;
+bool are_oriented_boxes_intersecting(const pair<dvec3, dvec3>& box_a, const transform3& pos_a, const pair<dvec3, dvec3>& box_b, const transform3& pos_b) {
+	throw new std::runtime_error("unfinished");
 }
 
-bool AreShapesSeparatedQuick(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
-    // TODO sphere / sphere
-    // TODO OBB / OBB
-    // TODO convex / convex (if at least one of them is concave)
-	return false;
+bool approx_intersects(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+	// Bounding sphere check
+	if (squared(pos_a.position - pos_b.position) > squared(shape_a.sphere_radius() + shape_b.sphere_radius()))
+		return false;
+
+	return are_oriented_boxes_intersecting(shape_a.box(), pos_a, shape_b.box(), pos_b);
 }
 
-bool AreBodiesPenetrating(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+bool intersects(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+	// Check all vertices of one against the other
+	FOR_EACH(vertex_a, shape_a.convex_vertices())
+		if (intersects(pos_b.to_local(pos_a.to_global(vertex_a)), shape_b))
+			return true;
+	FOR_EACH(vertex_b, shape_b.convex_vertices())
+		if (intersects(pos_a.to_local(pos_b.to_global(vertex_b)), shape_a))
+			return true;
+
 	// Check all edges of one against the other
 	FOR_EACH(edge_a, shape_a.convex_edges())
-		if (IsEdgePenetratingShape(pos_b.to_local(pos_a.to_global(edge_a)), shape_b))
-				return true;
+		if (intersects_edge_interior(pos_b.to_local(pos_a.to_global(edge_a)), shape_b))
+			return true;
 	FOR_EACH(edge_b, shape_b.convex_edges())
-		if (IsEdgePenetratingShape(pos_a.to_local(pos_b.to_global(edge_b)), shape_a))
-				return true;
+		if (intersects_edge_interior(pos_a.to_local(pos_b.to_global(edge_b)), shape_a))
+			return true;
 
-	// Also check a single vertex from one body against another,
-	// in case of one shape being completely inside the other.
-	return IsVertexPenetratingShape(pos_b.to_local(pos_a.to_global(shape_a.convex_vertices()[0])), shape_b)
-		|| IsVertexPenetratingShape(pos_a.to_local(pos_b.to_global(shape_b.convex_vertices()[0])), shape_a);
+	return false;
 }
+
+// TODO test intersects:
+// - "simulate" two boxes "colliding" one another (different sizes and movement directions)
+// - same test, but with bunnies
+// - OpenGL visualization (for debugging the test)
 
 struct Contact {
 	real squared_dist;
@@ -641,16 +833,30 @@ bool is_edge_edge_contact(const segment3& p, const segment3& q, Contact& /*out*/
 	return false;
 }
 
-// Assuming bodies aren't penetrating each other
+bool all_less_equal(const dvec3& a, const dvec3& b) {
+	return a.x <= b.x && a.y <= b.y && a.z <= b.z;
+}
+
+bool approx_intersects(const dvec3& v, const Shape& shape) {
+	return squared(v) <= squared(shape.sphere_radius()) && all_less_equal(shape.box().first, v) && all_less_equal(v, shape.box().second);
+}
+
+bool approx_intersects(const segment3& v, const Shape& shape) {
+	// TODO
+	return true;
+}
+
+// Assuming shares aren't intersecting, look for pairs of features that are within ContactEpsilon
 std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
 	std::vector<Contact> contacts;
 	Contact contact;
 
 	// vertex vs face contacts
 	FOR_EACH(vertex_a, shape_a.convex_vertices()) {
-		dvec3 vertex_a_global = pos_a.to_global(vertex_a);
-		// TODO bounding volume check?
-		dvec3 vertex_a_local = pos_b.to_local(vertex_a_global);
+		dvec3 vertex_a_local = pos_b.to_local(pos_a.to_global(vertex_a));
+		// TODO this approx check needs to be a little loose to allow for contacts
+		if (!approx_intersects(vertex_a_local, shape_b))
+			continue;
 		FOR_EACH(face_b, shape_b.faces())
 			if (is_vertex_triangle_contact(vertex_a_local, face_b, /*out*/contact)) {
 				contact.position = pos_b.to_global(contact.position);
@@ -659,9 +865,10 @@ std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& p
 			}
 	}
 	FOR_EACH(vertex_b, shape_b.convex_vertices()) {
-		dvec3 vertex_b_global = pos_b.to_global(vertex_b);
-		// TODO bounding volume check?
-		dvec3 vertex_b_local = pos_a.to_local(vertex_b_global);
+		dvec3 vertex_b_local = pos_a.to_local(pos_b.to_global(vertex_b));
+		// TODO this approx check needs to be a little loose to allow for contacts
+		if (!approx_intersects(vertex_b_local, shape_a))
+			continue;
 		FOR_EACH(face_a, shape_a.faces())
 			if (is_vertex_triangle_contact(vertex_b_local, face_a, /*out*/contact)) {
 				contact.position = pos_a.to_global(contact.position);
@@ -671,9 +878,12 @@ std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& p
 	}
 
 	// edge vs edge contacts
+	// TODO flip loop order if B has less edges than A
 	FOR_EACH(edge_a, shape_a.convex_edges()) {
 		segment3 edge_a_global = pos_a.to_global(edge_a);
-		// TODO bounding volume check?
+		// TODO this approx check needs to be a little loose to allow for contacts
+		if (!approx_intersects(pos_b.to_local(edge_a_global), shape_b))
+			continue;
 		// TODO avoid transforming every edge in B
 		FOR_EACH(edge_b, shape_b.convex_edges())
 			if (is_edge_edge_contact(edge_a_global, pos_b.to_global(edge_b), /*out*/contact))
@@ -683,17 +893,8 @@ std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& p
 	return contacts;
 }
 
-bool are_bounding_spheres_intersecting(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
-	return squared(pos_a.position - pos_b.position) <= squared(shape_a.sphere_radius() + shape_b.sphere_radius());
-}
-
 // returns 0 if interecting
 real distance(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
-    // TODO need strict intersection (not just deep penetration)
-    if (!are_bounding_spheres_intersecting(shape_a, pos_a, shape_b, pos_b)
-			&& IsVertexPenetratingShape(pos_b.to_local(pos_a.to_global(shape_a.convex_vertices()[0])), shape_b))
-        return 0;
-
 	// Upper bound on distance
     real dist = max(distance(pos_a.position, pos_b.position), shape_a.sphere_radius(), shape_b.sphere_radius());
 
@@ -755,3 +956,136 @@ class ArticulatedBody {
 };
 
 #include "integration.hh"
+
+// =====================
+
+void on_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
+		glfwSetWindowShouldClose(window, GL_TRUE);
+		return;
+	}
+}
+
+void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+	if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT) {
+	}
+}
+
+void on_scroll(GLFWwindow* window, double x, double y) {
+}
+
+// =====================
+// OpenGL
+
+int render_width = 0, render_height = 0;
+
+void model_init(GLFWwindow* window) {
+    glfwSetKeyCallback(window, on_key);
+    glfwSetMouseButtonCallback(window, on_mouse_button);
+    glfwSetScrollCallback(window, on_scroll);
+}
+
+Text* text = nullptr;
+
+void render_init() {
+	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
+	glEnable(GL_CULL_FACE);
+	glClearColor(0.2, 0.2, 1, 1.0);
+	glViewport(0, 0, render_width, render_height);
+
+	text = new Text;
+	text->fg_color = vec4(1, 1, 1, 1);
+	text->bg_color = vec4(0, 0, 0, 1);
+}
+
+void render_gui() {
+	glm::mat4 matrix = glm::ortho<float>(0, render_width, 0, render_height, -1, 1);
+	text->Reset(render_width, render_height, matrix, true);
+	text->Print("Hello world!");
+}
+
+void OnError(int error, const char* message) {
+	fprintf(stderr, "GLFW error %d: %s\n", error, message);
+}
+
+GLFWwindow* create_window() {
+	glfwSetErrorCallback(OnError);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+	GLFWwindow* window = glfwCreateWindow(mode->width*2, mode->height*2, "Sima", glfwGetPrimaryMonitor(), NULL);
+	if (!window)
+		return nullptr;
+	glfwMakeContextCurrent(window);
+	glfwSwapInterval(0/*VSYNC*/);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwGetFramebufferSize(window, &render_width, &render_height);
+	return window;
+}
+
+void sigsegv_handler(int sig) {
+ 	fprintf(stderr, "Error: signal %d:\n", sig);
+    void* array[20];
+    backtrace_symbols_fd(array, backtrace(array, 20), STDERR_FILENO);
+    exit(1);
+}
+
+int main(int argc, char** argv) {
+	void sigsegv_handler(int sig);
+	signal(SIGSEGV, sigsegv_handler);
+	if (!glfwInit())
+        return -1;
+
+	glm::dvec3 a;
+	glm::i64vec3 b;
+	a.x = glfwGetTime();
+	b.x = rdtsc();
+	usleep(100000);
+	a.y = glfwGetTime();
+	b.y = rdtsc();
+	usleep(100000);
+	a.z = glfwGetTime();
+	b.z = rdtsc();
+
+	GLFWwindow* window = create_window();
+	if (!window)
+        return -1;
+	model_init(window);
+	render_init();
+
+	glm::dvec3 c;
+	glm::i64vec3 d;
+	c.x = glfwGetTime();
+	d.x = rdtsc();
+	usleep(100000);
+	c.y = glfwGetTime();
+	d.y = rdtsc();
+	usleep(100000);
+	c.z = glfwGetTime();
+	d.z = rdtsc();
+	Timestamp::init(a, b, c, d);
+
+	while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
+
+		//model_frame(window, frame_ms);
+		/*glm::mat4 matrix = glm::translate(perspective_rotation, -g_player.position);
+		Frustum frustum(matrix);
+		g_player.cpos = glm::ivec3(glm::floor(g_player.position)) >> ChunkSizeBits;*/
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_DEPTH_TEST);
+		//render_world_blocks(matrix, frustum);
+		glDisable(GL_DEPTH_TEST);
+		render_gui();
+
+		glfwSwapBuffers(window);
+	}
+
+	glfwTerminate();
+	_exit(0); // exit(0) is not enough
+	return 0;
+}
