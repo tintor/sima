@@ -256,16 +256,27 @@ std::pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(
 	return std::pair(tree, best_score);
 }
 
+dvec3 min(const Mesh3d& mesh) {
+    dvec3 vmin = mesh[0].a;
+    FOR_EACH(face, mesh)
+		FOR(i, 3)
+            vmin = min(vmin, face[i]);
+	return vmin;
+}
+
+dvec3 max(const Mesh3d& mesh) {
+    dvec3 vmax = mesh[0].a;
+    FOR_EACH(face, mesh)
+		FOR(i, 3)
+            vmax = max(vmax, face[i]);
+	return vmax;
+}
+
 std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples) {
 	SolidBSPTreeBuildData data;
 
-    dvec3 vmin = mesh[0].a;
-    dvec3 vmax = mesh[0].a;
-    FOR_EACH(face, mesh)
-		FOR(i, 3) {
-            vmin = min(vmin, face[i]);
-            vmax = max(vmax, face[i]);
-        }
+    dvec3 vmin = min(mesh);
+    dvec3 vmax = max(mesh);
     dvec3 d = vmax - vmin;
     real dmax = max(d.x, d.y, d.z);
 
@@ -451,6 +462,29 @@ bool is_convex(const Mesh3d& mesh) {
 	return true;
 }
 
+bool is_box(const Mesh3d& mesh) {
+	dvec3 vmin = min(mesh);
+	dvec3 vmax = max(mesh);
+
+	// All vertices must be made from extreme coordinates
+	FOR_EACH(f, mesh)
+		FOR(i, 3) {
+			dvec3 v = f[i];
+			if (v.x != vmin.x && v.x != vmax.x && v.y != vmin.y && v.y != vmax.y && v.z != vmin.z && v.z != vmax.z)
+				return false;
+		}
+
+	// Every face must have one coordinate constant
+	FOR_EACH(f, mesh) {
+		bool xx = f.a.x == f.b.x && f.b.x == f.c.x;
+		bool yy = f.a.y == f.b.y && f.b.y == f.c.y;
+		bool zz = f.a.z == f.b.z && f.b.z == f.c.z;
+		if (!xx && !yy && !zz)
+			return false;
+	}
+	return true;
+}
+
 // Mesh generators
 // ===============
 
@@ -607,6 +641,11 @@ Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 
 	m_is_convex = ::is_convex(m_mesh);
 
+	// Bounding box
+	m_is_box = ::is_box(m_mesh);
+	m_box.first = min(m_mesh);
+	m_box.second = max(m_mesh);
+
 	// Compute convex edges and vertices
 	std::unordered_map<segment3, dvec3> third_vertex;
 	FOR_EACH(face, m_mesh)
@@ -629,14 +668,10 @@ Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 	FOR_EACH(v, set_of_convex_vertices)
 		m_convex_vertices.push_back(v);
 
-	// Compute radius of bounding sphere and size of object bounding box
+	// Compute radius of bounding sphere
 	m_sphere_radius = 0;
-	m_box.first = m_box.second = m_convex_vertices[0];
-	FOR_EACH(v, m_convex_vertices) {
+	FOR_EACH(v, m_convex_vertices)
 		m_sphere_radius = std::max(m_sphere_radius, squared(v));
-		m_box.first = min(m_box.first, v);
-		m_box.second = max(m_box.second, v);
-	}
 	m_sphere_radius = sqrt(m_sphere_radius);
 
 	// Sort faces by decreasing surface area
