@@ -53,21 +53,22 @@ Mesh3d load_stl(const std::string& filename) {
 }
 
 Mesh3d load_ply(const std::string& filename) {
-    std::ifstream in(filename);
-    std::string line;
+    FileReader file(filename.c_str());
+    std::string_view line;
 
     std::vector<dvec3> vertices;
     Mesh3d mesh;
-    std::smatch match;
+    std::cmatch match;
 
     std::regex element_regex(R"(element (vertex|face) (\d+)\s*)");
     while (true) {
-        if (!std::getline(in, line))
+        if (!file.getline(line))
             throw std::runtime_error("bad ply file header");
         if (line == "end_header")
             break;
-        if (std::regex_match(line, /*out*/match, element_regex)) {
-            int s = std::stoi(match[2].str());
+        if (std::regex_match(line.begin(), line.end(), /*out*/match, element_regex)) {
+            int s;
+            from_chars(match[2].first, match[2].second, s);
             if (match[1].str() == "vertex")
                 vertices.reserve(s);
             else
@@ -77,23 +78,25 @@ Mesh3d load_ply(const std::string& filename) {
 
     std::regex vertex_regex(tfm::format(R"(^(%s) (%s) (%s)(\s+|$))", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
     while (vertices.size() < vertices.capacity()) {
-        if (!std::getline(in, line))
+        if (!file.getline(line))
             throw std::runtime_error("unexpected end of ply file");
-        if (!std::regex_search(line, /*out*/match, vertex_regex))
-            throw std::runtime_error("expected vertex in ply file: [" + line + "]");
-        double a = std::stod(match[1].str());
-        double b = std::stod(match[3].str());
-        double c = std::stod(match[5].str());
+        if (!std::regex_search(line.begin(), line.end(), /*out*/match, vertex_regex))
+            throw std::runtime_error(tfm::format("expected vertex in ply file: [%s]", line));
+        double a, b, c;
+        from_chars(match[1].first, match[1].second, a);
+        from_chars(match[3].first, match[3].second, b);
+        from_chars(match[5].first, match[5].second, c);
         vertices.emplace_back(a, b, c);
     }
 
     std::regex face_regex(R"(3 (\d+) (\d+) (\d+)\s*)");
     while (mesh.size() < mesh.capacity()) {
-        if (!std::getline(in, line) || !std::regex_match(line, /*out*/match, face_regex))
+        if (!file.getline(line) || !std::regex_match(line.begin(), line.end(), /*out*/match, face_regex))
             throw std::runtime_error("expected face in ply file");
-        int a = std::stoi(match[1].str());
-        int b = std::stoi(match[2].str());
-        int c = std::stoi(match[3].str());
+        int a, b, c;
+        from_chars(match[1].first, match[1].second, a);
+        from_chars(match[3].first, match[3].second, b);
+        from_chars(match[5].first, match[5].second, c);
         mesh.emplace_back(vertices[a], vertices[b], vertices[c]);
     }
 
