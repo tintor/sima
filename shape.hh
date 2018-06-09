@@ -95,9 +95,9 @@ public:
 	const auto& faces() const { return m_mesh; }
 	const auto& convex_edges() const { return m_convex_edges; }
 	const auto& convex_vertices() const { return m_convex_vertices; }
-	bool is_convex() const { return m_is_convex; }
-	bool is_box() const { return false; }
 	real sphere_radius() const { return m_sphere_radius; }
+	bool is_convex() const { return m_is_convex; }
+	bool is_box() const { return m_is_box; }
 	std::pair<dvec3, dvec3> box() const { return m_box; }
 
 private:
@@ -110,6 +110,7 @@ private:
 	real m_sphere_radius;
 	std::pair<dvec3, dvec3> m_box; // oriented bounding box
 	bool m_is_convex;
+	bool m_is_box;
 };
 
 real signed_distance(const dvec3& v, const Shape& shape);

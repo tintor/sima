@@ -27,9 +27,9 @@
 // ============
 
 inline int64_t rdtsc() {
-        uint lo, hi;
-        __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-        return (static_cast<uint64_t>(hi) << 32) | lo;
+	uint lo, hi;
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+	return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
 struct Timestamp {
