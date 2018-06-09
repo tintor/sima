@@ -37,6 +37,7 @@ using real = double;
 #include "glm/gtc/matrix_access.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/norm.hpp"
+#include "glm/gtx/transform.hpp"
 using namespace glm;
 
 static_assert(sizeof(dvec3) == sizeof(real) * 3);
