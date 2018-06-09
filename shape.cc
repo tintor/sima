@@ -6,44 +6,46 @@
 #include "shape.hh"
 #include "util.hh"
 #include "auto.h"
+#include "file.hh"
 
-constexpr const char* float_regex = R"(-?\d+\.\d+(e[+-]\d+)?)";
+constexpr const char* FLOAT_REGEX = R"(-?\d+\.\d+(e[+-]\d+)?)";
 
 Mesh3d load_stl(const std::string& filename) {
-    std::ifstream in(filename);
-    std::string line;
+    FileReader file(filename.c_str());
+    std::string_view line;
 
     Mesh3d mesh;
-    std::smatch match;
+    std::cmatch match;
 
-    if (!std::getline(in, line) || line != "solid Default")
+    if (!file.getline(line) || line != "solid Default")
         throw std::runtime_error("expected [solid Default]");
 
     std::regex facet_regex(R"(^\s*facet\s+)");
-    std::regex vertex_regex(tfm::format(R"(^\s*vertex (%s) (%s) (%s)\s*$)", float_regex, float_regex, float_regex));
+    std::regex vertex_regex(tfm::format(R"(^\s*vertex (%s) (%s) (%s)\s*$)", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
     while (true) {
-        if (!std::getline(in, line))
+        if (!file.getline(line))
             throw std::runtime_error("expected [facet ...] or [endsolid Default] insted of end");
         if (line == "endsolid Default")
             break;
-        if (!std::regex_search(line, match, facet_regex))
-            throw std::runtime_error("expected [facet ...] or [endsolid Default] instead of [" + line + "]");
-        if (!std::getline(in, line) || line != "    outer loop")
+        if (!std::regex_search(line.begin(), line.end(), facet_regex))
+            throw std::runtime_error(tfm::format("expected [facet ...] or [endsolid Default] instead of [%s]", line));
+        if (!file.getline(line) || line != "    outer loop")
             throw std::runtime_error("expected [outer loop]");
 
         dvec3 v[3];
         FOR(i, 3) {
-            if (!std::getline(in, line) || !std::regex_match(line, match, vertex_regex))
-                throw std::runtime_error("expected [vertex ...] instead of [" + line + "]");
-            v[i].x = std::stod(match[1].str());
-            v[i].y = std::stod(match[3].str());
-            v[i].z = std::stod(match[5].str());
+            if (!file.getline(line) || !std::regex_match(line.begin(), line.end(), match, vertex_regex))
+                throw std::runtime_error(tfm::format("expected [vertex ...] instead of [%s]", line));
+
+            from_chars(match[1].first, match[1].second, v[i].x);
+            from_chars(match[3].first, match[3].second, v[i].y);
+            from_chars(match[5].first, match[5].second, v[i].z);
         }
         mesh.emplace_back(v[0], v[1], v[2]);
 
-        if (!std::getline(in, line) || line != "    endloop")
+        if (!file.getline(line) || line != "    endloop")
             throw std::runtime_error("expected [endloop]");
-        if (!std::getline(in, line) || line != "  endfacet")
+        if (!file.getline(line) || line != "  endfacet")
             throw std::runtime_error("expected [endfacet]");
     }
 
@@ -73,7 +75,7 @@ Mesh3d load_ply(const std::string& filename) {
         }
     }
 
-    std::regex vertex_regex(tfm::format(R"(^(%s) (%s) (%s)(\s+|$))", float_regex, float_regex, float_regex));
+    std::regex vertex_regex(tfm::format(R"(^(%s) (%s) (%s)(\s+|$))", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
     while (vertices.size() < vertices.capacity()) {
         if (!std::getline(in, line))
             throw std::runtime_error("unexpected end of ply file");
@@ -228,7 +230,7 @@ std::pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(
         if (pmesh.size() == 0 || nmesh.size() == 0)
             if (pmesh.size() + nmesh.size() == mesh.size())
                 continue;
-        std::cout << pmesh.size() << " : " << nmesh.size() << std::endl;
+        std::cout << (pmesh.size() / 3) << " : " << (nmesh.size() / 3) << std::endl;
 
         auto split = std::partition(samples_begin, samples_end, [&data, &candidate](uint32_t s) {
             return candidate.distance(data.samples[s]) > 0;

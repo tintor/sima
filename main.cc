@@ -238,9 +238,42 @@ real solid_angle(dvec3 A, dvec3 B, dvec3 C) {
 int main(int argc, char** argv) {
 	void sigsegv_handler(int sig);
 	signal(SIGSEGV, sigsegv_handler);
+    if (!glfwInit())
+        return -1;
+
+    {
+    glm::dvec3 a;
+	glm::i64vec3 b;
+	a.x = glfwGetTime();
+	b.x = rdtsc();
+	usleep(100000);
+	a.y = glfwGetTime();
+	b.y = rdtsc();
+	usleep(100000);
+	a.z = glfwGetTime();
+	b.z = rdtsc();
+
+    usleep(100000);
+
+    glm::dvec3 c;
+	glm::i64vec3 d;
+	c.x = glfwGetTime();
+	d.x = rdtsc();
+	usleep(100000);
+	c.y = glfwGetTime();
+	d.y = rdtsc();
+	usleep(100000);
+	c.z = glfwGetTime();
+	d.z = rdtsc();
+	Timestamp::init(a, b, c, d);
+    }
 
     try {
+        std::cout << "load bunny" << std::endl;
+        Timestamp ta;
         Mesh3d mm = load_stl("models/bunny.stl");
+        std::cout << ta.elapsed_ms() << std::endl;
+
         std::vector<dvec3> vertices;
         FOR_EACH(f, mm)
             FOR(i, 3)
@@ -258,14 +291,11 @@ int main(int argc, char** argv) {
 
         std::random_device rd;
         std::default_random_engine rnd(rd());
-        build_solid_leaf_bsp_tree(SphereMesh(10, rnd), 10000);
+        //build_solid_leaf_bsp_tree(SphereMesh(10, rnd), 10000);
     } catch (std::runtime_error& e) {
         std::cout << "std::runtime_error " << e.what() << std::endl;
     }
     return 0;
-
-	if (!glfwInit())
-        return -1;
 
 	glm::dvec3 a;
 	glm::i64vec3 b;
