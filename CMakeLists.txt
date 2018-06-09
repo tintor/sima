@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 2.8)
 project(sima)
 
 add_executable(sima main.cc shape.cc primitives.cc rendering.cc lodepng/lodepng.cc)
-add_executable(test primitives_test.cc primitives.cc integration_test.cc)
+add_executable(test shape.cc shape_test.cc primitives_test.cc primitives.cc integration_test.cc)
 
 add_definitions(-g -O3 -flto -DNDEBUG)
 

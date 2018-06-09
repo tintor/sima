@@ -1,5 +1,11 @@
+#include <unordered_map>
+#include <unordered_set>
+#include <fstream>
+#include <regex>
+
 #include "shape.hh"
 #include "util.hh"
+#include "auto.h"
 
 constexpr const char* float_regex = R"(-?\d+\.\d+(e[+-]\d+)?)";
 
@@ -383,14 +389,6 @@ Validity is_valid(const Mesh3d& mesh) {
 	return Validity::OK;
 }
 
-/*TEST_CASE("is_valid") {
-	REQUIRE(is_valid(std::vector<triangle3>{}) == Validity::TooFewFaces);
-	dvec3 a(0, 0, 0);
-	dvec3 b(1, 0, 0);
-	dvec3 c(0, 1, 0);
-	dvec3 d(0, 0, 1);
-}*/
-
 // Mesh properties
 // ===============
 
@@ -567,14 +565,6 @@ Mesh3d BoxMesh(real sx, real sy, real sz) {
 	return build_convex_hull(vertices);
 }
 
-/*TEST_CASE("SphereMesh - ConvexHull - IsConvex") {
-	Mesh3d mesh = SphereMesh(100);
-	real v = 4.0 / 3 * M_PI;
-	REQUIRE(abs(volume(mesh) - v) / v < 0.15);
-	REQUIRE(is_valid(mesh) == Validity::OK);
-	REQUIRE(is_convex(mesh));
-}*/
-
 void AddQuad(Mesh3d& mesh, dvec3 a, dvec3 b, dvec3 c, dvec3 d) {
 	mesh.push_back(triangle3(a, b, c));
 	mesh.push_back(triangle3(c, d, a));
@@ -595,15 +585,6 @@ Mesh3d CreateCrossMesh(real inner, real outer) {
 	AddQuad(m, dvec3(b, a, a), dvec3(b, -a, a), dvec3(b, -a, -a), dvec3(b, a, -a));
 	AddQuad(m, dvec3(-b, a, a), dvec3(-b, -a, -a), dvec3(-b, -a, a), dvec3(-b, a, -a));
 	return m;
-}
-
-/*TEST_CASE("CreateCrossMesh") {
-	Mesh3d cross = CreateCrossMesh(0.05, 0.25);
-	//REQUIRE(IsValid(cross) == Validity::OK);
-}*/
-
-bool lexicographical_less(dvec3 a, dvec3 b) {
-	return a.x < b.x || (a.x == b.x && a.y < b.y) || (a.x == b.x && a.y == b.y && a.z < b.z);
 }
 
 // Shape is 3d solid, immutable, purely geometric and with origin in center of mass

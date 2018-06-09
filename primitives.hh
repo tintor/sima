@@ -1,30 +1,12 @@
-#include <vector>
-#include <array>
-#include <unordered_map>
-#include <unordered_set>
+#ifndef __PRIMITIVES_H__
+#define __PRIMITIVES_H__
+
 #include <cmath>
 #include <random>
-#include <cassert>
-#include <iostream>
-#include <functional>
-#include <stdexcept>
-#include <cstdint>
-#include <atomic>
-#include <unistd.h>
-#include <execinfo.h>
 
 #include "tinyformat.h"
-
-template<typename T> constexpr
-T min(T a, T b, T c) { return std::min(a, std::min(b, c)); }
-template<typename T> constexpr
-T max(T a, T b, T c) { return std::max(a, std::max(b, c)); }
-template<typename T> constexpr
-T min(T a, T b, T c, T d) { return std::min(std::min(a, b), std::min(c, d)); }
-template<typename T> constexpr
-T max(T a, T b, T c, T d) { return std::max(std::max(a, b), std::max(c, d)); }
-
 #include "for.hh"
+#include "util.hh"
 
 using real = double;
 
@@ -41,6 +23,10 @@ using real = double;
 using namespace glm;
 
 static_assert(sizeof(dvec3) == sizeof(real) * 3);
+
+inline bool lexicographical_less(dvec3 a, dvec3 b) {
+	return a.x < b.x || (a.x == b.x && a.y < b.y) || (a.x == b.x && a.y == b.y && a.z < b.z);
+}
 
 namespace glm {
 	inline std::ostream& operator<<(std::ostream& os, const dvec3& v) { return os << v.x << ' ' << v.y << ' ' << v.z; }
@@ -403,3 +389,5 @@ struct sphere {
 };
 
 sphere merge_spheres(const sphere& a, const sphere& b);
+
+#endif

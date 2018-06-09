@@ -1,22 +1,9 @@
-#include <vector>
-#include <array>
-#include <unordered_map>
-#include <unordered_set>
-#include <cmath>
-#include <random>
-#include <cassert>
-#include <iostream>
-#include <functional>
-#include <stdexcept>
-#include <cstdint>
-#include <atomic>
-#include <unistd.h>
-#include <execinfo.h>
-#include <fstream>
-#include <regex>
+#ifndef __SHAPE_HH__
+#define __SHAPE_HH__
 
-#include "tinyformat.h"
-#include "auto.h"
+#include <vector>
+#include <string>
+#include <random>
 #include "rendering.hh"
 #include "primitives.hh"
 
@@ -159,3 +146,5 @@ std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& p
 
 // returns 0 if interecting
 real distance(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b);
+
+#endif

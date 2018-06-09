@@ -22,6 +22,7 @@
 #include "auto.h"
 #include "rendering.hh"
 #include "shape.hh"
+#include "integration.hh"
 
 // ============
 
@@ -55,8 +56,6 @@ double Timestamp::milisec_per_tick = 0;
 
 // Dynamics and simulation
 // =======================
-
-#include "integration.hh"
 
 struct Body {
     // const
