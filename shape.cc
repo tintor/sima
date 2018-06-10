@@ -7,6 +7,7 @@
 #include "util.hh"
 #include "auto.h"
 #include "file.hh"
+#include "timestamp.hh"
 
 constexpr const char* FLOAT_REGEX = R"(-?\d+\.\d+(e[+-]\d+)?)";
 
@@ -117,10 +118,10 @@ int classify(dvec3 v, const plane& p, double epsilon) {
 }
 
 enum class TriangleClass : uint8_t {
-	Positive,
-	Negative,
-	Coplanar,
-	Split,
+	Positive = 0,
+	Negative = 1,
+	Coplanar = 2,
+	Split = 3,
 };
 
 TriangleClass classify(const triangle3& f, const plane& p, double epsilon) {
@@ -140,80 +141,125 @@ TriangleClass classify(const triangle3& f, const plane& p, double epsilon) {
     return TriangleClass::Split;
 }
 
+struct itriangle {
+    uint16_t a, b, c;
+};
+
 struct SolidBSPTreeBuildData {
 	std::vector<dvec3> vertices;
+    std::vector<itriangle> ifaces;
+    std::vector<triangle3> faces;
 	std::vector<dvec3> samples;
 	std::default_random_engine rnd;
 	std::vector<TriangleClass> side;
+
+    std::unordered_map<size_t, std::pair<SolidLeafBSPTree*, real>> cache;
 };
 
-int depth = 0;
+size_t hash(uint32_t a) {
+    size_t seed = 0;
+    hash_combine(seed, a);
+    return seed;
+}
 
-// TODO add memoization / add persisted memoization
+size_t hash(const std::vector<uint32_t>& mesh, std::vector<uint32_t>::iterator samples_begin, std::vector<uint32_t>::iterator samples_end) {
+    size_t seed = 0;
+    hash_combine(seed, mesh.size());
+    hash_combine(seed, std::distance(samples_begin, samples_end));
+    FOR_EACH(f, mesh)
+        hash_combine(seed, f);
+
+    size_t a = 0;
+    size_t e = 0;
+    for (auto i = samples_begin; i != samples_end; i++) {
+        a += hash(*i);
+        e ^= hash(*i);
+    }
+        //hash_combine(seed, *i);
+    hash_combine(seed, a);
+    hash_combine(seed, e);
+    return seed;
+}
+
 // Returns pair of tree node and average query depth across all samples
 std::pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(
-        SolidBSPTreeBuildData& data, const std::vector<uint16_t>& mesh,
+        SolidBSPTreeBuildData& data, const std::vector<uint32_t>& mesh,
         std::vector<uint32_t>::iterator samples_begin,
         std::vector<uint32_t>::iterator samples_end) {
-    depth += 1;
-    AUTO(depth -= 1);
-    std::cout << "build " << (mesh.size() / 3) << " (" << depth << ")" << std::endl;
 	if (mesh.empty())
 		return std::pair<SolidLeafBSPTree*, real>(nullptr, 0.0);
 
-    if (mesh.size() == 3) {
+    // Memoisation
+    //
+    size_t h = hash(mesh, samples_begin, samples_end);
+    auto it = data.cache.find(h);
+    if (it != data.cache.end())
+        return it->second;
+
+    if (mesh.size() == 1) {
         SolidLeafBSPTree* m = new SolidLeafBSPTree;
-        m->divider = plane(data.vertices[mesh[0]], data.vertices[mesh[1]], data.vertices[mesh[2]]);
+        m->divider = plane(data.faces[mesh[0]]);
         m->positive = nullptr;  // outside
         m->negative = const_cast<SolidLeafBSPTree*>(SolidLeafBSPTree::Inside);
-        return std::pair<SolidLeafBSPTree*, real>(m, 1.0);
+        m->percent = float(std::distance(samples_begin, samples_end)) / data.samples.size();
+        /*m->hist[0] = 0;
+        m->hist[1] = 0;
+        m->hist[2] = 0;
+        m->hist[3] = 0;*/
+        m->hist[static_cast<int>(TriangleClass::Coplanar)] = 1;
+
+        auto result = std::pair<SolidLeafBSPTree*, real>(m, 1.0);
+        data.cache.insert({h, result});
+        return result;
     }
 
-	if (mesh.size() / 3 >= 100) {
-		// use heuristics instead of exaustive
-		// TODO dividing plane generation:
-		//      1) from any 3 vertices
-		//      2) from an existing face
-		//      3) major axis aligned to some vertex
-		// TODO dividing plane heuristic ranking:
-		//      1) avoid straddle
-		//      2) equal number of faces on both sides
-		//      3) early out (one side empty)
-	}
+    // TODO ranking function to minimize: psamples * positive + nsamples * negative + samples * stradle
 
-	std::unordered_set<uint16_t> vertices;
-	FOR_EACH(i, mesh)
-		vertices.insert(i);
+	std::vector<uint16_t> vertices;
+    vertices.reserve(mesh.size() * 3);
+	FOR_EACH(f, mesh) {
+		vertices.push_back(data.ifaces[f].a);
+        vertices.push_back(data.ifaces[f].b);
+        vertices.push_back(data.ifaces[f].c);
+    }
+    remove_dups(vertices);
 
 	// All possible candidate dividers (includes optimal solution)
-	std::vector<plane> candidates;
-	FOR(a, vertices.size())
-		FOR(b, a)
-			FOR(c, b)
-				candidates.push_back(plane(data.vertices[a], data.vertices[b], data.vertices[c]));
+	std::vector<std::pair<plane, itriangle>> candidates;
+	FOR(ai, vertices.size())
+		FOR(bi, ai)
+			FOR(ci, bi) {
+                itriangle t;
+                t.a = vertices[ai];
+                t.b = vertices[bi];
+                t.c = vertices[ci];
+				candidates.emplace_back(plane(data.vertices[t.a], data.vertices[t.b], data.vertices[t.c]), t);
+            }
     release(vertices);
 
 	SolidLeafBSPTree* tree = new SolidLeafBSPTree;
+    tree->percent = float(std::distance(samples_begin, samples_end)) / data.samples.size();
 	real best_score = 1e100;
-	std::vector<uint16_t> pmesh, nmesh;
+	std::vector<uint32_t> pmesh, nmesh;
 
-    std::uniform_int_distribution<uint32_t> uint_dist(0, candidates.size() - 1);
-    //FOR_EACH(candidate, candidates)
-    int c = uint_dist(data.rnd);
-    while (true) {
-        auto candidate = candidates[c++ % candidates.size()];
+    int remaining = 1000000;
+    std::shuffle(candidates.begin(), candidates.end(), data.rnd);
+    FOR_EACH(cc, candidates) {
+        auto candidate = cc.first;
 		// classify faces against divider and build tree recursively
-        data.side.resize(mesh.size() / 3);
-        int s = mesh.size() / 3;
-        FOR(f, mesh.size() / 3) {
-            data.side[f] = classify(triangle3(data.vertices[mesh[f * 3]], data.vertices[mesh[f * 3 + 1]], data.vertices[mesh[f * 3 + 2]]), candidate, 1e-5);
+        data.side.resize(mesh.size());
+        int s = mesh.size();
+        int hist[4] = {0, 0, 0, 0};
+        FOR(f, mesh.size()) {
+            data.side[f] = classify(data.faces[mesh[f]], candidate, 1e-5);
             if (data.side[f] == TriangleClass::Coplanar)
                 s -= 1;
             if (data.side[f] == TriangleClass::Split)
                 s += 1;
+            hist[static_cast<int>(data.side[f])] += 1;
         }
 
-        if (s <= mesh.size() / 3) {
+        if (s <= mesh.size()) {
             // repartition in place
         } else {
             // use pmesh and nmesh
@@ -221,24 +267,30 @@ std::pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(
 
         pmesh.clear();
 		nmesh.clear();
-        FOR(f, mesh.size() / 3) {
-			if (data.side[f] == TriangleClass::Positive || data.side[f] == TriangleClass::Split)
-				FOR(i, 3)
-					pmesh.push_back(mesh[f * 3 + i]);
-            if (data.side[f] == TriangleClass::Negative || data.side[f] == TriangleClass::Split)
-				FOR(i, 3)
-					nmesh.push_back(mesh[f * 3 + i]);
-		}
+        pmesh.reserve(hist[static_cast<int>(TriangleClass::Positive)] + hist[static_cast<int>(TriangleClass::Split)]);
+        nmesh.reserve(hist[static_cast<int>(TriangleClass::Negative)] + hist[static_cast<int>(TriangleClass::Split)]);
 
-        if (pmesh.size() == 0 || nmesh.size() == 0)
-            if (pmesh.size() + nmesh.size() == mesh.size())
-                continue;
-        std::cout << (pmesh.size() / 3) << " : " << (nmesh.size() / 3) << std::endl;
+        FOR(i, mesh.size()) {
+			if (data.side[i] == TriangleClass::Positive || data.side[i] == TriangleClass::Split)
+                pmesh.push_back(mesh[i]);
+            if (data.side[i] == TriangleClass::Negative || data.side[i] == TriangleClass::Split)
+                nmesh.push_back(mesh[i]);
+		}
 
         auto split = std::partition(samples_begin, samples_end, [&data, &candidate](uint32_t s) {
             return candidate.distance(data.samples[s]) > 0;
         });
+
+        if (split == samples_begin || split == samples_end)
+            continue;
+
+        sort(pmesh);
+        sort(nmesh);
+
 		auto presult = build_solid_leaf_bsp_tree_internal(data, pmesh, samples_begin, split);
+        // TODO may need to correct the sign in some cases
+        /*if (pmesh.size() == 0)
+            presult.first = (candidate vs face it was made from) ? SolidLeafBSPTree::Inside : nullptr;*/
 		auto nresult = build_solid_leaf_bsp_tree_internal(data, nmesh, split, samples_end);
 
         auto p = std::distance(samples_begin, split) * presult.second;
@@ -247,18 +299,23 @@ std::pair<SolidLeafBSPTree*, real> build_solid_leaf_bsp_tree_internal(
 
 		if (score < best_score) {
 			tree->divider = candidate;
-			SolidLeafBSPTree::destroy(tree->positive);
-			SolidLeafBSPTree::destroy(tree->negative);
+            FOR(e, 4)
+                tree->hist[e] = hist[e];
+			//SolidLeafBSPTree::destroy(tree->positive);
+			//SolidLeafBSPTree::destroy(tree->negative);
 			tree->positive = presult.first;
 			tree->negative = nresult.first;
 			best_score = score;
 		} else {
-			SolidLeafBSPTree::destroy(presult.first);
-			SolidLeafBSPTree::destroy(nresult.first);
+			//SolidLeafBSPTree::destroy(presult.first);
+			//SolidLeafBSPTree::destroy(nresult.first);
 		}
-        break;
+        if (--remaining <= 0)
+            break;
 	}
-	return std::pair(tree, best_score);
+    auto result = std::pair(tree, best_score);
+    data.cache.insert({h, result});
+    return result;
 }
 
 dvec3 min(const Mesh3d& mesh) {
@@ -277,48 +334,79 @@ dvec3 max(const Mesh3d& mesh) {
 	return vmax;
 }
 
-std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples) {
-	SolidBSPTreeBuildData data;
+void print_tree(const SolidLeafBSPTree* node, int depth=0) {
+    FOR(i, depth) std::cout << "  ";
+    if (node == nullptr) {
+        std::cout << "outside";
+        std::cout << std::endl;
+    } else if (node == SolidLeafBSPTree::Inside) {
+        std::cout << "inside";
+        std::cout << std::endl;
+    } else {
+        std::cout << tfm::format("plane %.3f%% [%d %d %d %d]", 100 * node->percent,
+            (int)node->hist[0], (int)node->hist[1], (int)node->hist[2], (int)node->hist[3]);
+        std::cout << std::endl;
+        print_tree(node->positive, depth + 1);
+        print_tree(node->negative, depth + 1);
+    }
+}
 
-    dvec3 vmin = min(mesh);
-    dvec3 vmax = max(mesh);
+bool intersects_convex(const dvec3& v, const Mesh3d& mesh) {
+    FOR_EACH(face, mesh)
+        if (plane::sign(face.a, face.b, face.c, v) > 0)
+            return false;
+    return true;
+}
+
+bool intersects(const dvec3& v, const Mesh3d& mesh) {
+	// Can't just take the sdist sign of min_dist as two faces that share the edge can have the same dist but different sgn(sdist)
+	real min_dist = std::numeric_limits<real>::max(), max_sdist = 0;
+	constexpr real eps = 1e-5; // ??? arbitrary, need to account for rounding errors when computing distance(vertex, face)
+	FOR_EACH(face, mesh) {
+		plane p(face); // TODO precompute this
+
+		real dist, sdist;
+		FOR_EACH_EDGE(a, b, face)
+			if (plane::sign(*a, *b, *a + p.normal, v) > 0) {
+				dist = distance(v, segment3(*a, *b));
+				if (dist > min_dist + eps)
+					goto next;
+
+				sdist = p.distance(v);
+				goto rest;
+			}
+
+		sdist = p.distance(v);
+		dist = abs(sdist);
+		if (dist > min_dist + eps)
+			continue;
+		rest:
+		if (dist < min_dist) {
+			if (dist + eps < min_dist)
+				max_sdist = sdist;
+			min_dist = dist;
+		}
+		if (abs(sdist) > abs(max_sdist))
+			max_sdist = sdist;
+		next:;
+	}
+	return max_sdist <= 0;
+}
+
+// TODO move to primitives.hh
+template<typename RND>
+dvec3 box_uniform_random(dvec3 vmin, dvec3 vmax, RND& rnd) {
     dvec3 d = vmax - vmin;
     real dmax = max(d.x, d.y, d.z);
-
-	// Init samples
-	data.samples.resize(num_samples);
-	std::vector<uint32_t> isamples(num_samples);
-	FOR(i, num_samples) {
-        while (true) {
-            dvec3 v = random_vector(data.rnd) * d + vmin;
-            if (v.x <= vmax.x && v.y <= vmax.y && v.z <= vmax.z) {
-                data.samples[i] = v;
-        		isamples[i] = i;
-                break;
-            }
-        }
-	}
-
-	// Init vertices and imesh
-	std::unordered_map<dvec3, uint16_t> vec_index;
-	std::vector<uint16_t> imesh;
-	FOR_EACH(face, mesh)
-		FOR(i, 3) {
-			const auto& v = face[i];
-			if (vec_index.count(v) == 0) {
-				vec_index[v] = data.vertices.size();
-				data.vertices.push_back(v);
-			}
-			imesh.push_back(vec_index[v]);
-		}
-
-	auto result = build_solid_leaf_bsp_tree_internal(data, imesh, isamples.begin(), isamples.end());
-    std::cout << "TreeScore " << result.second << std::endl;
-	return std::unique_ptr<SolidLeafBSPTree>(result.first);
+    while (true) {
+        dvec3 v = random_vector(rnd, 0, 1) * dmax;
+        if (v.x <= d.x && v.y <= d.y && v.z <= d.z)
+            return vmin + v;
+    }
 }
 
 // Note: may return either true or false for boundary!
-bool intersects(const SolidLeafBSPTree* tree, const dvec3& v) {
+bool intersects(const dvec3& v, const SolidLeafBSPTree* tree) {
 	while (true) {
 		if (tree == nullptr)
 			return false;
@@ -326,6 +414,102 @@ bool intersects(const SolidLeafBSPTree* tree, const dvec3& v) {
 			return true;
 		tree = (tree->divider.distance(v) > 0) ? tree->positive : tree->negative;
 	}
+}
+
+std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples, std::default_random_engine& rnd) {
+	SolidBSPTreeBuildData data;
+    data.rnd = rnd;
+
+    dvec3 vmin = min(mesh);
+    dvec3 vmax = max(mesh);
+
+	// Init samples
+	data.samples.resize(num_samples);
+	std::vector<uint32_t> isamples(num_samples);
+	FOR(i, num_samples) {
+        data.samples[i] = box_uniform_random(vmin, vmax, data.rnd);
+        isamples[i] = i;
+	}
+
+	// Init vertices and imesh
+	std::unordered_map<dvec3, uint16_t> vec_index;
+	std::vector<uint32_t> imesh;
+	FOR_EACH(face, mesh) {
+		const auto& a = face[0];
+		if (vec_index.count(a) == 0) {
+			vec_index[a] = data.vertices.size();
+			data.vertices.push_back(a);
+		}
+        const auto& b = face[1];
+		if (vec_index.count(b) == 0) {
+			vec_index[b] = data.vertices.size();
+			data.vertices.push_back(b);
+		}
+        const auto& c = face[2];
+		if (vec_index.count(c) == 0) {
+			vec_index[c] = data.vertices.size();
+			data.vertices.push_back(c);
+		}
+        itriangle t;
+        t.a = vec_index[a];
+        t.b = vec_index[b];
+        t.c = vec_index[c];
+        data.ifaces.push_back(t);
+        data.faces.push_back(face);
+        imesh.push_back(imesh.size());
+	}
+
+	auto result = build_solid_leaf_bsp_tree_internal(data, imesh, isamples.begin(), isamples.end());
+    std::cout << "TreeScore " << result.second << std::endl;
+    print_tree(result.first);
+
+    int ab = 0, aac = 0, aa = 0, bb = 0;
+    real n = num_samples * 10;
+    std::vector<dvec3> tester;
+    tester.resize(n);
+    FOR(j, n)
+        tester[j] = box_uniform_random(vmin, vmax, data.rnd);
+
+    FOR(j, n) {
+        dvec3 v = tester[j];
+        bool insideAc = intersects(v, mesh);
+        bool insideA = intersects(v, mesh);
+        bool insideB = intersects(v, result.first);
+        if (insideAc)
+            aac += 1;
+        if (insideA)
+            aa += 1;
+        if (insideB)
+            bb += 1;
+        if (insideA == insideB)
+            ab += 1;
+    }
+    int x = 0;
+    Timestamp ta;
+    FOR(j, n)
+        x += intersects_convex(tester[j], mesh);
+    Timestamp tb;
+    FOR(j, n)
+        x += intersects(tester[j], mesh);
+    Timestamp tc;
+    FOR(j, n)
+        x += intersects(tester[j], result.first);
+    Timestamp td;
+    FOR(j, n)
+        x += intersects_convex(tester[j], mesh);
+    Timestamp te;
+    FOR(j, n)
+        x += intersects(tester[j], mesh);
+    Timestamp tf;
+    FOR(j, n)
+        x += intersects(tester[j], result.first);
+    Timestamp tg;
+
+    dvec3 d = vmax - vmin;
+    std::cout << tfm::format("Same %.05f, A %.05f, Ac %.05f, Tree %.05f Volume %.05f", ab / n, aa / n, aac / n, bb / n, volume(mesh) / (d.x * d.y * d.z)) << std::endl;
+    std::cout << tfm::format("timing %lf %lf %lf (%d)", ta.elapsed_ms(tb), tb.elapsed_ms(tc), tc.elapsed_ms(td), x) << std::endl;
+    std::cout << tfm::format("timing %lf %lf %lf (%d)", td.elapsed_ms(te), te.elapsed_ms(tf), tf.elapsed_ms(tg), x) << std::endl;
+	return std::unique_ptr<SolidLeafBSPTree>(result.first);
 }
 
 // ============

@@ -30,12 +30,17 @@ struct SolidLeafBSPTree {
 	}
 
 	plane divider;
+
+    // dbg info
+    float percent;
+    int hist[4] = { 0, 0, 0, 0 };
+
 	// nullptr means outside space, 0x0001 means inside space
 	SolidLeafBSPTree* positive = nullptr;
 	SolidLeafBSPTree* negative = nullptr;
 };
 
-std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples);
+std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples, std::default_random_engine& rnd);
 
 // Note: may return either true or false for boundary!
 bool intersects(const SolidLeafBSPTree* tree, const dvec3& v);

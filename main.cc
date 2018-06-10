@@ -23,36 +23,7 @@
 #include "rendering.hh"
 #include "shape.hh"
 #include "integration.hh"
-
-// ============
-
-inline int64_t rdtsc() {
-	uint lo, hi;
-	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-	return (static_cast<uint64_t>(hi) << 32) | lo;
-}
-
-struct Timestamp {
-    Timestamp() : m_ticks(rdtsc()) { }
-
-    int64_t elapsed(Timestamp a = Timestamp()) const { return a.m_ticks - m_ticks; }
-    double elapsed_ms(Timestamp a = Timestamp()) const { return elapsed(a) * milisec_per_tick; }
-
-    static void init(dvec3 a, i64vec3 b, dvec3 c, i64vec3 d) {
-        glm::dvec3 q = (c - a) / glm::dvec3(d - b);
-        if (q.x > q.y) std::swap(q.x, q.y);
-        if (q.y > q.z) std::swap(q.y, q.z);
-        if (q.x > q.y) std::swap(q.x, q.y);
-        milisec_per_tick = q.y * 1000;
-    }
-
-    static double milisec_per_tick;
-
-private:
-    int64_t m_ticks;
-};
-
-double Timestamp::milisec_per_tick = 0;
+#include "timestamp.hh"
 
 // Dynamics and simulation
 // =======================
@@ -238,42 +209,14 @@ real solid_angle(dvec3 A, dvec3 B, dvec3 C) {
 int main(int argc, char** argv) {
 	void sigsegv_handler(int sig);
 	signal(SIGSEGV, sigsegv_handler);
+
+    Timestamp::init();
+
     if (!glfwInit())
         return -1;
 
-    {
-    glm::dvec3 a;
-	glm::i64vec3 b;
-	a.x = glfwGetTime();
-	b.x = rdtsc();
-	usleep(100000);
-	a.y = glfwGetTime();
-	b.y = rdtsc();
-	usleep(100000);
-	a.z = glfwGetTime();
-	b.z = rdtsc();
-
-    usleep(100000);
-
-    glm::dvec3 c;
-	glm::i64vec3 d;
-	c.x = glfwGetTime();
-	d.x = rdtsc();
-	usleep(100000);
-	c.y = glfwGetTime();
-	d.y = rdtsc();
-	usleep(100000);
-	c.z = glfwGetTime();
-	d.z = rdtsc();
-	Timestamp::init(a, b, c, d);
-    }
-
     try {
-        std::cout << "load bunny" << std::endl;
-        Timestamp ta;
         Mesh3d mm = load_stl("models/bunny.stl");
-        std::cout << ta.elapsed_ms() << std::endl;
-
         std::vector<dvec3> vertices;
         FOR_EACH(f, mm)
             FOR(i, 3)
@@ -289,42 +232,33 @@ int main(int argc, char** argv) {
         std::cout << "CenterOfMass " << center_of_mass(ch) << std::endl;
         std::cout << "IsConvex " << is_convex(ch) << std::endl;
 
-        std::random_device rd;
-        std::default_random_engine rnd(rd());
-        //build_solid_leaf_bsp_tree(SphereMesh(10, rnd), 10000);
+        std::default_random_engine rnd(0);
+
+        Timestamp ta;
+        build_solid_leaf_bsp_tree(SphereMesh(5, rnd), 100000, rnd);
+        std::cout << ta.elapsed_ms() << std::endl;
+
+        Timestamp tb;
+        build_solid_leaf_bsp_tree(SphereMesh(6, rnd), 100000, rnd);
+        std::cout << tb.elapsed_ms() << std::endl;
+
+        Timestamp tc;
+        build_solid_leaf_bsp_tree(SphereMesh(7, rnd), 100000, rnd);
+        std::cout << tc.elapsed_ms() << std::endl;
+
+        Timestamp td;
+        build_solid_leaf_bsp_tree(SphereMesh(8, rnd), 100000, rnd);
+        std::cout << td.elapsed_ms() << std::endl;
     } catch (std::runtime_error& e) {
         std::cout << "std::runtime_error " << e.what() << std::endl;
     }
     return 0;
-
-	glm::dvec3 a;
-	glm::i64vec3 b;
-	a.x = glfwGetTime();
-	b.x = rdtsc();
-	usleep(100000);
-	a.y = glfwGetTime();
-	b.y = rdtsc();
-	usleep(100000);
-	a.z = glfwGetTime();
-	b.z = rdtsc();
 
 	GLFWwindow* window = create_window();
 	if (!window)
 		return -1;
 	model_init(window);
 	render_init();
-
-	glm::dvec3 c;
-	glm::i64vec3 d;
-	c.x = glfwGetTime();
-	d.x = rdtsc();
-	usleep(100000);
-	c.y = glfwGetTime();
-	d.y = rdtsc();
-	usleep(100000);
-	c.z = glfwGetTime();
-	d.z = rdtsc();
-	Timestamp::init(a, b, c, d);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();

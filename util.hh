@@ -4,10 +4,24 @@
 #include <strstream>
 #include <algorithm>
 
+// TODO implement without a swap
+template<typename T>
+T median(T x, T y, T z) {
+    if (x > y) std::swap(x, y);
+    if (y > z) std::swap(y, z);
+    if (x > y) std::swap(x, y);
+    return y;
+}
+
 template<typename Container>
 void release(Container& container) {
 	Container empty;
 	std::swap(empty, container);
+}
+
+template<typename Container>
+void sort(Container& container) {
+	std::sort(container.begin(), container.end());
 }
 
 template<typename Container, typename Func>
@@ -29,6 +43,12 @@ template<typename Number>
 void from_chars(const char* begin, const char* end, Number& out) {
     std::istrstream is(begin, end - begin);
     is >> out;
+}
+
+template<typename Vector>
+void remove_dups(Vector& v) {
+	std::sort(v.begin(), v.end());
+	v.erase(std::unique(v.begin(), v.end()), v.end());
 }
 
 #endif

@@ -123,8 +123,8 @@ inline auto angle(segment3 p, segment3 q) {
 
 // uniform inside a cube
 template<typename RandomEngine>
-dvec3 random_vector(RandomEngine& rnd) {
-	std::uniform_real_distribution<real> dist(-1.0, 1.0);
+dvec3 random_vector(RandomEngine& rnd, real a = -1.0, real b = 1.0) {
+	std::uniform_real_distribution<real> dist(a, b);
 	return dvec3(dist(rnd), dist(rnd), dist(rnd));
 }
 

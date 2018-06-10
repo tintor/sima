@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(sima)
 
-set(prod shape.cc file.cc primitives.cc rendering.cc lodepng/lodepng.cc)
+set(prod shape.cc file.cc primitives.cc rendering.cc timestamp.cc lodepng/lodepng.cc)
 set(test shape_test.cc primitives_test.cc integration_test.cc)
 
 add_executable(sima main.cc ${prod})
