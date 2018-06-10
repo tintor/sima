@@ -12,38 +12,64 @@ typedef std::vector<triangle3> Mesh3d;
 Mesh3d load_stl(const std::string& filename);
 Mesh3d load_ply(const std::string& filename);
 
-struct SolidLeafBSPTree {
-	static const SolidLeafBSPTree* Inside;
+class SolidBSPTree {
+public:
+    SolidBSPTree(const Mesh3d& mesh, uint32_t num_samples, std::default_random_engine& rnd);
+    bool intersects(const dvec3& v);
 
-	SolidLeafBSPTree() { }
-	SolidLeafBSPTree(SolidLeafBSPTree&) = delete;
-	SolidLeafBSPTree& operator=(SolidLeafBSPTree&) = delete;
+private:
+    struct Node {
+        plane divider;
+        uint32_t positive, negative;
+    };
 
-	~SolidLeafBSPTree() {
-		destroy(positive);
-		destroy(negative);
-	}
+    struct Hist {
+        int positive;
+        int negative;
+        int overlap;
+        int stradle;
+    };
 
-	static void destroy(SolidLeafBSPTree* p) {
-		if (p != nullptr && p != Inside)
-			delete p;
-	}
+    struct itriangle {
+        uint16_t a, b, c;
+    };
 
-	plane divider;
+    struct BuildData {
+        std::vector<dvec3> vertices;
+        std::vector<itriangle> ifaces;
+        std::vector<triangle3> faces;
+        std::vector<dvec3> samples;
+        std::default_random_engine rnd;
+    };
 
-    // dbg info
-    float percent;
-    int hist[4] = { 0, 0, 0, 0 };
+    std::pair<uint32, real> build_internal(
+            BuildData& data, const std::vector<uint32_t>& mesh,
+            uint32_t* samples_begin, uint32_t* samples_end);
 
-	// nullptr means outside space, 0x0001 means inside space
-	SolidLeafBSPTree* positive = nullptr;
-	SolidLeafBSPTree* negative = nullptr;
+    void print(uint32_t n, int depth = 0);
+
+    static void evaluate_candidate(
+            const plane& candidate,
+            BuildData& data,
+            const std::vector<uint32_t>& mesh,
+            uint32_t* samples_begin,
+            uint32_t* samples_end,
+            int64_t& best_heuristic,
+            Hist& best_hist,
+            plane& best_candidate);
+
+    uint32_t add_node() {
+        uint32_t n = node.size();
+        node.resize(n + 1);
+        percent.resize(n + 1);
+        hist.resize(n + 1);
+        return n;
+    }
+
+    std::vector<Node> node;
+    std::vector<float> percent;
+    std::vector<Hist> hist;
 };
-
-std::unique_ptr<SolidLeafBSPTree> build_solid_leaf_bsp_tree(const Mesh3d& mesh, uint32_t num_samples, std::default_random_engine& rnd);
-
-// Note: may return either true or false for boundary!
-bool intersects(const SolidLeafBSPTree* tree, const dvec3& v);
 
 // Mesh properties
 // ===============

@@ -234,21 +234,14 @@ int main(int argc, char** argv) {
 
         std::default_random_engine rnd(0);
 
-        Timestamp ta;
-        build_solid_leaf_bsp_tree(SphereMesh(5, rnd), 100000, rnd);
-        std::cout << ta.elapsed_ms() << std::endl;
-
-        Timestamp tb;
-        build_solid_leaf_bsp_tree(SphereMesh(6, rnd), 100000, rnd);
-        std::cout << tb.elapsed_ms() << std::endl;
-
-        Timestamp tc;
-        build_solid_leaf_bsp_tree(SphereMesh(7, rnd), 100000, rnd);
-        std::cout << tc.elapsed_ms() << std::endl;
-
-        Timestamp td;
-        build_solid_leaf_bsp_tree(SphereMesh(8, rnd), 100000, rnd);
-        std::cout << td.elapsed_ms() << std::endl;
+        FOR(n, 100) {
+            if (n < 5)
+                continue;
+            std::cout << "SphereMesh(" << n << ")" << std::endl;
+            Timestamp ta;
+            SolidBSPTree tree(SphereMesh(n, rnd), 1000000, rnd);
+            std::cout << ta.elapsed_ms() << std::endl;
+        }
     } catch (std::runtime_error& e) {
         std::cout << "std::runtime_error " << e.what() << std::endl;
     }

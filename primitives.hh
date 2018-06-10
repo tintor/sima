@@ -181,6 +181,8 @@ struct plane {
 
 	plane() { }
 
+	plane(const dvec3& normal, real d) : normal(normal), d(d) { }
+
 	plane(const dvec3& a, const dvec3& b, const dvec3& c)
 		: normal(normalize(Normal(a, b, c))), d(dot(-normal, a)) { }
 
