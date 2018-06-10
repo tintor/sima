@@ -234,14 +234,9 @@ int main(int argc, char** argv) {
 
         std::default_random_engine rnd(0);
 
-        FOR(n, 100) {
-            if (n < 5)
-                continue;
-            std::cout << "SphereMesh(" << n << ")" << std::endl;
-            Timestamp ta;
-            SolidBSPTree tree(SphereMesh(n, rnd), 1000000, rnd);
-            std::cout << ta.elapsed_ms() << std::endl;
-        }
+        Timestamp ta;
+        SolidBSPTree tree(mm, 100000, rnd);
+        std::cout << ta.elapsed_ms() << std::endl;
     } catch (std::runtime_error& e) {
         std::cout << "std::runtime_error " << e.what() << std::endl;
     }

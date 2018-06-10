@@ -63,12 +63,14 @@ private:
         node.resize(n + 1);
         percent.resize(n + 1);
         hist.resize(n + 1);
+        box_size.resize(n + 1);
         return n;
     }
 
     std::vector<Node> node;
     std::vector<float> percent;
     std::vector<Hist> hist;
+    std::vector<dvec3> box_size;
 };
 
 // Mesh properties

@@ -230,14 +230,14 @@ struct plucker {
 	}
 };
 
-inline dvec3 mini(const triangle3& p) {
+inline dvec3 min(const triangle3& p) {
 	dvec3 e;
 	FOR(i, 3)
 		e[i] = min(p.a[i], p.b[i], p.c[i]);
 	return e;
 }
 
-inline dvec3 maxi(const triangle3& p) {
+inline dvec3 max(const triangle3& p) {
 	dvec3 e;
 	FOR(i, 3)
 		e[i] = max(p.a[i], p.b[i], p.c[i]);
