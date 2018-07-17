@@ -1,0 +1,13 @@
+CMakeCache.txt
+CMakeFiles/*
+*/CMakeFiles/*
+*/*/CMakeFiles/*
+Makefile
+*/Makefile
+*/*/Makefile
+*.cmake
+*/*.cmake
+*/*/*.a
+sima
+test
+glfw/docs/Doxyfile
