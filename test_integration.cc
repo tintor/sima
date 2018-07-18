@@ -1,6 +1,6 @@
+#include "integration.h"
+#include "range.h"
 #include "catch.hpp"
-#include "for.hh"
-#include "integration.hh"
 
 TEST_CASE("Numerical integrators") {
 	// differential edquation: y' = y, y(0) = 1
@@ -10,17 +10,17 @@ TEST_CASE("Numerical integrators") {
 	double k = 4.0 / 320;
 
 	double e = 1;
-	FOR(i, 320)
+	for (auto i : range(320))
 		e = EulersMethod<double, double>(e, i * k, k, der);
 	CHECK(abs(e - exp(4.0)) <= 1.34);
 
 	e = 1;
-	FOR(i, 320)
+	for (auto i : range(320))
 		e = MidpointMethod<double, double>(e, i * k, k, der);
 	CHECK(abs(e - exp(4.0)) <= 0.0057);
 
 	e = 1;
-	FOR(i, 320)
+	for (auto i : range(320))
 		e = RungeKutta4<double, double>(e, i * k, k, der);
 	CHECK(abs(e - exp(4.0)) <= 4.4e-08);
 }

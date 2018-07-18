@@ -1,6 +1,4 @@
-#ifndef __INTEGRATION_H__
-#define __INTEGRATION_H__
-
+#pragma once
 #include <functional>
 
 // T = vector, S = scalar
@@ -27,5 +25,3 @@ T RungeKutta4(T x0, S t0, S dt, std::function<T(T x, S d)> derivative) {
 	T k4 = dt * derivative(x0 + k3, t0 + dt);
 	return x0 + (k1 + 2 * (k2 + k3) + k4) / 6;
 }
-
-#endif
