@@ -51,14 +51,14 @@ namespace detail
 	template<>
 	GLM_FUNC_QUALIFIER int bitCount(uint32 x)
 	{
-		return _mm_popcnt_u32(x);
+		return __builtin_popcount(x);
 	}
 
 #	if(GLM_MODEL == GLM_MODEL_64)
 	template<>
 	GLM_FUNC_QUALIFIER int bitCount(uint64 x)
 	{
-		return static_cast<int>(_mm_popcnt_u64(x));
+		return static_cast<int>(__builtin_popcountl(x));
 	}
 #	endif//GLM_MODEL
 #	endif//GLM_ARCH
