@@ -15,13 +15,13 @@ imesh3 load_stl(std::string_view filename) {
         throw error("expected [solid Default]");
 
     std::regex facet_regex(R"(^\s*facet\s+)");
-    std::regex vertex_regex(format(R"(^\s*vertex ({}) ({}) ({})\s*$)", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
+    std::regex vertex_regex(format(R"(^\s*vertex (%s) (%s) (%s)\s*$)", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
     while (true) {
 		line = file.readline();
         if (line == "endsolid Default\n")
             break;
         if (!search(line, facet_regex))
-            throw error("expected [facet ...] or [endsolid Default] instead of [{}]", line);
+            throw error("expected [facet ...] or [endsolid Default] instead of [%s]", line);
         if (file.readline() != "    outer loop\n")
             throw error("expected [outer loop]");
 
@@ -29,7 +29,7 @@ imesh3 load_stl(std::string_view filename) {
         for (auto i : range(3)) {
 			line = file.readline();
             if (!match(line, vertex_regex, /*out*/m))
-                throw error("expected [vertex ...] instead of [{}]", line);
+                throw error("expected [vertex ...] instead of [%s]", line);
             v[i].x = parse<double>(m[1]);
             v[i].y = parse<double>(m[3]);
             v[i].z = parse<double>(m[5]);
@@ -69,13 +69,13 @@ imesh3 load_ply(std::string_view filename) {
         }
     }
 
-    std::regex vertex_regex(format(R"(^({}) ({}) ({})(\s+|$))", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
+    std::regex vertex_regex(format(R"(^(%s) (%s) (%s)(\s+|$))", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
     while (vertices.size() < vertices.capacity()) {
 		line = file.readline();
         if (line == "")
             throw error("unexpected end of ply file");
         if (!search(line, vertex_regex, /*out*/m))
-            throw error("expected vertex in ply file: [{}]", line);
+            throw error("expected vertex in ply file: [%s]", line);
         double a = parse<double>(m[1]);
         double b = parse<double>(m[3]);
 		double c = parse<double>(m[5]);

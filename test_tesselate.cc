@@ -73,7 +73,7 @@ static long xarea(ivec2 a, ivec2 b, ivec2 c) {
 TEST_CASE("tesselate 1000") {
 	std::default_random_engine rng;
 	for (auto i : range(3, 1001)) {
-		print("Case: {}\n", i);
+		print("Case: %s\n", i);
 
 		ipolygon2 poly;
 		long poly_area = 0;
@@ -85,18 +85,18 @@ TEST_CASE("tesselate 1000") {
 
 		print("POLYGON ((");
 		for (auto p : poly)
-			print("{}, ", p);
-		print("{}))\n", poly.front());
+			print("%s, ", p);
+		print("%s))\n", poly.front());
 	
 		print("MULTIPOLYGON ((");
 		for (auto t : tess) {
 			if (t != tess.front())
 				print(", ");
-			print("({}, {})", t, t.a);
+			print("(%s, %s)", t, t.a);
 		}
 		print("))\n");
 		for (auto t : tess) {
-			print("{}\n", (long)xarea(t.a, t.b, t.c));
+			print("%s\n", (long)xarea(t.a, t.b, t.c));
 		}
 		
 		// verify that sum of areas of all triangles equals polygon area
