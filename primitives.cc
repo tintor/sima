@@ -1,5 +1,6 @@
-#include "primitives.hh"
+#include "primitives.h"
 
+#ifdef xxx
 // infinite line vs. point
 real line_point_squared_distance(dvec3 a, dvec3 b, dvec3 p) {
 	dvec3 ba = b - a, pa = p - a;
@@ -291,15 +292,6 @@ real distance(const triangle3& p, const triangle3& q) {
 	return disjoint_distance(p, q);
 }
 
-transform3 combine(const transform3& a, const transform3& b) {
-    // TODO create two dmat4 from two transform3
-	dmat4 a4, b4;
-    // TODO figure out combination formula: ie: a * inverse(b)
-	dmat4 c4 = a4 * inverse(b4);
-    // TODO convert c4 back to transform3
-	throw new std::runtime_error("combine() unimplemented");
-}
-
 // Angle between oriented triangles ABC and BAD.
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
@@ -322,3 +314,4 @@ sphere merge_spheres(const sphere& a, const sphere& b) {
 	c.center = a.center + ((c.radius - a.radius) / dist) * d;
 	return c;
 }
+#endif
