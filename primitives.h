@@ -1,12 +1,11 @@
-#ifndef __PRIMITIVES_H__
-#define __PRIMITIVES_H__
+#pragma once
 
 #include <cmath>
 #include <random>
 
-#include "tinyformat.h"
-#include "for.hh"
-#include "util.hh"
+#include "util.h"
+#include "range.h"
+#include "common.h"
 
 using real = double;
 
@@ -39,7 +38,7 @@ inline real squared(vec4 a) { return dot(a, a); }
 inline constexpr long double operator "" _deg(long double a) { return a * (M_PI / 180); }
 inline constexpr long double operator "" _deg(unsigned long long a) { return a * (M_PI / 180); }
 
-inline std::string deg(long double r) { return tfm::format("%llg deg", r * (180 / M_PI)); }
+inline std::string deg(long double r) { return format("%g deg", r * (180 / M_PI)); }
 
 inline auto angle(dvec3 a, dvec3 b) {
 	// atan2 is numericaly better than acos when angle is very small
@@ -230,82 +229,16 @@ struct plucker {
 	}
 };
 
-inline dvec3 min(const triangle3& p) {
-	dvec3 e;
-	FOR(i, 3)
-		e[i] = min(p.a[i], p.b[i], p.c[i]);
-	return e;
-}
-
-inline dvec3 max(const triangle3& p) {
-	dvec3 e;
-	FOR(i, 3)
-		e[i] = max(p.a[i], p.b[i], p.c[i]);
-	return e;
-}
-
-inline bool DisjointIntervals(real amin, real amax, real bmin, real bmax) {
-	return amax + PlanarEpsilon < bmin || bmax + PlanarEpsilon < amin;
-}
-
-class UnionFind {
-public:
-	UnionFind() : m_parent(this), m_rank(0) { }
-
-	void Union(UnionFind& b) {
-		UnionFind* pa = Find();
-		UnionFind* pb = b.Find();
-
-		if (pa->m_rank < pb->m_rank) {
-			pa->m_parent = pb;
-		} else if (pa->m_rank > pb->m_rank) {
-			pb->m_parent = pa;
-		} else {
-			pa->m_rank += 1;
-			pb->m_parent = pa;
-		}
-	}
-
-	UnionFind* Find() {
-		// Path halving faster than path compression (from Wikipedia)
-		UnionFind* x = this;
-		while (x->m_parent != x) {
-			x->m_parent = x->m_parent->m_parent;
-			x = x->m_parent;
-		}
-  		return x;
-	}
-
-private:
-	UnionFind* m_parent;
-	uint32_t m_rank;
-};
-
-template<typename T>
-void hash_combine(size_t& seed, const T& value) {
-	// The code is from `hash_combine` function of the Boost library. See
-	// http://www.boost.org/doc/libs/1_55_0/doc/html/hash/reference.html#boost.hash_combine .
-	seed ^= std::hash<T>()(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
 
 namespace std {
 	template<> struct hash<dvec3> {
 		size_t operator()(const dvec3& a) const {
 			size_t seed = 0;
-			FOR(i, 3)
+			for (auto i : range(3))
 				hash_combine(seed, a[i]);
 			return seed;
 		}
     };
-
-  template <typename A, typename B> struct hash<pair<A, B>> {
-    size_t operator()(const pair<A, B>& x) const {
-		size_t seed = 0;
-		hash_combine(seed, x.first);
-		hash_combine(seed, x.second);
-	    return seed;
-    }
-  };
 
   template<> struct hash<segment3> {
     size_t operator()(const segment3& x) const {
@@ -315,11 +248,6 @@ namespace std {
 	    return seed;
     }
   };
-}
-
-inline dmat3 full_mat3(real a) {
-    const real m[] = { a, a, a, a, a, a, a, a, a};
-    return glm::make_mat3(m);
 }
 
 real distance(const dvec3& a, const dvec3& b);
@@ -346,39 +274,6 @@ real distance(const triangle3 m, const segment3& e);
 real disjoint_distance(const triangle3& p, const triangle3& q);
 real distance(const triangle3& p, const triangle3& q);
 
-struct transform3 {
-	dmat3 orientation;
-	dvec3 position;
-
-    transform3(const dvec3& position, dquat orientation)
-        : orientation(orientation), position(position) { }
-
-    dvec3 to_global(dvec3 v) const { return orientation * v + position; }
-    dvec3 to_local(dvec3 v) const { return (v - position) * orientation; }
-
-    segment3 to_local(const segment3& p) const {
-		return segment3(to_local(p.a), to_local(p.b));
-	}
-
-	dvec3 to_global_dir(const dvec3& p) const {
-		return orientation * p;
-	}
-
-	segment3 to_global(const segment3& p) const {
-		return segment3(to_global(p.a), to_global(p.b));
-	}
-
-	triangle3 to_local(const triangle3& p) const {
-		return triangle3(to_local(p.a), to_local(p.b), to_local(p.c));
-	}
-
-	triangle3 to_global(const triangle3& p) const {
-		return triangle3(to_global(p.a), to_global(p.b), to_global(p.c));
-	}
-};
-
-transform3 combine(const transform3& a, const transform3& b);
-
 // Angle between oriented triangles ABC and BAD.
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
@@ -391,5 +286,3 @@ struct sphere {
 };
 
 sphere merge_spheres(const sphere& a, const sphere& b);
-
-#endif

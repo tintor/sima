@@ -1,11 +1,10 @@
-#include "primitives.hh"
-
-#define CATCH_CONFIG_MAIN
+#include "primitives.h"
 #include "catch.hpp"
 
 using std::cout;
 using std::endl;
 
+#ifdef xxx
 TEST_CASE("line_point_squared_distance") {
     REQUIRE(line_point_squared_distance(dvec3(0,0,0), dvec3(9,0,0), dvec3(1,2,0)) == 4);
 }
@@ -50,7 +49,7 @@ segment3 LineNearestNumeric(segment3 p, segment3 q, std::default_random_engine& 
 	std::normal_distribution<real> gauss(0.0, 1.0);
 	real snum = 0.5, tnum = 0.5;
 	real dnum = l2Norm(p.linear(snum) - q.linear(tnum));
-	FOR(j, 1000000) {
+	for (auto j : range(1000000)) {
 		real s = clamp(snum + gauss(rnd));
 		real t = clamp(tnum + gauss(rnd));
 		const dvec3 A = p.linear(s);
@@ -66,22 +65,22 @@ segment3 LineNearestNumeric(segment3 p, segment3 q, std::default_random_engine& 
 
 void TestLineNearest(segment3 p, segment3 q, std::default_random_engine& rnd) {
 	segment3 n = segment3::Nearest(p, q).first;
-	cout << p.param(n.a) << " " << q.param(n.b) << " computed Angle " << deg(angle(p, n)) << " " << deg(angle(q, n)) << endl;
+	//cout << p.param(n.a) << " " << q.param(n.b) << " computed Angle " << deg(angle(p, n)) << " " << deg(angle(q, n)) << endl;
 	real d = l2Norm(n.a - n.b);
 
 	segment3 nn = LineNearestNumeric(p, q, rnd);
 	real snum = p.param(nn.a), tnum = q.param(nn.b);
 	real dnum = l2Norm(nn.a-nn.b);
-	if (dnum < d * 0.99999)
-		cout << snum << " " << tnum << " Angle: " << deg(angle(p, nn)) << " " << deg(angle(q, nn)) << endl;
+	//if (dnum < d * 0.99999)
+	//	cout << snum << " " << tnum << " Angle: " << deg(angle(p, nn)) << " " << deg(angle(q, nn)) << endl;
 	REQUIRE(dnum >= d * 0.99999);
 }
 
 TEST_CASE("LineNearest - random long and short") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<real> uni2(-6, 6);
-	FOR(i, 20) {
-		cout << "Case " << i << endl;
+	for (auto i : range(20)) {
+		//cout << "Case " << i << endl;
 		dvec3 pa = random_vector(rnd) * 1000.0;
 		dvec3 qa = random_vector(rnd) * 1000.0;
 		dvec3 pd = random_vector(rnd) * 1000.0 * static_cast<real>(pow(10, uni2(rnd)));
@@ -95,8 +94,8 @@ TEST_CASE("LineNearest - random long and short") {
 TEST_CASE("LineNearest - random parallel") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<real> uni2(-1, 1);
-	FOR(i, 20) {
-		cout << "Case " << i << endl;
+	for (auto i : range(20)) {
+		//cout << "Case " << i << endl;
 		segment3 p(random_vector(rnd) * 1000.0, random_vector(rnd) * 1000.0);
 		dvec3 t = random_vector(rnd) * 1000.0;
 		dvec3 dir = p.b - p.a;
@@ -131,3 +130,4 @@ TEST_CASE("merge_spheres()") {
 		e *= 0.9;
 	}
 }
+#endif
