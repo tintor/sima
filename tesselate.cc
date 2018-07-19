@@ -1,6 +1,5 @@
 #include "tesselate.h"
 #include "range.h"
-#include "catch.hpp"
 
 inline long m(int a, int b, int c, int d) {
 	return (long(a) + b) * (long(c) - d);
@@ -25,11 +24,11 @@ static int sign(ivec2 a, ivec2 b, ivec2 c) {
 }
 
 imesh2 tesselate(ipolygon2 poly) {
-	REQUIRE(poly.size() >= 3);
+	assert(poly.size() >= 3);
 	imesh2 m;
 	m.reserve(poly.size() - 2);
 	auto sign_poly = sign(poly);
-	REQUIRE(sign_poly != 0);
+	assert(sign_poly != 0);
 	ipolygon2 copy;
 	copy.reserve(poly.size() - 1);
 	while (poly.size() > 2) {
@@ -48,7 +47,7 @@ imesh2 tesselate(ipolygon2 poly) {
 			}
 			b = c;
 		}
-		REQUIRE(copy.size() < poly.size());
+		assert(copy.size() < poly.size());
 		poly.clear();
 		std::swap(poly, copy);
 	}

@@ -70,25 +70,6 @@ static long xarea(ivec2 a, ivec2 b, ivec2 c) {
 	return area;
 }
 
-namespace glm {
-
-inline void format_e(std::string& s, std::string_view spec, ivec2 v) {
-	::format_e(s, "", v.x);
-	s += ' ';
-	::format_e(s, "", v.y);
-}
-
-}
-
-template<typename T>
-void format_e(std::string& s, std::string_view spec, triangle<T> v) {
-	format_e(s, "", v.a);
-	s += ", ";
-	format_e(s, "", v.b);
-	s += ", ";
-	format_e(s, "", v.c);
-}
-
 TEST_CASE("tesselate 1000") {
 	std::default_random_engine rng;
 	for (auto i : range(3, 1001)) {
