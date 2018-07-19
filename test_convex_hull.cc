@@ -1,5 +1,6 @@
 #include "convex_hull.h"
 #include "zip.h"
+#include "properties.h"
 #include "catch.hpp"
 #include <random>
 #include <iostream>
@@ -34,7 +35,7 @@ bool less(const std::vector<ivec3>& a, const std::vector<ivec3>& b) {
 	return false;
 };
 
-std::vector<ivec3> normalize(const std::vector<ivec3>& v) {
+static std::vector<ivec3> normalize(const std::vector<ivec3>& v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
@@ -47,7 +48,7 @@ std::vector<ivec3> normalize(const std::vector<ivec3>& v) {
 	return w;
 }
 
-ipoly3 hull(std::vector<ivec3> a) {
+static ipoly3 hull(std::vector<ivec3> a) {
 	imesh3 m = convex_hull(a);
 	// convert imesh3 to ipoly3 with triangles
 	ipoly3 p;
@@ -64,7 +65,7 @@ ipoly3 hull(std::vector<ivec3> a) {
 	return p;	
 }
 
-void rotate90_flip_and_shuffle(std::vector<ivec3> v) {
+static void rotate90_flip_and_shuffle(std::vector<ivec3> v) {
 	std::default_random_engine rnd;
 	ipoly3 m = hull(v);
 	for (auto i : range(100)) {	
@@ -139,20 +140,7 @@ ivec3 random_direction(RandomEngine& rnd) {
 	return { std::round(v.x), std::round(v.y), std::round(v.z) };
 }
 
-double volume(const imesh3& mesh) {
-	double volume = 0;
-	for (auto m : mesh) {
-		double s = 0, z = 0;
-		for (auto [a, b] : m.edges()) {
-			z += b.z;
-			s += ((double)a.y + b.y) * ((double)a.x - b.x);
-		}
-		volume += z * s;
-	}
-	return volume / 6;
-}
-
-/*TEST_CASE("convex_hull random points on sphere") {
+TEST_CASE("convex_hull random points on sphere") {
 	std::default_random_engine rnd;
 	int vertices = 1000;
 	std::vector<ivec3> V(vertices);
@@ -162,4 +150,4 @@ double volume(const imesh3& mesh) {
 	double v = 4.0 / 3 * M_PI * 1e18;
 	REQUIRE(m.size() == vertices * 2 - 4);
 	REQUIRE(abs(volume(m) - v) / v < 0.15);
-}*/
+}

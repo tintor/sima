@@ -83,6 +83,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	for (auto p : points) {
 		if (p == a || p == b || p == c || p == d)
 			continue;
+		print("{}\n", hull);
 		// Remove faces on hull covered by new vertex
 		open_edges.clear();
 		for (auto i : range(hull.size())) {
@@ -104,6 +105,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		// For each open edge create a face that connects it with P
 		for (auto e : open_edges)
 			hull.emplace_back(e.a, e.b, p);
+		print("{}\n", hull);
 		assert(is_convex(hull));
 	}
 }
