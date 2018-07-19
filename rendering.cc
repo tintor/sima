@@ -1,12 +1,12 @@
-#include "rendering.hh"
-#include "for.hh"
-#include "auto.h"
-#include "tinyformat.h"
+#include "rendering.h"
+#include "range.h"
 
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <mutex>
+
+#define LODEPNG_COMPILE_CPP
+#include "lodepng/lodepng.h"
 
 void Error(const char* name) {
 	int error = glGetError();
@@ -28,9 +28,6 @@ int gen_buffer(GLenum target, GLsizei size, const void* data) {
 }
 
 // Render::Texture
-
-#define LODEPNG_COMPILE_CPP
-#include "lodepng/lodepng.h"
 
 void load_png_texture(std::string_view filename) {
 	unsigned char* image;
@@ -83,7 +80,7 @@ GLuint make_shader(GLenum type, std::string_view source) {
 }
 
 GLuint load_shader(GLenum type, std::string_view name, std::string_view ext) {
-	return make_shader(type, read_file(tfm::format("shaders/%s.%s", name, ext)));
+	return make_shader(type, read_file(format("shaders/%s.%s", name, ext)));
 }
 
 GLuint make_program(const std::vector<GLuint>& shaders) {
@@ -153,21 +150,20 @@ void make_character(float* vertex, float* texture, float x, float y, float n, fl
 	*t++ = du + 0; *t++ = dv + b - p;
 }
 
-void text_gen_buffers(GLuint position_buffer, GLuint uv_buffer, float x, float y, float n, const char* text,
+void text_gen_buffers(GLuint position_buffer, GLuint uv_buffer, float x, float y, float n, std::string_view text,
 		std::vector<GLfloat>& position_data, std::vector<GLfloat>& uv_data) {
-	int length = strlen(text);
-	position_data.resize(length * 6 * 2);
-	uv_data.resize(length * 6 * 2);
+	position_data.resize(text.size() * 6 * 2);
+	uv_data.resize(text.size() * 6 * 2);
 
-	for (int i = 0; i < length; i++) {
+	for (auto i : range(text.size())) {
 		make_character(&position_data[0] + i * 12, &uv_data[0] + i * 12, x, y, n / 2, n, text[i]);
 		x += n;
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * length * 6 * 2, &position_data[0], GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * text.size() * 6 * 2, &position_data[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, uv_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * length * 6 * 2, &uv_data[0], GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * text.size() * 6 * 2, &uv_data[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -199,8 +195,8 @@ Text::Text() {
 	text_uv_loc = glGetAttribLocation(text_program, "uv");
 	glBindFragDataLocation(text_program, 0, "color");
 
-	glGenBuffers(1, &m_positionBuffer);
-	glGenBuffers(1, &m_uvBuffer);
+	glGenBuffers(1, &_positionBuffer);
+	glGenBuffers(1, &_uvBuffer);
 
 	glGenTextures(1, &text_texture);
 	glBindTexture(GL_TEXTURE_2D, text_texture);
@@ -218,44 +214,29 @@ void Text::Reset(int width, int height, glm::mat4& matrix, bool down) {
 	glUniformMatrix4fv(text_matrix_loc, 1, GL_FALSE, &matrix[0][0]);
 	glUniform1i(text_sampler_loc, 0/*text_texture*/);
 	int lines = (height > width) ? 80 : 40;
-	m_ts = height / (lines * 2);
-	m_tx = m_ts / 2;
-	m_ty = down ? (height - m_ts) : (m_ts);
-	m_tdy = down ? (-m_ts * 2) : (m_ts * 2);
+	_ts = height / (lines * 2);
+	_tx = _ts / 2;
+	_ty = down ? (height - _ts) : (_ts);
+	_tdy = down ? (-_ts * 2) : (_ts * 2);
 }
 
-void Text::Print(const char* format, ...) {
-	char buffer[1024];
-	va_list va;
-	va_start(va, format);
-	int length = vsnprintf(buffer, sizeof(buffer), format, va);
-	va_end(va);
-
-	PrintBuffer(buffer, length);
-}
-
-void Text::PrintBuffer(const char* buffer, int length) {
-	PrintAt(m_tx, m_ty, m_ts, buffer, length);
-	m_ty += m_tdy;
-}
-
-void Text::PrintAt(float x, float y, float n, const char* text, int length) {
-	text_gen_buffers(m_positionBuffer, m_uvBuffer, x, y, (n == 0) ? m_ts : n, text, m_position_data, m_uv_data);
+void Text::PrintAt(float x, float y, float n, std::string_view text) {
+	text_gen_buffers(_positionBuffer, _uvBuffer, x, y, (n == 0) ? _ts : n, text, _position_data, _uv_data);
 	// TODO use glm::value_ptr(matrix)
 	glUniform4fv(text_fg_color_loc, 1, &fg_color[0]);
 	glUniform4fv(text_bg_color_loc, 1, &bg_color[0]);
-	text_draw_buffers(m_positionBuffer, m_uvBuffer, text_position_loc, text_uv_loc, length);
+	text_draw_buffers(_positionBuffer, _uvBuffer, text_position_loc, text_uv_loc, text.size());
 }
 
 Console::Console() {
-	memset(m_output, ' ', ConsoleWidth * ConsoleHeight);
+	memset(_output, ' ', ConsoleWidth * ConsoleHeight);
 
 	Input* p = new Input;
 	p->cursor = 1;
 	p->buffer[0] = '>';
-	memset(p->buffer + 1, ' ', ConsoleWidth - 1);
-	m_inputs.push_back(p);
-	m_current_input = 0;
+	memset(p->buffer.data() + 1, ' ', ConsoleWidth - 1);
+	_inputs.push_back(p);
+	_current_input = 0;
 }
 
 bool Console::KeyToChar(int key, int mods, char& ch) {
@@ -286,36 +267,27 @@ bool Console::KeyToChar(int key, int mods, char& ch) {
 	return true;
 }
 
-// TODO switch to tinyformat library
-void Console::Print(const char* fmt, ...) {
-	std::lock_guard lock(m_mutex);
-	char buffer[10240];
-	va_list va;
-	va_start(va, fmt);
-	int length = vsnprintf(buffer, sizeof(buffer), fmt, va);
-	va_end(va);
-
-	char* w = m_output[m_last_line];
-	FOR(i, length) {
-		if (buffer[i] == '\n')
-		{
-			m_last_column = ConsoleWidth;
+void Console::PrintInternal(std::string_view s) {
+	char* w = _output[_last_line];
+	for (char c : s) {
+		if (c == '\n') {
+			_last_column = ConsoleWidth;
 			continue;
 		}
-		if (m_last_column == ConsoleWidth)
-		{
-			m_last_line += 1;
-			if (m_last_line == ConsoleHeight) m_last_line = 0;
-			m_last_column = 0;
-			w = m_output[m_last_line];
+		if (_last_column == ConsoleWidth) {
+			_last_line += 1;
+			if (_last_line == ConsoleHeight)
+				_last_line = 0;
+			_last_column = 0;
+			w = _output[_last_line];
 			memset(w, ' ', ConsoleWidth);
 		}
-		w[m_last_column++] = buffer[i];
+		w[_last_column++] = c;
 	}
 }
 
 bool contains_non_space(const char* a, int length) {
-	FOR(i, length)
+	for (auto i : range(length))
 		if (a[i] != ' ')
 			return true;
 	return false;
@@ -324,35 +296,35 @@ bool contains_non_space(const char* a, int length) {
 // TODO left / right move cursor to make edits
 bool Console::OnKey(int key, int mods) {
 	char ch;
-	Input& input = *m_inputs[m_current_input];
+	Input& input = *_inputs[_current_input];
 	if (key == GLFW_KEY_BACKSPACE) {
 		if (input.cursor > 1) input.buffer[input.cursor--]  = ' ';
 		return true;
 	}
-	if (key == GLFW_KEY_ENTER && contains_non_space(input.buffer + 1, input.cursor - 1)) {
-		Execute(input.buffer + 1, input.cursor - 1);
-		if (m_current_input != m_inputs.size() - 1) {
-			delete m_inputs.back();
-			m_inputs.pop_back();
-			while (m_current_input != m_inputs.size() - 1) {
-				std::swap(m_inputs[m_current_input], m_inputs[m_current_input + 1]);
-				m_current_input += 1;
+	if (key == GLFW_KEY_ENTER && contains_non_space(input.buffer.data() + 1, input.cursor - 1)) {
+		Execute(std::string_view(input.buffer.data() + 1, input.cursor - 1));
+		if (_current_input != _inputs.size() - 1) {
+			delete _inputs.back();
+			_inputs.pop_back();
+			while (_current_input != _inputs.size() - 1) {
+				std::swap(_inputs[_current_input], _inputs[_current_input + 1]);
+				_current_input += 1;
 			}
 		}
 		Input* p = new Input;
 		p->cursor = 1;
 		p->buffer[0] = '>';
-		memset(p->buffer + 1, ' ', ConsoleWidth - 1);
-		m_inputs.push_back(p);
-		m_current_input = m_inputs.size() - 1;
+		memset(p->buffer.data() + 1, ' ', ConsoleWidth - 1);
+		_inputs.push_back(p);
+		_current_input = _inputs.size() - 1;
 		return true;
 	}
 	if (key == GLFW_KEY_UP) {
-		if (m_current_input > 0) m_current_input -= 1;
+		if (_current_input > 0) _current_input -= 1;
 		return true;
 	}
 	if (key == GLFW_KEY_DOWN) {
-		if (m_current_input + 1 < m_inputs.size()) m_current_input += 1;
+		if (_current_input + 1 < _inputs.size()) _current_input += 1;
 		return true;
 	}
 	if (KeyToChar(key, mods, /*out*/ch)) {
@@ -363,21 +335,21 @@ bool Console::OnKey(int key, int mods) {
 }
 
 void Console::Render(Text* text, float time) {
-	if (!m_visible)
+	if (!_visible)
 		return;
 
 	{
-		std::lock_guard lock(m_mutex);
-		for (int i = m_last_line + 1; i < ConsoleHeight; i++)
-			text->PrintBuffer(m_output[i], ConsoleWidth);
-		for (int i = 0; i <= m_last_line; i++)
-			text->PrintBuffer(m_output[i], ConsoleWidth);
+		std::lock_guard lock(_mutex);
+		for (int i = _last_line + 1; i < ConsoleHeight; i++)
+			text->PrintBuffer(std::string_view(_output[i], ConsoleWidth));
+		for (int i = 0; i <= _last_line; i++)
+			text->PrintBuffer(std::string_view(_output[i], ConsoleWidth));
 	}
 
-	Input& input = *m_inputs[m_current_input];
+	Input& input = *_inputs[_current_input];
 	if (input.cursor < ConsoleWidth)
 		input.buffer[input.cursor] = (fmod(time, 1.6f) <= 0.8) ? '_' : ' ';
-	text->PrintBuffer(input.buffer, ConsoleWidth);
+	text->PrintBuffer(std::string_view(input.buffer.data(), input.buffer.size()));
 }
 
 /*json_t* Console::save()
@@ -386,13 +358,13 @@ void Console::Render(Text* text, float time) {
 	json_t* output = json_array();
 	{
 		AutoLock(m_mutex);
-		FOR2(i, m_last_line + 1, ConsoleHeight - 1)
+		FOR2(i, _last_line + 1, ConsoleHeight - 1)
 		{
 			int len = ConsoleWidth;
 			while (len > 0 && m_output[i][len-1] == ' ') len -= 1;
 			json_array_append(output, json_stringn(m_output[i], len));
 		}
-		FOR2(i, 0, m_last_line)
+		FOR2(i, 0, _last_line)
 		{
 			int len = ConsoleWidth;
 			while (len > 0 && m_output[i][len-1] == ' ') len -= 1;
@@ -400,9 +372,9 @@ void Console::Render(Text* text, float time) {
 		}
 	}
 	json_object_set(doc, "output", output);
-	json_object_set(doc, "last_column", json_integer(m_last_column));
+	json_object_set(doc, "last_column", json_integer(_last_column));
 	json_t* commands = json_array();
-	FOR(i, m_inputs.size() - 1) json_array_append(commands, json_stringn(m_inputs[i]->buffer, m_inputs[i]->cursor));
+	FOR(i, _inputs.size() - 1) json_array_append(commands, json_stringn(_inputs[i]->buffer, _inputs[i]->cursor));
 	json_object_set(doc, "commands", commands);
 	return doc;
 }
@@ -417,8 +389,8 @@ bool Console::load(json_t* doc)
 	{
 		CHECK(json_is_array(output));
 		memset(m_output, ' ', ConsoleWidth * ConsoleHeight);
-		m_last_line = 0;
-		m_last_column = 0;
+		_last_line = 0;
+		_last_column = 0;
 		FOR(i, json_array_size(output))
 		{
 			json_t* line = json_array_get(output, i);
@@ -431,17 +403,17 @@ bool Console::load(json_t* doc)
 	if (last_column)
 	{
 		CHECK(json_is_integer(last_column));
-		m_last_column = json_integer_value(last_column);
+		_last_column = json_integer_value(last_column);
 	}
 
 	json_t* commands = json_object_get(doc, "commands");
 	if (commands)
 	{
 		CHECK(json_is_array(commands));
-		while (m_inputs.size() > 0)
+		while (_inputs.size() > 0)
 		{
-			delete m_inputs.back();
-			m_inputs.pop_back();
+			delete _inputs.back();
+			_inputs.pop_back();
 		}
 		FOR(i, json_array_size(commands))
 		{
@@ -451,15 +423,15 @@ bool Console::load(json_t* doc)
 			p->cursor = std::min<int>(ConsoleWidth, json_string_length(line));
 			memset(p->buffer, ' ', ConsoleWidth);
 			memcpy(p->buffer, json_string_value(line), p->cursor);
-			m_inputs.push_back(p);
+			_inputs.push_back(p);
 		}
 
 		Input* p = new Input;
 		p->cursor = 1;
 		p->buffer[0] = '>';
 		memset(p->buffer + 1, ' ', ConsoleWidth - 1);
-		m_inputs.push_back(p);
-		m_current_input = m_inputs.size() - 1;
+		_inputs.push_back(p);
+		_current_input = _inputs.size() - 1;
 	}
 	return true;
 }*/
