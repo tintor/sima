@@ -1,5 +1,7 @@
 #pragma once
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_AVX2
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_CXX14
 #include "glm/glm.hpp"

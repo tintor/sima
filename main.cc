@@ -20,10 +20,10 @@
 #include <GLFW/glfw3.h>
 #include "tinyformat.h"
 #include "auto.h"
-#include "rendering.hh"
-#include "shape.hh"
-#include "integration.hh"
-#include "timestamp.hh"
+#include "rendering.h"
+#include "shape.h"
+#include "integration.h"
+#include "timestamp.h"
 
 // Dynamics and simulation
 // =======================
@@ -81,6 +81,18 @@ void update(Body& body, double dt) {
 
 // =====================
 
+Text* text = nullptr;
+
+struct FpvCamera {
+    vec3 position;
+    quat orientation;
+};
+FpvCamera camera;
+
+glm::vec3 g_position(0,0,0);
+float g_yaw=0, g_pitch=0;
+glm::mat4 g_orientation;
+
 void on_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
@@ -111,13 +123,12 @@ void model_init(GLFWwindow* window) {
     glfwSetScrollCallback(window, on_scroll);
 }
 
-Text* text = nullptr;
 glm::mat4 perspective, perspective_rotation;
 
 void render_init() {
 	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
 	glEnable(GL_CULL_FACE);
-	glClearColor(0.2, 0.2, 1, 1.0);
+	glClearColor(0.0, 0.5, 0.0, 1.0);
 	glViewport(0, 0, render_width, render_height);
 
 	::perspective = glm::perspective<float>(M_PI / 180 * 90, render_width / (float)render_height, 0.03, 1000);
@@ -130,15 +141,36 @@ void render_init() {
 	text->bg_color = vec4(0, 0, 0, 1);
 }
 
+struct Triangle {
+    vec3 vertex[3];
+    vec3 color;
+};
+
+struct Line {
+    vec3 vectex[2];
+    vec3 color;
+};
+
+void render_line(vec3 vertex_a, vec3 vertex_b, vec3 color) {
+
+}
+
+void render_world(const glm::mat4& matrix) {
+    glClear(GL_COLOR_BUFFER_BIT /*| GL_DEPTH_BUFFER_BIT*/);
+    //glEnable(GL_DEPTH_TEST);
+    // TODO floor checkerbox
+    // TODO two boxes in space
+    //glDisable(GL_DEPTH_TEST);
+    render_line(vec3(0,0,0), vec3(3,0,0), vec3(1,1,1));
+    render_line(vec3(0,0,0), vec3(0,2,0), vec3(1,1,1));
+    render_line(vec3(0,0,0), vec3(0,0,1), vec3(1,1,1));
+}
+
 void render_gui() {
 	glm::mat4 matrix = glm::ortho<float>(0, render_width, 0, render_height, -1, 1);
 	text->Reset(render_width, render_height, matrix, true);
 	text->Print("Hello world!");
 }
-
-glm::vec3 g_position(0,0,0);
-float g_yaw=0, g_pitch=0;
-glm::mat4 g_orientation;
 
 bool last_cursor_init = false;
 double last_cursor_x, last_cursor_y;
@@ -215,7 +247,7 @@ int main(int argc, char** argv) {
     if (!glfwInit())
         return -1;
 
-    try {
+    /*try {
         Mesh3d mm = load_stl("models/bunny.stl");
         std::vector<dvec3> vertices;
         FOR_EACH(f, mm)
@@ -240,7 +272,7 @@ int main(int argc, char** argv) {
     } catch (std::runtime_error& e) {
         std::cout << "std::runtime_error " << e.what() << std::endl;
     }
-    return 0;
+    return 0;*/
 
 	GLFWwindow* window = create_window();
 	if (!window)
@@ -256,10 +288,7 @@ int main(int argc, char** argv) {
 		//Frustum frustum(matrix);
 		//g_player.cpos = glm::ivec3(glm::floor(g_player.position)) >> ChunkSizeBits;*/
 
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glEnable(GL_DEPTH_TEST);
-		//render_world_blocks(matrix, frustum);
-		glDisable(GL_DEPTH_TEST);
+        render_world(matrix);
 		render_gui();
 
 		glfwSwapBuffers(window);

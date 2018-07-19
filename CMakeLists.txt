@@ -5,23 +5,48 @@ cmake_minimum_required(VERSION 2.8)
 
 project(sima)
 
-set(prod shape.cc file.cc primitives.cc rendering.cc timestamp.cc lodepng/lodepng.cc)
-set(test shape_test.cc primitives_test.cc integration_test.cc)
+set(prod
+	convex_hull.cc
+	is_valid.cc
+	tesselate.cc
+	properties.cc
+	generators.cc
+	solid_bsp_tree.cc
+	csg.cc
+	shape.cc
+	file.cc
+	primitives.cc
+	rendering.cc
+	timestamp.cc
+	mesh_import.cc
+	lodepng/lodepng.cc)
 
-add_executable(sima main.cc ${prod})
-add_executable(test ${prod} ${test})
+set(test
+	test.cc
+	test_convex_hull.cc
+	test_shape.cc
+	test_primitives.cc
+	test_tesselate.cc
+	test_integration.cc)
 
-add_definitions(-g -O3 -flto -DNDEBUG)
+add_executable(a.sima main.cc ${prod})
+add_executable(a.test ${prod} ${test})
+
+add_definitions(-g)
+#add_definitions(-g -O3 -flto -DNDEBUG)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 
 add_subdirectory(glfw)
 include_directories(glfw/include)
 include_directories(lodepng)
+include_directories(../cpp_template_library)
 
 if (APPLE)
-    target_link_libraries(sima glfw ${GLFW_LIBRARIES})
+    target_link_libraries(a.sima glfw ${GLFW_LIBRARIES})
+    target_link_libraries(a.test glfw ${GLFW_LIBRARIES})
 else()
     find_package(GLEW REQUIRED)
-    target_link_libraries(sima glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
+    target_link_libraries(a.sima glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
+    target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
 endif()
