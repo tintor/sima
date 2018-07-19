@@ -1,12 +1,16 @@
-#include "file.hh"
+#include "file.h"
 #include <sys/stat.h>
 #include <iostream>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 
-MappedFile::MappedFile(const char* fname) {
-	m_fd = open(fname, O_RDONLY);
+using namespace std::literals;
+
+MappedFile::MappedFile(std::string_view filename) {
+	std::string fname;
+	fname = filename;
+	m_fd = open(fname.c_str(), O_RDONLY);
 	if (m_fd == -1)
 		throw std::runtime_error("open");
 
@@ -25,21 +29,17 @@ MappedFile::~MappedFile() {
 	close(m_fd);
 }
 
-bool FileReader::getline(std::string_view& line) {
+std::string_view FileReader::readline() {
 	if (m_pos == m_file.view().end())
-		return false;
+		return ""sv;
 
 	const char* b = m_pos;
 	const char* e = m_file.view().end();
 
 	while (m_pos < e) {
-		if (*m_pos == '\n') {
-			line = std::string_view(b, m_pos - b);
-			m_pos += 1;
-			return true;
-		}
+		if (*m_pos == '\n')
+			return std::string_view(b, ++m_pos - b);
 		m_pos += 1;
 	}
-	line = std::string_view(b, m_pos - b);
-	return true;
+	return std::string_view(b, m_pos - b);
 }

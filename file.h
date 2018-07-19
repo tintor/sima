@@ -1,15 +1,11 @@
-#ifndef __FILE_H__
-#define __FILE_H__
-
+#pragma once
 #include <string_view>
 
 class MappedFile {
 public:
-    MappedFile(const char* fname);
-
+    MappedFile(std::string_view filename);
     MappedFile(const MappedFile&) = delete;
     MappedFile& operator=(const MappedFile&) = delete;
-
     ~MappedFile();
 
     std::string_view view() const { return std::string_view(m_addr, m_length); }
@@ -20,15 +16,14 @@ private:
     const char* m_addr;
 };
 
+// TODO this can just be a string iterator (detached from file)
 class FileReader {
 public:
-    FileReader(const char* fname) : m_file(fname), m_pos(m_file.view().begin()) { }
+    FileReader(std::string_view filename) : m_file(filename), m_pos(m_file.view().begin()) { }
 
-    bool getline(std::string_view& line);
+    std::string_view readline();
 
 private:
     MappedFile m_file;
     const char* m_pos;
 };
-
-#endif
