@@ -1,4 +1,5 @@
 #include "properties.h"
+#include "aabb.h"
 
 // Volume of a valid polyhedron
 double volume(const imesh3& mesh) {
@@ -50,13 +51,14 @@ dmat3 moment_of_inertia(const imesh3& mesh) {
 }
 
 bool is_aabb(const imesh3& mesh) {
-	ivec3 vmin = mesh[0].a, vmax = mesh[0].a;
-	for (auto f : mesh)
+	aabb<ivec3> box(mesh);
 
 	// All vertices must be made from extreme coordinates
 	for (auto f : mesh)
 		for (ivec3 v : f)
-			if (v.x != vmin.x && v.x != vmax.x && v.y != vmin.y && v.y != vmax.y && v.z != vmin.z && v.z != vmax.z)
+			if (v.x != box.mm[0].min && v.x != box.mm[0].max
+			 && v.y != box.mm[1].min && v.y != box.mm[1].max
+			 && v.z != box.mm[2].min && v.z != box.mm[2].max)
 				return false;
 
 	// Every face must have one coordinate constant
