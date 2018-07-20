@@ -28,11 +28,7 @@ struct triangle {
 
 template<typename T>
 void format_e(std::string& s, std::string_view spec, triangle<T> v) {
-	format_e(s, "", v.a);
-	s += ", ";
-	format_e(s, "", v.b);
-	s += ", ";
-	format_e(s, "", v.c);
+	format_s(s, "(%s, %s, %s)", v.a, v.b, v.c);
 }
 
 using itriangle2 = triangle<ivec2>;
