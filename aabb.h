@@ -28,7 +28,22 @@ struct aabb {
 		for (auto i : range(dim))
 			mm[i].include(p[i]);
 	}
-	
+
+	explicit aabb(Vec a, Vec b) {
+		for (auto i : range(dim)) {
+			mm[i].include(a[i]);
+			mm[i].include(b[i]);
+		}
+	}
+
+	explicit aabb(Vec a, Vec b, Vec c) {
+		for (auto i : range(dim)) {
+			mm[i].include(a[i]);
+			mm[i].include(b[i]);
+			mm[i].include(c[i]);
+		}
+	}
+
 	explicit aabb(const segment<Vec>& p) {
 		for (auto i : range(dim)) {
 			mm[i].include(p.a[i]);
@@ -57,6 +72,21 @@ struct aabb {
 				mm[i].include(p.b[i]);
 				mm[i].include(p.c[i]);
 			}
+	}
+
+	// strictly inside!
+	bool inside(ivec3 e) const {
+		for (auto i : range(dim))
+			if (e[i] <= mm[i].min || e[i] >= mm[i].max)
+				return false;
+		return true;
+	}
+
+	bool intersects(ivec3 e) const {
+		for (auto i : range(dim))
+			if (e[i] < mm[i].min || e[i] > mm[i].max)
+				return false;
+		return true;
 	}
 
 	bool intersects(const aabb& e) const {
