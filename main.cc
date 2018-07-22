@@ -18,12 +18,12 @@
     #include <GL/glew.h>
 #endif
 #include <GLFW/glfw3.h>
-#include "tinyformat.h"
 #include "auto.h"
 #include "rendering.h"
 #include "shape.h"
 #include "integration.h"
 #include "timestamp.h"
+#include "callstack.h"
 
 // Dynamics and simulation
 // =======================
@@ -224,10 +224,12 @@ GLFWwindow* create_window() {
 }
 
 void sigsegv_handler(int sig) {
- 	fprintf(stderr, "Error: signal %d:\n", sig);
-    void* array[20];
-    backtrace_symbols_fd(array, backtrace(array, 20), STDERR_FILENO);
-    exit(1);
+	fprintf(stderr, "Error: signal %d:\n", sig);
+	Callstack stack;
+	std::string s;
+	stack.write(s, {"sigsegv_handler(int)", "_sigtramp"});
+	fputs(s.c_str(), stderr);
+	exit(1);
 }
 
 // solid angle between triangle and origin
