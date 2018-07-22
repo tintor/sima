@@ -1,5 +1,7 @@
 #include "properties.h"
 #include "aabb.h"
+#include "scalar.h"
+#include "ivec.h"
 
 int128 signed_volume_mul6(const imesh3& mesh) {
 	int128 volume = 0;
