@@ -1,17 +1,18 @@
 #include "properties.h"
 #include "aabb.h"
 
-long signed_volume_mul6(const imesh3& mesh) {
-	long volume = 0;
+int128 signed_volume_mul6(const imesh3& mesh) {
+	int128 volume = 0;
 	for (const itriangle3& f : mesh) {
-		long s = 0, z = 0;
+		int128 s = 0;
+		long z = 0;
 		for (auto [a, b] : f.edges()) {
-			z += b.z;
+			z = addi(z, b.z);
 			long y = addi(a.y, b.y);
 			long x = subi(a.x, b.x);
 			s = addi(s, muli(y, x));
 		}
-		long v = muli(z, s);
+		int128 v = muli(s, z);
 		volume = addi(volume, v);
 	}
 	return volume;
