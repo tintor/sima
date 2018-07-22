@@ -1,6 +1,6 @@
 #include "generators.h"
 
-imesh3 BoxMesh(int sx, int sy, int sz) {
+imesh3 generate_box(int sx, int sy, int sz) {
 	std::vector<ivec3> vertices;
 	vertices.reserve(8);
 	for (int x = -1; x <= 1; x += 2)
