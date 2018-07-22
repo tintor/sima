@@ -2,7 +2,7 @@
 
 #include "triangle.h"
 
-long signed_volume_mul6(const imesh3& mesh);
+int128 signed_volume_mul6(const imesh3& mesh);
 
 // Volume of a valid polyhedron
 double volume(const imesh3& mesh);
