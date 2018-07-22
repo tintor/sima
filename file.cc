@@ -1,4 +1,5 @@
 #include "file.h"
+#include "exception.h"
 #include <sys/stat.h>
 #include <iostream>
 #include <unistd.h>
@@ -12,16 +13,16 @@ MappedFile::MappedFile(std::string_view filename) {
 	fname = filename;
 	m_fd = open(fname.c_str(), O_RDONLY);
 	if (m_fd == -1)
-		throw std::runtime_error("open");
+		THROW(runtime_error, "open");
 
 	struct stat sb;
 	if (fstat(m_fd, &sb) == -1)
-		throw std::runtime_error("fstat");
+		THROW(runtime_error, "fstat");
 
 	m_length = sb.st_size;
 	m_addr = static_cast<const char*>(mmap(NULL, m_length, PROT_READ, MAP_PRIVATE, m_fd, 0u));
 	if (m_addr == MAP_FAILED)
-		throw std::runtime_error("mmap");
+		THROW(runtime_error, "mmap");
 }
 
 MappedFile::~MappedFile() {
