@@ -1,14 +1,16 @@
 #pragma once
-
 #include "triangle.h"
 
 enum class Validity {
 	OK = 0,
-	EdgeTooShort = 1,
-	TooFewFaces = 2,
+	TooFewFaces = 1,
+	InvalidFace = 2,
 	OpenEdge = 3,
 	SeparateComponents = 4,
 	SelfIntersection = 5,
+	NotSealed = 6,
+	Inverted = 7,
+	OverlappingFaces = 8,
 };
 
 Validity is_valid(const imesh3& mesh);
