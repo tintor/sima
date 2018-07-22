@@ -13,3 +13,4 @@ test
 glfw/docs/Doxyfile
 a.*
 compile_commands.json
+benchmark.cc
