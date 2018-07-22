@@ -1,6 +1,6 @@
 #include "convex_hull.h"
 #include "is_valid.h"
-#include <unordered_set>
+#include "ivec.h"
 
 bool is_convex(const imesh3& mesh) {
 	// Extract all unique vertices

@@ -1,9 +1,8 @@
 #include "tesselate.h"
 #include "format.h"
 #include "catch.hpp"
-#include <unordered_set>
+#include "range.h"
 #include <random>
-#include <iostream>
 
 TEST_CASE("tesselate 2") {
 	ivec2 a = {0, 0};

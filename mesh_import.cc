@@ -1,6 +1,7 @@
 #include "mesh_import.h"
 #include "util.h"
 #include "file.h"
+#include "range.h"
 
 constexpr const char* FLOAT_REGEX = R"(-?\d+\.\d+(e[+-]\d+)?)";
 

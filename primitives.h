@@ -1,34 +1,16 @@
 #pragma once
 
+#include "glm.h"
 #include <cmath>
 #include <random>
-
 #include "util.h"
 #include "range.h"
-#include "common.h"
 
 using real = double;
-
-#define GLM_ENABLE_EXPERIMENTAL
-#define GLM_FORCE_CXX14
-#include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtx/norm.hpp"
-#include "glm/gtx/transform.hpp"
-using namespace glm;
-
 static_assert(sizeof(dvec3) == sizeof(real) * 3);
 
 inline bool lexicographical_less(dvec3 a, dvec3 b) {
 	return a.x < b.x || (a.x == b.x && a.y < b.y) || (a.x == b.x && a.y == b.y && a.z < b.z);
-}
-
-namespace glm {
-	inline std::ostream& operator<<(std::ostream& os, const dvec3& v) { return os << v.x << ' ' << v.y << ' ' << v.z; }
 }
 
 inline constexpr real squared(real a) { return a * a; }
@@ -40,14 +22,20 @@ inline constexpr long double operator "" _deg(unsigned long long a) { return a *
 
 inline std::string deg(long double r) { return format("%g deg", r * (180 / M_PI)); }
 
-inline auto angle(dvec3 a, dvec3 b) {
-	// atan2 is numericaly better than acos when angle is very small
+inline dvec3 any_normal(dvec3 v) {
+	double x = std::abs(v.x);
+	double y = std::abs(v.y);
+	double z = std::abs(v.z);
+	if (x <= y && x <= z)
+		return {0, -v.z, v.y};
+	if (y <= z)
+		return {-v.z, 0, v.x};
+	return {-v.y, v.x, 0};
+}
 
-	// make the vectors equal length first (without division)
-	real aa = l2Norm(a), bb = l2Norm(b);
-	a *= bb;
-	b *= aa;
-	return 2 * atan2(l2Norm(a - b), l2Norm(a + b));
+// returns angle in range [0, PI)
+inline double angle(dvec3 a, dvec3 b) {
+	return std::atan2(glm::l2Norm(glm::cross(a, b)), glm::dot(a, b));
 }
 
 inline constexpr real clamp(real t, real min = 0, real max = 1) {
@@ -61,8 +49,7 @@ struct line3 {
 	dvec3 a, b;
 };
 
-struct ray3
-{
+struct ray3 {
     // TODO is dir constrained to UnitVector?
     dvec3 origin, dir;
 };

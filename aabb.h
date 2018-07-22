@@ -1,4 +1,5 @@
 #pragma once
+#include "range.h"
 #include "triangle.h"
 #include "array_ptr.h"
 
