@@ -1,6 +1,8 @@
 #include "convex_hull.h"
+#include "is_valid.h"
 #include "zip.h"
 #include "properties.h"
+#include "generators.h"
 #include "catch.hpp"
 #include <random>
 #include <iostream>
@@ -95,7 +97,6 @@ TEST_CASE("convex_hull trivial") {
 	REQUIRE(convex_hull(std::vector{a, b, c, d}).size() == 4);
 }
 
-
 TEST_CASE("convex_hull simple") {
 	ivec3 a = {0, 0, 0};
 	ivec3 b = {1000, 0, 0};
@@ -110,44 +111,55 @@ TEST_CASE("convex_hull simple") {
 	REQUIRE(hull({a, b, c, d, ivec3(1, 0, 1)}) == m);
 	REQUIRE(hull({a, b, c, d, ivec3(1, 1, 0)}) == m);
 
-	// TODO REQUIRE(hull({a, b, c, d, ivec3(-1, 0, 0)}).size() == 6);
+	REQUIRE(hull({a, b, c, d, ivec3(-1, 0, 0)}).size() == 4);
 }
 
 // uniform inside a cube
 template<typename RandomEngine>
-ivec3 random_vector(RandomEngine& rnd, int a = -100, int b = 100) {
+ivec3 random_vector(RandomEngine& rnd, int a, int b) {
 	std::uniform_int_distribution<int> dist(a, b);
 	return ivec3(dist(rnd), dist(rnd), dist(rnd));
 }
 
-/*TEST_CASE("convex_hull random points on cube") {
+TEST_CASE("convex_hull random points on cube") {
 	std::default_random_engine rnd;
-	for (int vertices = 4; vertices <= 40; vertices++) {
+	for (int vertices = 4; vertices <= 200; vertices++) {
 		std::vector<ivec3> V(vertices);
 		for (auto i : range(vertices))
-			V[i] = random_vector(rnd);
+			V[i] = random_vector(rnd, -100, 100);
 		imesh3 m = convex_hull(V);
+		REQUIRE(is_valid(m) == Validity::OK);
 		REQUIRE(is_convex(m));
-		std::cout << vertices << " " << m.size() << std::endl;
 	}
-}*/
+}
 
 // uniform on the unit sphere surface
 template<typename RandomEngine>
-ivec3 random_direction(RandomEngine& rnd) {
+ivec3 random_direction(RandomEngine& rnd, double radius) {
 	std::normal_distribution<double> dist(0.0, 1.0);
-	dvec3 v = 1000000.0 * normalize(dvec3(dist(rnd), dist(rnd), dist(rnd)));
+	dvec3 v = radius * normalize(dvec3(dist(rnd), dist(rnd), dist(rnd)));
 	return { std::round(v.x), std::round(v.y), std::round(v.z) };
 }
 
 TEST_CASE("convex_hull random points on sphere") {
 	std::default_random_engine rnd;
-	int vertices = 1000;
-	std::vector<ivec3> V(vertices);
-	for (auto i : range(vertices))
-		V[i] = random_direction(rnd);
-	imesh3 m = convex_hull(V);
-	double v = 4.0 / 3 * M_PI * 1e18;
-	REQUIRE(m.size() == vertices * 2 - 4);
-	REQUIRE(abs(volume(m) - v) / v < 0.15);
+	double r = 1000000;
+	for (int vertices = 200; vertices <= 200; vertices++) {
+		print("vertices %s\n", vertices);
+		std::vector<ivec3> V(vertices);
+		for (auto i : range(vertices))
+			V[i] = random_direction(rnd, r);
+		imesh3 m = convex_hull(V);
+		double v = 4.0 / 3 * M_PI * r * r * r;
+		print("act volume %s\n", volume(m));
+		print("exp volume %s\n", v);
+		REQUIRE(m.size() == vertices * 2 - 4);
+		REQUIRE(abs(volume(m) - v) / v < 0.15);
+	}
+}
+
+TEST_CASE("convex_hull cube") {
+	auto m = generate_box(1, 1, 1);	
+	REQUIRE(is_convex(m));
+	REQUIRE(is_aabb(m));
 }

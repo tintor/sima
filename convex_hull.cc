@@ -1,4 +1,5 @@
 #include "convex_hull.h"
+#include "is_valid.h"
 #include <unordered_set>
 
 bool is_convex(const imesh3& mesh) {
@@ -9,11 +10,14 @@ bool is_convex(const imesh3& mesh) {
 			vertices.insert(vertex);
 	// Check if every face has all vertices on its negative side
 	for (auto face : mesh) {
-		auto normal = cross(face.b - face.a, face.c - face.a);
-		auto d = dot(normal, face.a);
+		lvec3 normal = normali(face.a, face.b, face.c);
+		long d = doti(normal, face.a);
 		for (auto v : vertices)
-			if (dot(normal, v) > d)
+			if (doti(normal, v) > d) {
+				dprint("Not convex: Vertex %s is in front of face %s (dist %f)!\n", v, face,
+					(double)(doti(normal, v) - d) / sqrt((double)doti(normal, normal)));
 				return false;
+			}
 	}
 	return true;
 }
@@ -38,7 +42,8 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	int128 max_dist2 = 0;
 	ivec3 c;
 	for (auto p : points) {
-		auto dist2 = squared(cross(p - a, p - b));
+		lvec3 cross = crossi(subi(p, a), subi(p, b));
+		int128 dist2 = squaredi((llvec3)cross);
 		if (dist2 > max_dist2) {
 			c = p;
 			max_dist2 = dist2;
@@ -50,10 +55,10 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	// Fourth point D on the hull (furthest from plane ABC)
 	int128 max_dist = 0;
 	ivec3 d;
-	lvec3 normal = cross(b - a, c - a);
-	long dd = dot(normal, a);
+	lvec3 normal = normali(a, b, c);
+	long dd = doti(normal, a);
 	for (auto p : points) {
-		int128 dist = dot(normal, p) - dd;
+		int128 dist = subi(doti((llvec3)normal, (llvec3)p), dd);
 		if (std::abs(dist) > std::abs(max_dist)) {
 			d = p;
 			max_dist = dist;
@@ -76,27 +81,27 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		hull.emplace_back(b, c, d);
 		hull.emplace_back(c, a, d);
 	}
-	assert(is_convex(hull));
 
 	// Expand hull to include all remaining points outside of it
 	std::unordered_set<isegment3> open_edges;
 	for (auto p : points) {
 		if (p == a || p == b || p == c || p == d)
 			continue;
-		print("%s\n", hull);
 		// Remove faces on hull covered by new vertex
 		open_edges.clear();
-		for (auto i : range(hull.size())) {
+		for (size_t i = 0; i < hull.size(); i++) {
 			const itriangle3& f = hull[i];
 			// Skip if P is not in front of face F
-			if (dot(cross(f.b - f.a, f.c - f.a), p - f.a) <= 0)
+			lvec3 n = normali(f.a, f.b, f.c);
+			if (doti((llvec3)n, (llvec3)subi(p, f.a)) <= 0)
 				continue;
 			// Add edges of removed face to open_edges
-			for (auto e : f.edges())
+			for (auto e : f.edges()) {
 				// If two faces that share an edge are both removed,
 				// then their shared edge isn't open anymore.
 				if (open_edges.erase(e.reversed()) == 0)
 					open_edges.insert(e);
+			}
 			// Remove face
 			hull[i] = hull[hull.size() - 1];
 			hull.resize(hull.size() - 1);
@@ -105,8 +110,5 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		// For each open edge create a face that connects it with P
 		for (auto e : open_edges)
 			hull.emplace_back(e.a, e.b, p);
-		print("%s\n", hull);
-		assert(is_convex(hull));
 	}
 }
-
