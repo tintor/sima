@@ -13,13 +13,15 @@
 #include "glm/gtx/norm.hpp"
 #include "glm/gtx/transform.hpp"
 
+#include "common.h"
+
 using glm::ivec2;
 using glm::ivec3;
 using glm::dvec3;
 using lvec3 = glm::tvec3<long>;
+using llvec3 = glm::tvec3<int128>;
 using glm::dmat3;
 
-#include "common.h"
 #include "range.h"
 #include "bits.h"
 #include "exception.h"
@@ -27,11 +29,11 @@ using glm::dmat3;
 
 namespace glm {
 
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const tvec3<T>& v) { return os << v.x << ' ' << v.y << ' ' << v.z; }
-
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const tvec2<T>& v) { return os << v.x << ' ' << v.y; }
+inline void format_e(std::string& s, std::string_view spec, ivec2 v) {
+	::format_e(s, "", v.x);
+	s += ' ';
+	::format_e(s, "", v.y);
+}
 
 inline void format_e(std::string& s, std::string_view spec, ivec3 v) {
 	::format_e(s, "", v.x);
@@ -41,14 +43,23 @@ inline void format_e(std::string& s, std::string_view spec, ivec3 v) {
 	::format_e(s, "", v.z);
 }
 
-inline void format_e(std::string& s, std::string_view spec, ivec2 v) {
+inline void format_e(std::string& s, std::string_view spec, lvec3 v) {
 	::format_e(s, "", v.x);
 	s += ' ';
 	::format_e(s, "", v.y);
+	s += ' ';
+	::format_e(s, "", v.z);
+}
+
+inline void format_e(std::string& s, std::string_view spec, llvec3 v) {
+	::format_e(s, "", v.x);
+	s += ' ';
+	::format_e(s, "", v.y);
+	s += ' ';
+	::format_e(s, "", v.z);
 }
 
 }
-
 
 namespace std {
 
@@ -133,59 +144,98 @@ inline long gcd(lvec3 s) {
 	return gcd_unsigned(c, gcd_unsigned(b, a));
 }
 
-// throws std::overflow_error in case of int64 overflow
-inline long addi(long a, long b) {
-	long e;
-	if (__builtin_add_overflow(a, b, &e))
-		THROW(overflow_error, "addi(%s, %s)", a, b);
-	return e;
-}
-
-// will never overflow
 inline long addi(int a, int b) {
 	return (long)a + (long)b;
 }
+#define ADDI(R, A, B) inline R addi(A a, B b) { \
+	R e; \
+	if (__builtin_add_overflow(a, b, &e)) \
+		THROW(overflow_error, "addi(%s, %s)", a, b); \
+	return e; \
+}
+ADDI(long, long, int);
+ADDI(long, int, long);
+ADDI(long, long, long);
+ADDI(int128, long, int128);
+ADDI(int128, int128, long);
+ADDI(int128, int128, int128);
 
-// throws std::overflow_error in case of int64 overflow
+inline long negi(int a) {
+	return -(long)a;
+}
 inline long negi(long a) {
 	if (a == std::numeric_limits<long>::min())
 		THROW(overflow_error, "negi(%s)", a);
 	return -a;
 }
-
-// throws std::overflow_error in case of int64 overflow
-inline long subi(long a, long b) {
-	long e;
-	if (__builtin_sub_overflow(a, b, &e))
-		THROW(overflow_error, "subi(%s, %s)", a, b);
-	return e;
+inline int128 negi(int128 a) {
+	if (a == std::numeric_limits<int128>::min())
+		THROW(overflow_error, "negi(%s)", a);
+	return -a;
 }
 
-// will never overflow
 inline long subi(int a, int b) {
 	return (long)a - (long)b;
 }
-
-// throws std::overflow_error in case of int64 overflow
-inline long muli(long a, long b) {
-	long e;
-	if (__builtin_mul_overflow(a, b, &e))
-		THROW(overflow_error, "muli(%s, %s)", a, b);
-	return e;
+#define SUBI(R, A, B) inline R subi(A a, B b) { \
+	R e; \
+	if (__builtin_sub_overflow(a, b, &e)) \
+		THROW(overflow_error, "subi(%s, %s)", a, b); \
+	return e; \
 }
+SUBI(long, int, long);
+SUBI(long, long, int);
+SUBI(long, long, long);
+SUBI(int128, long, int128);
+SUBI(int128, int128, long);
+SUBI(int128, int128, int128);
 
-// throws std::overflow_error in case of int64 overflow
+inline long muli(int a, int b) {
+	return (long)a * (long)b;
+}
+#define MULI(R, A, B) inline R muli(A a, B b) { \
+	R e; \
+	if (__builtin_mul_overflow(a, b, &e)) \
+		THROW(overflow_error, "muli(%s, %s)", a, b); \
+	return e; \
+}
+MULI(long, int, long);
+MULI(long, long, int);
+MULI(long, long, long);
+MULI(int128, long, int128);
+MULI(int128, int128, long);
+MULI(int128, int128, int128);
+
+inline lvec3 addi(ivec3 a, ivec3 b) {
+	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
+}
+inline lvec3 addi(lvec3 a, ivec3 b) {
+	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
+}
+inline lvec3 addi(ivec3 a, lvec3 b) {
+	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
+}
 inline lvec3 addi(lvec3 a, lvec3 b) {
 	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
 }
+inline llvec3 addi(llvec3 a, llvec3 b) {
+	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
+}
 
-// throws std::overflow_error in case of int64 overflow
+inline lvec3 subi(ivec3 a, ivec3 b) {
+	return {subi(a.x, b.x), subi(a.y, b.y), subi(a.z, b.z)};
+}
 inline lvec3 subi(lvec3 a, lvec3 b) {
 	return {subi(a.x, b.x), subi(a.y, b.y), subi(a.z, b.z)};
 }
+inline llvec3 subi(llvec3 a, llvec3 b) {
+	return {subi(a.x, b.x), subi(a.y, b.y), subi(a.z, b.z)};
+}
 
-// throws std::overflow_error in case of int64 overflow
 inline lvec3 muli(lvec3 a, long b) {
+	return {muli(a.x, b), muli(a.y, b), muli(a.z, b)};
+}
+inline llvec3 muli(llvec3 a, int128 b) {
 	return {muli(a.x, b), muli(a.y, b), muli(a.z, b)};
 }
 
@@ -196,9 +246,18 @@ inline long doti(lvec3 a, lvec3 b) {
 	long z = muli(a.z, b.z);
 	return addi(addi(x, y), z);
 }
+inline int128 doti(llvec3 a, llvec3 b) {
+	int128 x = muli(a.x, b.x);
+	int128 y = muli(a.y, b.y);
+	int128 z = muli(a.z, b.z);
+	return addi(addi(x, y), z);
+}
 
 // throws std::overflow_error in case of int64 overflow
 inline long squaredi(lvec3 a) {
+	return doti(a, a);
+}
+inline int128 squaredi(llvec3 a) {
 	return doti(a, a);
 }
 
@@ -212,9 +271,8 @@ inline lvec3 crossi(lvec3 a, lvec3 b) {
 
 // throws std::overflow_error in case of int64 overflow
 inline lvec3 normali(ivec3 a, ivec3 b, ivec3 c) {
-	lvec3 normal = crossi(subi(b, a), subi(c, a));
-	return normal / gcd(normal); // reduce normal to reduce chance of overflow in callers
-}		
+	return crossi(subi(b, a), subi(c, a));
+}
 
 // throws std::overflow_error in case of int64 overflow
 inline bool colinear(ivec3 a, ivec3 b, ivec3 c) {
