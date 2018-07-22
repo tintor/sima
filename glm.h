@@ -12,10 +12,17 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/norm.hpp"
 #include "glm/gtx/transform.hpp"
-using namespace glm;
+
+using glm::ivec2;
+using glm::ivec3;
+using glm::dvec3;
+using lvec3 = glm::tvec3<long>;
+using glm::dmat3;
 
 #include "common.h"
 #include "range.h"
+#include "bits.h"
+#include "exception.h"
 #include <ostream>
 
 namespace glm {
@@ -42,7 +49,6 @@ inline void format_e(std::string& s, std::string_view spec, ivec2 v) {
 
 }
 
-using lvec3 = glm::tvec3<long>;
 
 namespace std {
 
@@ -69,43 +75,162 @@ struct hash<glm::tvec3<T>> {
 
 }
 
-inline long mul(int a, int b) {
-	// TODO maybe faster with assembly
-	return static_cast<long>(a) * static_cast<long>(b);
+template<typename T>
+T gcd_unsigned(T u, T v) {
+    if (u == 0) return v;
+    if (v == 0) return u;
+    int shift = ctz(u | v);
+    u >>= ctz(u);
+    do {
+        v >>= ctz(v);
+        if (u > v) {
+            auto t = v;
+            v = u;
+            u = t;
+        }
+        v -= u;
+    } while (v != 0);
+    return u << shift;
 }
 
-inline int128 mul(long a, long b) {
-	// TODO maybe faster with assembly
-	return static_cast<int128>(a) * static_cast<int128>(b);
-/*    int128 res;
-    __asm__ (
-        "movq  %1, %%rax;\n\t"          // rax = a
-        "movl  %3, %%ecx;\n\t"          // ecx = b
-        "imulq %2;\n\t"                 // rdx:rax = a * b
-        "shrdq %%cl, %%rdx, %%rax;\n\t" // rax = int64_t (rdx:rax >> s)
-        "movq  %%rax, %0;\n\t"          // res = rax
-        : "=rm" (res)
-        : "rm"(a), "rm"(b)
-        : "%rax", "%rdx", "%ecx");
-    return res;*/
+inline long gcd(lvec3 s) {
+	ulong x = std::abs(s.x);
+	ulong y = std::abs(s.y);
+	ulong z = std::abs(s.z);
+
+	// TODO verify if sorting helps
+	ulong a, b, c;
+	if (x <= y) {
+		if (z <= x) {
+			a = z;
+			b = x;
+			c = y;
+		} else if (y <= z) {
+			a = x;
+			b = y;
+			c = z;
+		} else {
+			a = x;
+			b = z;
+			c = y;
+		}
+	} else {
+		if (z <= y) {
+			a = z;
+			b = y;
+			c = x;
+		} else if (x <= z) {
+			a = y;
+			b = x;
+			c = z;
+		} else {
+			a = y;
+			b = z;
+			c = x;
+		}
+	}
+	// compute gdc of smallest numbers first
+	return gcd_unsigned(c, gcd_unsigned(b, a));
 }
 
-// TODO use asserts to verify no overflow
-inline int128 dot(lvec3 a, lvec3 b) {
-	return mul(a.x, b.x) + mul(a.y, b.y) + mul(a.z, b.z);
+// throws std::overflow_error in case of int64 overflow
+inline long addi(long a, long b) {
+	long e;
+	if (__builtin_add_overflow(a, b, &e))
+		THROW(overflow_error, "addi(%s, %s)", a, b);
+	return e;
 }
 
-inline int128 squared(lvec3 a) {
-	return dot(a, a);
+// will never overflow
+inline long addi(int a, int b) {
+	return (long)a + (long)b;
 }
 
-// TODO use asserts to verify no overflow
-// TODO use clang __builtin_sadd_overflow extensions
-// takes int32_t vectors and returns int64_t vector (no overflow)
-inline lvec3 cross(ivec3 a, ivec3 b) {
-	auto x = mul(a.y, b.z) - mul(a.z, b.y);
-	auto y = mul(a.z, b.x) - mul(a.x, b.z);
-	auto z = mul(a.x, b.y) - mul(a.y, b.x);
-	return lvec3(x, y, z);
+// throws std::overflow_error in case of int64 overflow
+inline long negi(long a) {
+	if (a == std::numeric_limits<long>::min())
+		THROW(overflow_error, "negi(%s)", a);
+	return -a;
 }
 
+// throws std::overflow_error in case of int64 overflow
+inline long subi(long a, long b) {
+	long e;
+	if (__builtin_sub_overflow(a, b, &e))
+		THROW(overflow_error, "subi(%s, %s)", a, b);
+	return e;
+}
+
+// will never overflow
+inline long subi(int a, int b) {
+	return (long)a - (long)b;
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline long muli(long a, long b) {
+	long e;
+	if (__builtin_mul_overflow(a, b, &e))
+		THROW(overflow_error, "muli(%s, %s)", a, b);
+	return e;
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline lvec3 addi(lvec3 a, lvec3 b) {
+	return {addi(a.x, b.x), addi(a.y, b.y), addi(a.z, b.z)};
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline lvec3 subi(lvec3 a, lvec3 b) {
+	return {subi(a.x, b.x), subi(a.y, b.y), subi(a.z, b.z)};
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline lvec3 muli(lvec3 a, long b) {
+	return {muli(a.x, b), muli(a.y, b), muli(a.z, b)};
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline long doti(lvec3 a, lvec3 b) {
+	long x = muli(a.x, b.x);
+	long y = muli(a.y, b.y);
+	long z = muli(a.z, b.z);
+	return addi(addi(x, y), z);
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline long squaredi(lvec3 a) {
+	return doti(a, a);
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline lvec3 crossi(lvec3 a, lvec3 b) {
+	long x = subi(muli(a.y, b.z), muli(a.z, b.y));
+	long y = subi(muli(a.z, b.x), muli(a.x, b.z));
+	long z = subi(muli(a.x, b.y), muli(a.y, b.x));
+	return {x, y, z};
+}
+
+// throws std::overflow_error in case of int64 overflow
+inline lvec3 normali(ivec3 a, ivec3 b, ivec3 c) {
+	lvec3 normal = crossi(subi(b, a), subi(c, a));
+	return normal / gcd(normal); // reduce normal to reduce chance of overflow in callers
+}		
+
+// throws std::overflow_error in case of int64 overflow
+inline bool colinear(ivec3 a, ivec3 b, ivec3 c) {
+	return crossi(subi(b, a), subi(c, a)) == lvec3(0, 0, 0);
+}
+
+template<typename Vec>
+bool add_overflow(Vec a, Vec b, Vec& c) {
+	return __builtin_add_overflow(a.x, b.x, &c.x)
+		|| __builtin_add_overflow(a.y, b.y, &c.y)
+		|| __builtin_add_overflow(a.z, b.z, &c.z);
+}
+
+template<typename Vec>
+bool sub_overflow(Vec a, Vec b, Vec& c) {
+	return __builtin_sub_overflow(a.x, b.x, &c.x)
+		|| __builtin_sub_overflow(a.y, b.y, &c.y)
+		|| __builtin_sub_overflow(a.z, b.z, &c.z);
+}
