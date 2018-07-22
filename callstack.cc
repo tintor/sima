@@ -4,6 +4,8 @@
 #include <execinfo.h>
 #include <cxxabi.h>
 
+using namespace std::literals;
+
 Callstack::Callstack() {
 	_size = backtrace(_stack.data(), _stack.size());
 }
@@ -14,7 +16,14 @@ std::unique_ptr<char, void(*)(char*)> Callstack::demangle(const char* symbol) {
 	return {(status == 0) ? e : nullptr, [](char* p) { free(p); }};
 }
 
-void Callstack::write(std::string& out) const {
+bool matches(const std::initializer_list<std::string_view>& prefixes, std::string_view s) {
+	for (std::string_view m : prefixes)
+		if (s.size() >= m.size() && s.substr(0, m.size()) == m)
+			return true;
+	return false;
+}
+
+void Callstack::write(std::string& out, const std::initializer_list<std::string_view>& exclude) const {
 	char** strs = backtrace_symbols(_stack.data(), _size);
 	ON_SCOPE_EXIT(free(strs));
 
@@ -30,7 +39,7 @@ void Callstack::write(std::string& out) const {
 		char* new_buffer = abi::__cxa_demangle(symbol, buffer, &length, &status);
 		if (new_buffer)
 			buffer = new_buffer;
-		if (status != 0 || buffer != std::string_view("Callstack::Callstack()")) {
+		if (status != 0 || (buffer != "Callstack::Callstack()"sv && !matches(exclude, buffer))) {
 			for (int j = 0; j < sp.size(); j++) {
 				out += (j == 3 && status == 0) ? std::string_view(buffer) : sp[j];
 				out += ' ';
