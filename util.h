@@ -116,3 +116,23 @@ void remove_dups(Vector& v) {
 	std::sort(v.begin(), v.end());
 	v.erase(std::unique(v.begin(), v.end()), v.end());
 }
+
+inline std::vector<std::string_view> split(std::string_view s, char delim = ' ') {
+	std::vector<std::string_view> out;
+	const char* b = s.begin();
+	int c = 0;
+	for (const char* i = s.begin(); i != s.end(); i++) {
+		if (*i == delim) {
+			if (c > 0)
+				out.push_back(std::string_view(b, c));
+			b = i + 1;
+			c = 0;
+		} else {
+			c += 1;
+		}
+	}
+	if (c > 0)
+		out.push_back(std::string_view(b, c));
+	return out;
+}
+
