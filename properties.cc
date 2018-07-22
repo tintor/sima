@@ -1,33 +1,39 @@
 #include "properties.h"
 #include "aabb.h"
 
-// Volume of a valid polyhedron
-double volume(const imesh3& mesh) {
-	double volume = 0;
-	for (const auto& f : mesh) {
+long signed_volume_mul6(const imesh3& mesh) {
+	long volume = 0;
+	for (const itriangle3& f : mesh) {
 		long s = 0, z = 0;
 		for (auto [a, b] : f.edges()) {
 			z += b.z;
-			s += (long(a.y) + b.y) * (long(a.x) - b.x);
+			long y = addi(a.y, b.y);
+			long x = subi(a.x, b.x);
+			s = addi(s, muli(y, x));
 		}
-		volume += double(z) * s;
+		long v = muli(z, s);
+		volume = addi(volume, v);
 	}
-	return volume / 6;
+	return volume;
+}
+
+double volume(const imesh3& mesh) {
+	return std::abs(signed_volume_mul6(mesh)) / 6.0;
 }
 
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
 ivec3 center_of_mass(const imesh3& mesh) {
-	dvec3 P = {0, 0, 0};
-	double V = 0;
+	lvec3 P = {0, 0, 0};
+	long V = 0;
 	for (const auto& f : mesh) {
-		double v = dot(f.a, cross(f.b, f.c));
-		P += dvec3(f.a + f.b + f.c) * v;
-		V += v;
+		long v = doti(f.a, crossi(f.b, f.c));
+		lvec3 p = muli(addi(addi(f.a, f.b), f.c), v);
+		P = addi(P, p);
+		V = addi(V, v);
 	}
-	P /= V * 4;
-	return {std::round(P.x), std::round(P.y), std::round(P.z)};
+	return P / muli(V, 4);
 }
 
 inline dmat3 full_mat3(double a) {
