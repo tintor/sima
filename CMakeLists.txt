@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 2.8)
 
 project(sima)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(prod
 	convex_hull.cc
 	is_valid.cc
@@ -19,6 +21,7 @@ set(prod
 	rendering.cc
 	timestamp.cc
 	mesh_import.cc
+	callstack.cc
 	lodepng/lodepng.cc)
 
 set(test
@@ -32,8 +35,13 @@ set(test
 add_executable(a.sima main.cc ${prod})
 add_executable(a.test ${prod} ${test})
 
-add_definitions(-g)
-#add_definitions(-g -O3 -flto -DNDEBUG)
+add_definitions(-g -mavx2)
+#add_definitions(-g -O3 -mavx2 -lgmpxx -lgmp)
+#add_definitions(-g -O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
+
+#  8.7s for (empty)
+# 14.7s for -O3 -DNDEBUG -mavx2
+# 16.1s for -O3 -DNDEBUG -mavx2 -flto
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 
