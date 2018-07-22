@@ -35,7 +35,7 @@ set(test
 add_executable(a.sima main.cc ${prod})
 add_executable(a.test ${prod} ${test})
 
-add_definitions()
+add_definitions(-O3 -mavx2)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
 #add_definitions(-O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
 
