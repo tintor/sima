@@ -10,7 +10,7 @@
 // Shape is 3d solid, immutable, purely geometric and with origin in center of mass
 Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 	if (is_valid(mesh) != Validity::OK)
-		throw std::runtime_error("invalid mesh");
+		throw runtime_error("invalid mesh");
 
 	// Move to center of mass
 	dvec3 center = center_of_mass(mesh);
