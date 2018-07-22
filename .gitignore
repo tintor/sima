@@ -12,3 +12,4 @@ sima
 test
 glfw/docs/Doxyfile
 a.*
+compile_commands.json
