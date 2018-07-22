@@ -1,6 +1,12 @@
 #pragma once
 #include "int.h"
 
+#ifdef NDEBUG
+constexpr bool debug = false;
+#else
+constexpr bool debug = true;
+#endif
+
 static_assert(sizeof(int) == 4);
 static_assert(sizeof(long) == 8);
 static_assert(sizeof(long long) == 8);
