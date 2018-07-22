@@ -22,6 +22,14 @@ inline constexpr long double operator "" _deg(unsigned long long a) { return a *
 
 inline std::string deg(long double r) { return format("%g deg", r * (180 / M_PI)); }
 
+inline vec3 round(vec3 v) {
+	return {std::round(v.x), std::round(v.y), std::round(v.z)};
+}
+
+inline vec3 round(dvec3 v) {
+	return {std::round(v.x), std::round(v.y), std::round(v.z)};
+}
+
 inline dvec3 any_normal(dvec3 v) {
 	double x = std::abs(v.x);
 	double y = std::abs(v.y);

@@ -69,7 +69,7 @@ static long xarea(ivec2 a, ivec2 b, ivec2 c) {
 	return area;
 }
 
-TEST_CASE("tesselate 1000") {
+/*TEST_CASE("tesselate 1000") {
 	std::default_random_engine rng;
 	for (auto i : range(3, 1001)) {
 		print("Case: %s\n", i);
@@ -125,4 +125,4 @@ TEST_CASE("tesselate 1000") {
 			REQUIRE(pc + rc == 1);
 		}
 	}
-}
+}*/

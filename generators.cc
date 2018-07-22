@@ -3,10 +3,25 @@
 imesh3 generate_box(int sx, int sy, int sz) {
 	std::vector<ivec3> vertices;
 	vertices.reserve(8);
-	for (int x = -1; x <= 1; x += 2)
-		for (int y = -1; y <= 1; y += 2)
-			for (int z = -1; z <= 1; z += 2)
-				vertices.push_back(ivec3(x * sx, y * sy, z * sz));
+	for (int x : {-1, 1})
+		for (int y : {-1, 1})
+			for (int z : {-1, 1})
+				vertices.emplace_back(x * sx, y * sy, z * sz);
+	return convex_hull(vertices);
+}
+
+imesh3 generate_cylinder(int sides, int rmin, int rmax, int zmin, int zmax) {
+	std::vector<ivec3> vertices;
+	for (auto [z, r] : {std::pair{zmin, rmin}, std::pair{zmax, rmax}})
+		if (r == 0)
+			vertices.emplace_back(0, 0, z);
+		else
+			for (int i : range(sides)) {
+				double a = (2 * M_PI / sides) * i;
+				int x = std::round(std::cos(a) * r);
+				int y = std::round(std::sin(a) * r);
+				vertices.emplace_back(x, y, z);
+			}
 	return convex_hull(vertices);
 }
 

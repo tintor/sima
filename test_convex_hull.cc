@@ -133,31 +133,6 @@ TEST_CASE("convex_hull random points on cube") {
 	}
 }
 
-// uniform on the unit sphere surface
-template<typename RandomEngine>
-ivec3 random_direction(RandomEngine& rnd, double radius) {
-	std::normal_distribution<double> dist(0.0, 1.0);
-	dvec3 v = radius * normalize(dvec3(dist(rnd), dist(rnd), dist(rnd)));
-	return { std::round(v.x), std::round(v.y), std::round(v.z) };
-}
-
-TEST_CASE("convex_hull random points on sphere") {
-	std::default_random_engine rnd;
-	double r = 1000000;
-	for (int vertices = 200; vertices <= 200; vertices++) {
-		print("vertices %s\n", vertices);
-		std::vector<ivec3> V(vertices);
-		for (auto i : range(vertices))
-			V[i] = random_direction(rnd, r);
-		imesh3 m = convex_hull(V);
-		double v = 4.0 / 3 * M_PI * r * r * r;
-		print("act volume %s\n", volume(m));
-		print("exp volume %s\n", v);
-		REQUIRE(m.size() == vertices * 2 - 4);
-		REQUIRE(abs(volume(m) - v) / v < 0.15);
-	}
-}
-
 TEST_CASE("convex_hull cube") {
 	auto m = generate_box(1, 1, 1);	
 	REQUIRE(is_convex(m));

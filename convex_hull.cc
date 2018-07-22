@@ -111,4 +111,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		for (auto e : open_edges)
 			hull.emplace_back(e.a, e.b, p);
 	}
+
+	assert(is_valid(hull) == Validity::OK);
+	assert(is_convex(hull));
 }
