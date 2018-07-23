@@ -1,4 +1,5 @@
 #include "generators.h"
+#include "tesselate.h"
 
 imesh3 generate_box(int sx, int sy, int sz) {
 	std::vector<ivec3> vertices;
@@ -46,3 +47,33 @@ imesh3 CreateCrossMesh(int inner, int outer) {
 	AddQuad(m, ivec3(-b, a, a), ivec3(-b, -a, -a), ivec3(-b, -a, a), ivec3(-b, a, -a));
 	return m;
 }
+
+imesh3 generate_prism(const ipolygon2& poly, int zmin, int zmax) {
+	imesh2 m2 = tesselate(poly);
+	imesh3 m3;
+	m3.reserve(m2.size() * 2 + poly.size() * 2);
+	for (itriangle2 m : m2) {
+		// TODO check orientation of m
+		m3.emplace_back(ivec3(m.a.x, m.a.y, zmin), ivec3(m.b.x, m.b.y, zmin), ivec3(m.c.x, m.c.y, zmin));
+		m3.emplace_back(ivec3(m.b.x, m.b.y, zmax), ivec3(m.a.x, m.a.y, zmax), ivec3(m.c.x, m.c.y, zmax));
+	}
+	ivec2 sa = poly.back();
+	for (ivec2 sb : poly) {
+		ivec3 a(sa.x, sa.y, zmin);
+		ivec3 b(sa.x, sa.y, zmax);
+		ivec3 c(sb.x, sb.y, zmax);
+		ivec3 d(sb.x, sb.y, zmin);
+		m3.emplace_back(a, b, c);
+		m3.emplace_back(c, d, a);
+		sa = sb;
+	}
+	return m3;
+}
+
+// TODO sphere with bumps: generate sphere, then move vertices randomly towards or away from center
+
+// TODO concave imesh3 generator
+// "grow" it from a starting shape, by either extruding a triangle (or two) or adding a pyramid over a face (or two),
+// applied recursively (as long as there are no self intersections).
+//
+// "grow" a tree: first extrude face to get a branch, then add a pyramid to create a fork, then extrude again!
