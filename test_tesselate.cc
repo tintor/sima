@@ -2,25 +2,18 @@
 #include "format.h"
 #include "catch.hpp"
 #include "range.h"
+#include "aabb.h"
 #include <random>
 
-TEST_CASE("tesselate 2") {
-	ivec2 a = {0, 0};
-	ivec2 b = {2, 1};
-	ivec2 c = {0, 2};
-	ivec2 d = {1, 1};
-	REQUIRE(tesselate({a, b, c, d}) == imesh2{{d, a, b}, {d, b, c}});
-}
-
 inline long sq(ivec2 a, ivec2 b) {
-	long x = (long)a.x - b.x;
-	long y = (long)a.y - b.y;
-	return x * x + y * y;
+	long x = subi(a.x, b.x);
+	long y = subi(a.y, b.y);
+	return addi(muli(x, x), muli(y, y));
 }
 
 template<typename RNG>
 static ipolygon2 random_polygon(int size, RNG& rng) {
-	std::uniform_int_distribution<int> dist(0, 9); //INT_MIN, INT_MAX);
+	std::uniform_int_distribution<int> dist(-1000, 1000); //INT_MIN, INT_MAX);
 	std::unordered_set<ivec2> points;
 	while (points.size() < size) {
 		ivec2 p(dist(rng), dist(rng));
@@ -32,14 +25,15 @@ static ipolygon2 random_polygon(int size, RNG& rng) {
 	bool done = false;
 	while (!done) {
 		done = true;
-		for (int j : range(size - 2))
-			for (int i : range(j + 2, size)) {
-				auto a = poly[j];
-				auto b = poly[(j + 1) % size];
-				auto c = poly[i];
-				auto d = poly[(i + 1) % size];
+		for (int j : range(1, size))
+			for (int i : range(j - 1)) {
+				auto c = poly[j];
+				auto d = poly[(j + 1) % size];
+				auto a = poly[i];
+				auto b = poly[(i + 1) % size];
 				if (sq(a, b) + sq(c, d) > sq(a, c) + sq(b, d)) {
-					std::reverse(poly.begin() + j + 1, poly.begin() + i + 1);
+					// TODO faster if we replace polygon with XOR-linked list
+					std::reverse(poly.begin() + i + 1, poly.begin() + j + 1);
 					done = false;
 				}
 			}
@@ -47,62 +41,75 @@ static ipolygon2 random_polygon(int size, RNG& rng) {
 	return poly;
 }
 
-inline long edge_area(int a, int b, int c, int d) {
-	return (long(a) + b) * (long(c) - d);
-}
+bool is_valid(const ipolygon2& poly);
 
-static long xarea(const ipolygon2& poly) {
-	long area = 0;
-    auto a = poly.back();
-	for (auto b : poly) {
-        area += edge_area(a.x, b.x, a.y, b.y);
-		a = b;
+std::vector<ipolygon2> test_cases;
+
+#include <fstream>
+#include "file.h"
+#include "util.h"
+
+struct Setup {
+	Setup() {
+		std::ifstream is("concave_polygons.txt");
+		if (!is.is_open())
+			write();
+		else {
+			is.close();
+			read();
+		}
 	}
-	return area;
-}
 
-static long xarea(ivec2 a, ivec2 b, ivec2 c) {
-	long area = 0;
-    area += edge_area(a.x, b.x, a.y, b.y);
-    area += edge_area(b.x, c.x, b.y, c.y);
-    area += edge_area(c.x, a.x, c.y, a.y);
-	return area;
-}
-
-/*TEST_CASE("tesselate 1000") {
-	std::default_random_engine rng;
-	for (auto i : range(3, 1001)) {
-		print("Case: %s\n", i);
-
-		ipolygon2 poly;
-		long poly_area = 0;
-		while (poly_area == 0) {
-			poly = random_polygon(i, rng);
-			poly_area = xarea(poly);
+	void read() {
+		FileReader reader("concave_polygons.txt");
+		while (true) {
+			std::string_view line = reader.readline();
+			if (line.size() == 0)
+				break;
+			auto a = split(line);
+			ipolygon2 poly;
+			poly.reserve(a.size() / 2);
+			for (int i = 0; i < a.size()/2; i++) {
+				int x = parse<int>(a[i * 2]);
+				int y = parse<int>(a[i * 2 + 1]);
+				poly.emplace_back(x, y);
+			}
+			test_cases.push_back(std::move(poly));
 		}
-		auto tess = tesselate(poly);
+	}
 
-		print("POLYGON ((");
-		for (auto p : poly)
-			print("%s, ", p);
-		print("%s))\n", poly.front());
-	
-		print("MULTIPOLYGON ((");
-		for (auto t : tess) {
-			if (t != tess.front())
-				print(", ");
-			print("(%s, %s)", t, t.a);
+	void write() {
+		std::ofstream os("concave_polygons.txt");
+		std::default_random_engine rng;
+		for (auto i : range(3, 501)) {
+			if (i % 16 == 0)
+				print("prepare %s\n", i);
+			ipolygon2 poly;
+			while (!is_valid(poly))
+				poly = random_polygon(i, rng);
+			test_cases.push_back(poly);
+			for (ivec2 e : poly)
+				os << e.x << ' ' << e.y << ' ';
+			os << '\n';
 		}
-		print("))\n");
-		for (auto t : tess) {
-			print("%s\n", (long)xarea(t.a, t.b, t.c));
-		}
-		
+	}
+} setup;
+
+TEST_CASE("tesselate_500_verify") {
+	imesh2 tess;
+	tess.reserve(test_cases.back().size() + 2);
+	for (const auto& poly : test_cases) {
+		tess.clear();
+		tesselate(poly, tess);
+
+		REQUIRE(tess.size() == poly.size() - 2);
+
 		// verify that sum of areas of all triangles equals polygon area
-		long area = 0;
+		long tess_area = 0;
 		for (auto m : tess)
-			area += std::abs(xarea(m.a, m.b, m.c));
-		REQUIRE(std::abs(poly_area) == area);
+			tess_area += abs(area(m));
+		long poly_area = area(poly);
+		REQUIRE(std::abs(poly_area) == tess_area);
 
 		// verify that all edges are unique
 		std::unordered_set<isegment2> edges;
@@ -125,4 +132,4 @@ static long xarea(ivec2 a, ivec2 b, ivec2 c) {
 			REQUIRE(pc + rc == 1);
 		}
 	}
-}*/
+}

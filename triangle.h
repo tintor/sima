@@ -1,5 +1,7 @@
 #pragma once
 #include "segment.h"
+#include "range.h"
+#include "scalar.h"
 #include <vector>
 
 template<typename V>
@@ -47,3 +49,72 @@ struct polygon {
 
 using imesh2 = std::vector<itriangle2>;
 using imesh3 = std::vector<itriangle3>;
+
+inline std::string wkt(const ipolygon2& poly) {
+	std::string s;
+	s += "POLYGON (";
+	if (poly.size() > 0) {
+		for (auto p : poly) {
+			format_e(s, "", p);
+			s += ", ";
+		}
+		format_e(s, "", poly.front());
+	}
+	s += ')';
+	return s;
+}
+
+inline std::string wkt(const imesh2& mesh) {
+	std::string s;
+	s += "MULTIPOLYGON ((";
+	for (auto i : range(mesh.size())) {
+		if (i != 0)
+			s += ", ";
+		const itriangle2& m = mesh[i];
+		s += '(';
+		format_e(s, "", m.a);
+		s += ", ";
+		format_e(s, "", m.b);
+		s += ", ";
+		format_e(s, "", m.c);
+		s += ", ";
+		format_e(s, "", m.a);
+		s += ')';
+	}
+	s += "))";
+	return s;
+}
+
+// overflow safe
+inline long edge_area(ivec2 a, ivec2 b) {
+	return ((long)a.x + (long)b.x) * ((long)a.y - (long)b.y);
+}
+
+// throws on overflow
+inline long area(const ipolygon2& poly) {
+	long area = 0;
+	if (poly.size() > 0) {
+	    auto a = poly.back();
+		for (auto b : poly) {
+			// This is a little faster than calling edge_area instead?
+			area = addi(area, muli(addi(a.x, b.x), subi(a.y, b.y)));
+			//area = addi(area, edge_area(a, b));
+			a = b;
+		}
+	}
+	return area;
+}
+
+// throws on overflow
+inline long area(ivec2 a, ivec2 b, ivec2 c) {
+	long ab = edge_area(a, b);
+	long bc = edge_area(b, c);
+	long ca = edge_area(c, a);
+	long z = addi(ab, bc);
+	return addi(z, ca);
+}
+
+// throws on overflow
+inline long area(itriangle2 m) {
+	return area(m.a, m.b, m.c);
+}

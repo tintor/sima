@@ -7,6 +7,33 @@
 #include "ivec.h"
 #include "primitives.h"
 
+// from tesselate.cc
+bool relate_abxo(ivec2 a, ivec2 b, ivec2 p, ivec2 q, long ab);
+
+bool is_valid(const ipolygon2& poly) {
+	auto n = poly.size();
+	if (n < 3)
+		return false;
+
+	// all vertices must be unique
+	for (auto i : range(n))
+		for (auto j : range(i))
+			if (poly[i] == poly[j])
+				return false;
+
+	// no self intersection
+	for (auto i : range(n)) {
+		ivec2 a = poly[i], b = poly[(i + 1) % n];
+		long ab = edge_area(a, b);
+		for (auto j : range(i)) {
+			ivec2 p = poly[j], q = poly[(j + 1) % n];
+			if (relate_abxo(a, b, p, q, ab))
+				return false;
+		}
+	}
+	return true;
+}
+
 // is triangle Q intersecting with plane defined by plane of triangle P
 /*inline bool intersects_plane(const itriangle3& q, const itriangle3& plane) {
 	// TODO is this overflow safe?

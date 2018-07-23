@@ -1,6 +1,8 @@
 #pragma once
 #include "triangle.h"
 
+bool is_valid(const ipolygon2& poly);
+
 enum class Validity {
 	OK = 0,
 	TooFewFaces = 1,

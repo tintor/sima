@@ -14,6 +14,10 @@ struct interval {
 		if (a > max)
 			max = a;
 	}
+
+	bool overlaps(interval e) const {
+		return e.min < max && min < e.max;
+	}
 	
 	bool intersects(interval e) const {
 		return e.min <= max && min <= e.max;
@@ -86,6 +90,13 @@ struct aabb {
 	bool intersects(ivec3 e) const {
 		for (auto i : range(dim))
 			if (e[i] < mm[i].min || e[i] > mm[i].max)
+				return false;
+		return true;
+	}
+
+	bool overlaps(const aabb& e) const {
+		for (auto i : range(dim))
+			if (!mm[i].overlaps(e.mm[i]))
 				return false;
 		return true;
 	}
