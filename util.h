@@ -5,19 +5,23 @@
 #include <regex>
 
 template<typename T>
-T min(std::initializer_list<T> args) {
-	T result = std::numeric_limits<T>::max();
-	for (auto e : args)
-		result = std::min(e, result);
-	return result;
+T min(T a, T b) {
+	return (a < b) ? a : b;
+}
+
+template<typename T, typename... Args>
+T min(T a, Args... args) {
+	return min(a, min(args...));
 }
 
 template<typename T>
-T max(std::initializer_list<T> args) {
-	T result = std::numeric_limits<T>::min();
-	for (auto e : args)
-		result = std::max(e, result);
-	return result;
+T max(T a, T b) {
+	return (a > b) ? a : b;
+}
+
+template<typename T, typename... Args>
+T max(T a, Args... args) {
+	return max(a, max(args...));
 }
 
 template<typename T>
@@ -135,4 +139,3 @@ inline std::vector<std::string_view> split(std::string_view s, char delim = ' ')
 		out.push_back(std::string_view(b, c));
 	return out;
 }
-

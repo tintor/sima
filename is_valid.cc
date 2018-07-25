@@ -129,14 +129,14 @@ static void minimize(ivec3& a, lvec3 d) {
 	uint x = add_count(a.x, -d.x);
 	uint y = add_count(a.y, -d.y);
 	uint z = add_count(a.z, -d.z);
-	a -= d * (long)min({x, y, z});
+	a -= d * (long)min(x, y, z);
 }
 
 static void maximize(ivec3& a, lvec3 d) {
 	uint x = add_count(a.x, d.x);
 	uint y = add_count(a.y, d.y);
 	uint z = add_count(a.z, d.z);
-	a += d * (long)min({x, y, z});
+	a += d * (long)min(x, y, z);
 }
 
 struct Point {

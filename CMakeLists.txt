@@ -26,6 +26,7 @@ set(prod
 
 set(test
 	test.cc
+	test_util.cc
 	test_generators.cc
 	test_convex_hull.cc
 	test_shape.cc
