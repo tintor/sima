@@ -65,9 +65,9 @@ bool is_aabb(const imesh3& mesh) {
 	// All vertices must be made from extreme coordinates
 	for (auto f : mesh)
 		for (ivec3 v : f)
-			if (v.x != box.mm[0].min && v.x != box.mm[0].max
-			 && v.y != box.mm[1].min && v.y != box.mm[1].max
-			 && v.z != box.mm[2].min && v.z != box.mm[2].max)
+			if (v.x != box.min[0] && v.x != box.max[0]
+			 && v.y != box.min[1] && v.y != box.max[1]
+			 && v.z != box.min[2] && v.z != box.max[2])
 				return false;
 
 	// Every face must have one coordinate constant

@@ -3,161 +3,133 @@
 #include "triangle.h"
 #include "array_ptr.h"
 
-template<typename T>
-struct interval {
-	T min = std::numeric_limits<T>::max();
-	T max = std::numeric_limits<T>::min();
-
-	bool operator==(const interval<T>& v) const {
-		return min == v.min && max == v.max;
-	}
-
-	bool operator!=(const interval<T>& v) const {
-		return !operator==(v);
-	}
-
-	void include(T a) {
-		if (a < min)
-			min = a;
-		if (a > max)
-			max = a;
-	}
-
-	bool overlaps(interval e) const {
-		return e.min < max && min < e.max;
-	}
-
-	bool intersects(interval e) const {
-		return e.min <= max && min <= e.max;
-	}
-};
-
 template<typename Vec>
 struct aabb {
-	static constexpr int dim = sizeof(Vec) / sizeof(Vec::x);
-	std::array<interval<decltype(Vec::x)>, dim> mm;
+	Vec min, max;
 
-	aabb() { }
+	aabb() {
+		reset();
+	}
+
+	auto range_dim() const { return range(sizeof(min) / sizeof(min.x)); }
 
 	explicit aabb(Vec p) {
-		for (auto i : range(dim))
-			mm[i].include(p[i]);
+		min = max = p;
 	}
 
 	explicit aabb(Vec a, Vec b) {
-		for (auto i : range(dim)) {
-			mm[i].include(a[i]);
-			mm[i].include(b[i]);
-		}
+		min = max = a;
+		add(b);
 	}
 
 	explicit aabb(Vec a, Vec b, Vec c) {
-		for (auto i : range(dim)) {
-			mm[i].include(a[i]);
-			mm[i].include(b[i]);
-			mm[i].include(c[i]);
-		}
+		min = max = a;
+		add(b);
+		add(c);
 	}
 
 	explicit aabb(const segment<Vec>& p) {
-		for (auto i : range(dim)) {
-			mm[i].include(p.a[i]);
-			mm[i].include(p.b[i]);
-		}
+		min = max = p.a;
+		add(p.b);
 	}
 
 	explicit aabb(const triangle<Vec>& p) {
-		for (auto i : range(dim)) {
-			mm[i].include(p.a[i]);
-			mm[i].include(p.b[i]);
-			mm[i].include(p.c[i]);
-		}
+		min = max = p.a;
+		add(p.b);
+		add(p.c);
 	}
 
 	explicit aabb(array_cptr<Vec> p) {
+		reset();
 		for (auto v : p)
-			for (auto i : range(dim))
-				mm[i].include(v[i]);
+			add(v);
 	}
 
 	explicit aabb(array_cptr<triangle<Vec>> ap) {
-		for (auto i : range(dim))
-			for (auto p : ap) {
-				mm[i].include(p.a[i]);
-				mm[i].include(p.b[i]);
-				mm[i].include(p.c[i]);
-			}
+		reset();
+		for (auto p : ap) {
+			add(p.a);
+			add(p.b);
+			add(p.c);
+		}
 	}
 
 	bool operator==(const aabb<Vec>& v) const {
-		for (auto i : range(dim))
-			if (mm[i] != v.mm[i])
-				return false;
-		return true;
+		return min == v.min && max == v.max;
 	}
 
 	bool operator!=(const aabb<Vec>& v) const {
 		return !operator==(v);
 	}
 
-	void add(ivec3 v) {
-		for (auto i : range(dim))
-			mm[i].include(v[i]);
+	void reset() {
+		for (auto i : range_dim()) {
+			min[i] = std::numeric_limits<decltype(min.x)>::max();
+			max[i] = std::numeric_limits<decltype(min.x)>::min();
+		}
+	}
+
+	void add(Vec v) {
+		for (auto i : range_dim()) {
+			if (v[i] < min[i])
+				min[i] = v[i];
+			if (v[i] > max[i])
+				max[i] = v[i];
+		}
+	}
+
+	bool valid() const {
+		for (auto i : range_dim())
+			if (min[i] > max[i])
+				return false;
+		return true;
 	}
 
 	Vec size() const {
-		Vec v;
-		for (auto i : range(dim))
-			v[i] = mm[i].max - mm[i].min;
-		return v;
+		assert(valid());
+		return max - min;
 	}
 
 	Vec center() const {
-		Vec v;
-		for (auto i : range(dim))
-			v[i] = (mm[i].max + mm[i].min) / 2;
-		return v;
-	}
-
-	Vec min() const {
-		Vec v;
-		for (auto i : range(dim))
-			v[i] = mm[i].min;
-		return v;
-	}
-
-	Vec max() const {
-		Vec v;
-		for (auto i : range(dim))
-			v[i] = mm[i].max;
-		return v;
+		assert(valid());
+		return (min + max) / 2;
 	}
 
 	// strictly inside!
 	bool inside(ivec3 e) const {
-		for (auto i : range(dim))
-			if (e[i] <= mm[i].min || e[i] >= mm[i].max)
+		for (auto i : range_dim())
+			if (e[i] <= min[i] || e[i] >= max[i])
 				return false;
 		return true;
 	}
 
 	bool intersects(ivec3 e) const {
-		for (auto i : range(dim))
-			if (e[i] < mm[i].min || e[i] > mm[i].max)
+		for (auto i : range_dim())
+			if (e[i] < min[i] || e[i] > max[i])
 				return false;
 		return true;
 	}
 
+	template<typename T>
+	static bool overlaps(T amin, T amax, T bmin, T bmax) {
+		return bmin < amax && amin < bmax;
+	}
+
+	template<typename T>
+	static bool intersects(T amin, T amax, T bmin, T bmax) {
+		return bmin <= amax && amin <= bmax;
+	}
+
 	bool overlaps(const aabb& e) const {
-		for (auto i : range(dim))
-			if (!mm[i].overlaps(e.mm[i]))
+		for (auto i : range_dim())
+			if (!overlaps(min[i], max[i], e.min[i], e.max[i]))
 				return false;
 		return true;
 	}
 
 	bool intersects(const aabb& e) const {
-		for (auto i : range(dim))
-			if (!mm[i].intersects(e.mm[i]))
+		for (auto i : range_dim())
+			if (!intersects(min[i], max[i], e.min[i], e.max[i]))
 				return false;
 		return true;
 	}
@@ -166,12 +138,8 @@ struct aabb {
 template<typename T>
 void format_e(std::string& s, std::string_view spec, const aabb<T>& box) {
 	s += "aabb(";
-	for (auto i : range(aabb<T>::dim)) {
-		if (i != 0)
-			s += ", ";
-		format_e(s, "", box.mm[i].min);
-		s += ' ';
-		format_e(s, "", box.mm[i].max);
-	}
+	format_e(s, "", box.min);
+	s += ", ";
+	format_e(s, "", box.max);
 	s += ')';
 }
