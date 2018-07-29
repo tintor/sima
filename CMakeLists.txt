@@ -33,7 +33,15 @@ set(test
 	test_shape.cc
 	test_primitives.cc
 	test_tesselate.cc
-	test_integration.cc)
+	test_integration.cc
+ 	test_auto.cc
+	#test_array_set.cc
+	test_bits.cc
+	test_dynamic_array.cc
+	test_format.cc
+	test_range.cc
+	test_map.cc
+	test_zip.cc)
 
 add_executable(a.sima main.cc ${prod})
 add_executable(a.test ${prod} ${test})
