@@ -9,8 +9,8 @@ struct triangle {
 	V a, b, c;
 
 	triangle() { }
-	triangle(const triangle& v) : a(v.a), b(v.b), c(v.c) { }	
-	triangle(V a, V b, V c) : a(a), b(b), c(c) { }	
+	triangle(const triangle& v) : a(v.a), b(v.b), c(v.c) { }
+	triangle(V a, V b, V c) : a(a), b(b), c(c) { }
 
 	V& operator[](int idx) { return (&a)[idx]; }
 	V operator[](int idx) const { return (&a)[idx]; }
@@ -18,12 +18,12 @@ struct triangle {
 	std::array<segment<V>, 3> edges() const { return {segment<V>{a, b}, segment<V>{b, c}, segment<V>{c, a}}; }
 	std::array<segment<V&>, 3> edges() { return {segment<V&>{a, b}, {b, c}, {c, a}}; }
 
-	bool operator==(const triangle& v) const { return a == v.a && b == v.b && c == v.c; }
-	bool operator!=(const triangle& v) const { return a != v.a || b != v.b || c != v.c; }
+	bool operator==(const triangle& v) const { return equal(a, v.a) && equal(b, v.b) && equal(c, v.c); }
+	bool operator!=(const triangle& v) const { return !operator==(v); }
 
 	V* begin() { return &a; }
 	V* end() { return &a + 3; }
-	
+
 	const V* begin() const { return &a; }
 	const V* end() const { return &a + 3; }
 };
@@ -38,6 +38,39 @@ using itriangle3 = triangle<ivec3>;
 
 using ipolygon2 = std::vector<ivec2>;
 using ipolygon3 = std::vector<ivec3>;
+
+// TODO remove
+template<typename T>
+inline bool equal(const std::vector<T>& a, const std::vector<T>& b) {
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); i++)
+		if (!equal(a[i], b[i]))
+			return false;
+	return true;
+}
+
+inline bool operator==(const ipolygon2& a, const ipolygon2& b) {
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); i++)
+		if (!equal(a[i], b[i]))
+			return false;
+	return true;
+}
+
+inline bool operator==(const ipolygon3& a, const ipolygon3& b) {
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); i++)
+		if (!equal(a[i], b[i]))
+			return false;
+	return true;
+}
+
+inline bool operator!=(const ipolygon3& a, const ipolygon3& b) {
+	return !operator==(a, b);
+}
 
 // TODO move to own file
 template<typename V>

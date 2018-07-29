@@ -24,7 +24,7 @@ class Text
 public:
 	Text();
 
-	void Reset(int width, int height, glm::mat4& matrix, bool down);
+	//void Reset(int width, int height, glm::mat4& matrix, bool down);
 
 	template<typename ...Args>
 	void Print(std::string_view fmt, Args... args) {
@@ -36,8 +36,8 @@ public:
 	}
 	void PrintAt(float x, float y, float n, std::string_view);
 
-	glm::vec4 fg_color;
-	glm::vec4 bg_color;
+	vec4 fg_color;
+	vec4 bg_color;
 
 private:
 	float _tx;

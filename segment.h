@@ -5,12 +5,12 @@
 template<typename V>
 struct line {
 	V a, b;
-	
+
 	V& operator[](int idx) { return (&a)[idx]; }
 	V operator[](int idx) const { return (&a)[idx]; }
-	
-	bool operator==(const line& v) const { return a == v.a && b == v.b; }
-	bool operator!=(const line& v) const { return a != v.a || b != v.b; }
+
+	bool operator==(const line& v) const { return equal(a, v.a) && equal(b, v.b); }
+	bool operator!=(const line& v) const { return !(operator==(v)); }
 };
 
 template<typename V>
@@ -23,8 +23,8 @@ struct segment {
 	V& operator[](int idx) { return (&a)[idx]; }
 	V operator[](int idx) const { return (&a)[idx]; }
 
-	bool operator==(const segment& v) const { return a == v.a && b == v.b; }
-	bool operator!=(const segment& v) const { return a != v.a || b != v.b; }
+	bool operator==(const segment& v) const { return equal(a, v.a) && equal(b, v.b); }
+	bool operator!=(const segment& v) const { return !(operator==(v)); }
 
 	segment reversed() const { return {b, a}; }
 };

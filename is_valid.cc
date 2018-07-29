@@ -18,7 +18,7 @@ bool is_valid(const ipolygon2& poly) {
 	// all vertices must be unique
 	for (auto i : range(n))
 		for (auto j : range(i))
-			if (poly[i] == poly[j])
+			if (equal(poly[i], poly[j]))
 				return false;
 
 	// no self intersection
@@ -74,7 +74,9 @@ bool contains_multiple_components(const imesh3& mesh) {
 bool face_cuts_into_other_face(const imesh3& mesh) {
 	for (const itriangle3& m : mesh) {
 		auto box = aabb(m.a);
-		lvec3 ma = m.a, mb = m.b, mc = m.c;
+		lvec3 ma = vconvert(m.a, lvec3);
+		lvec3 mb = vconvert(m.b, lvec3);
+		lvec3 mc = vconvert(m.c, lvec3);
 		lvec3 cross_cb = crossi(mc, mb);
 		lvec3 cross_ba = crossi(mb, ma);
 		lvec3 cross_ac = crossi(ma, mc);
@@ -84,7 +86,8 @@ bool face_cuts_into_other_face(const imesh3& mesh) {
 		for (const itriangle3& n : mesh)
 			if (aabb<ivec3>(n).intersects(box))
 				for (isegment3 e : n.edges()) {
-					lvec3 ea = e.a, eb = e.b;
+					lvec3 ea = vconvert(e.a, lvec3);
+				    lvec3 eb = vconvert(e.b, lvec3);
 					lvec3 d = subi(eb, ea);
 					lvec3 n = crossi(d, eb);
 					long s = doti(n, sub_cb);
@@ -129,14 +132,14 @@ static void minimize(ivec3& a, lvec3 d) {
 	uint x = add_count(a.x, -d.x);
 	uint y = add_count(a.y, -d.y);
 	uint z = add_count(a.z, -d.z);
-	a -= d * (long)min(x, y, z);
+	a -= vconvert(d * (long)min(x, y, z), ivec3);
 }
 
 static void maximize(ivec3& a, lvec3 d) {
 	uint x = add_count(a.x, d.x);
 	uint y = add_count(a.y, d.y);
 	uint z = add_count(a.z, d.z);
-	a += d * (long)min(x, y, z);
+	a += vconvert(d * (long)min(x, y, z), ivec3);
 }
 
 struct Point {
@@ -155,10 +158,10 @@ void format_e(std::string& s, std::string_view spec, const Point& p) {
 // angle between planes [line,A] and [line,REF]
 // returns angle in range [-PI, PI]
 double compute_angle(isegment3 line, ivec3 pos, ivec3 off, dvec3 dir, dvec3 ref, dvec3 cross_dir_ref) {
-	dvec3 da = subi(off, pos);
-	dvec3 e = glm::normalize(da - dir * glm::dot(da, dir));
+	dvec3 da = vconvert(subi(off, pos), dvec3);
+	dvec3 e = normalize(da - dir * dot(da, dir));
 	double alpha = angle(e, ref);
-	return glm::dot(e, cross_dir_ref) < 0 ? -alpha : alpha;
+	return dot(e, cross_dir_ref) < 0 ? -alpha : alpha;
 }
 
 struct LineData {
@@ -172,7 +175,7 @@ bool is_sealed(const imesh3& mesh) {
 	for (const itriangle3& f : mesh)
 		for (int i : range(3)) {
 			ivec3 a = f[i], b = f[(i + 1) % 3], c = f[(i + 2) % 3];
-			lvec3 d = (lvec3)b - (lvec3)a;
+			lvec3 d = vconvert(b, lvec3) - vconvert(a, lvec3);
 			d /= gcd(d);
 			bool flip = d.x < 0 || (d.x == 0 && d.y < 0) || (d.x == 0 && d.y == 0 && d.z < 0);
 			if (flip)
@@ -188,16 +191,16 @@ bool is_sealed(const imesh3& mesh) {
 	for (auto& [line, data] : lines) {
 		ivec3 line_a = line.a;
 		std::sort(data.points.begin(), data.points.end(), [&line_a](const Point& a, const Point& b) {
-			return closer_to(line_a, a.pos, b.pos) || (a.pos == b.pos && !a.begin && b.begin);
+			return closer_to(line_a, a.pos, b.pos) || (equal(a.pos, b.pos) && !a.begin && b.begin);
 		});
 	}
 
 	// Verify all edges are sealed and no seal is penetrating any other seal
 	for (const auto& [line, data] : lines) {
 		// coordinate system to compute angles in!
-		dvec3 d = glm::normalize((dvec3)data.dir);
-		dvec3 r = glm::normalize(any_normal(d));
-		dvec3 dr = glm::normalize(glm::cross(d, r));
+		dvec3 d = normalize(vconvert(data.dir, dvec3));
+		dvec3 r = normalize(any_normal(d));
+		dvec3 dr = normalize(cross(d, r));
 
 		auto less = [](std::pair<double, bool> a, std::pair<double, bool> b) {
 			return a.first < b.first;
@@ -225,18 +228,18 @@ bool is_sealed(const imesh3& mesh) {
 	return true;
 }
 
-bool are_coplanar_faces_overlapping(const itriangle3& p, const itriangle3& q, lvec3 normal) {
+bool are_coplanar_faces_overlapping(const itriangle3& p, const itriangle3& q, dvec3 normal) {
 	for (auto i : range(3)) {
-		ivec3 ma = p[i];
-		ivec3 mb = p[(i + 1) % 3];
-		ivec3 mc = addi(ma, normal);
-		ivec3 c = p[(i + 2) % 3];
+		dvec3 ma = vconvert(p[i], dvec3);
+		dvec3 mb = vconvert(p[(i + 1) % 3], dvec3);
+		dvec3 mc = ma + normal;
+		dvec3 c = vconvert(p[(i + 2) % 3], dvec3);
 
-		lvec3 normal = normali(ma, mb, mc);
-		long pc = doti(subi(p.c, ma), normal);
+		dvec3 normal = ::normal(ma, mb, mc);
+		double pc = dot(vconvert(p.c, dvec3) - ma, normal); // TODO possible typo bug
 		bool outside = true;
 		for (ivec3 v : q) {
-			long qa = doti(subi(v, ma), normal);
+			double qa = dot(vconvert(v, dvec3) - ma, normal);
 			if ((pc > 0 && qa > 0) || (pc < 0 && qa < 0)) {
 				outside = false;
 				break;
@@ -250,19 +253,24 @@ bool are_coplanar_faces_overlapping(const itriangle3& p, const itriangle3& q, lv
 
 bool contains_overlapping_faces(const imesh3& mesh) {
 	// are there two faces whose intersection is 2d?
-	for (auto i : range(mesh.size()))
+	for (auto i : range(mesh.size())) {
+		const itriangle3& p = mesh[i];
+		// TODO compute normal as double
+		lvec3 normal = normali(p.a, p.b, p.c);
 		for (auto j : range(i)) {
-			const itriangle3& p = mesh[i], q = mesh[j];
-			lvec3 normal = normali(p.a, p.b, p.c);
+			const itriangle3& q = mesh[j];
+			// TODO this can overflow
+			// TODO compute dot product as double, then round it to int
 			if (doti(subi(q.a, p.a), normal) != 0)
 				continue;
 			if (doti(subi(q.b, p.a), normal) != 0)
 				continue;
 			if (doti(subi(q.c, p.a), normal) != 0)
 				continue;
-			if (are_coplanar_faces_overlapping(p, q, normal))
+			if (are_coplanar_faces_overlapping(p, q, vconvert(normal, dvec3)))
 				return false;
 		}
+	}
 	return false;
 }
 

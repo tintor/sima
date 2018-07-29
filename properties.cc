@@ -36,10 +36,10 @@ ivec3 center_of_mass(const imesh3& mesh) {
 		P = addi(P, p);
 		V = addi(V, v);
 	}
-	return P / muli(V, 4);
+	return vconvert(P / muli(V, 4), ivec3);
 }
 
-inline dmat3 full_mat3(double a) {
+/*inline dmat3 full_mat3(double a) {
     const double m[] = { a, a, a, a, a, a, a, a, a};
     return glm::make_mat3(m);
 }
@@ -57,7 +57,7 @@ dmat3 moment_of_inertia(const imesh3& mesh) {
 		C += (transpose(A) * canonical * A) * determinant(A);
 	}
 	return full_mat3(C[0][0] + C[1][1] + C[2][2]) - C; // C -> I
-}
+}*/
 
 bool is_aabb(const imesh3& mesh) {
 	aabb<ivec3> box(mesh);

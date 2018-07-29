@@ -21,12 +21,12 @@ char relate(ivec2 a, ivec2 b, ivec2 p, ivec2 q) {
 	if (sp == 0 && sq == 0) { // colinear
 		if (aabb<ivec2>(a, b).overlaps(aabb<ivec2>(p, q)))
 			return 'O';
-		if (a == p || a == q || b == p || b == q)
+		if (equal(a, p) || equal(a, q) || equal(b, p) || equal(b, q))
 			return 'V';
 		return 'D';
 	}
 
-	if (a == p || a == q || b == p || b == q)
+	if (equal(a, p) || equal(a, q) || equal(b, p) || equal(b, q))
 		return 'V';
 
 	int sab = sign(area(a, p, q)) * sign(area(b, p, q));
@@ -53,11 +53,11 @@ bool relate_abxo(ivec2 a, ivec2 b, ivec2 p, ivec2 q, long ab) {
 	if (sp == 0) {
 		if (sq == 0) // colinear
 			return aabb<ivec2>(a, b).overlaps(aabb<ivec2>(p, q));
-		if (a == p || b == p)
+		if (equal(a, p) || equal(b, p))
 			return false;
 	} else {
 		if (sq == 0)
-			if (a == q || b == q)
+			if (equal(a, q) || equal(b, q))
 				return false;
 
 		if (sign(sp) * sign(sq) > 0)
@@ -80,7 +80,7 @@ bool intersects_polyline(isegment2 s, long ab, ipolygon2::iterator begin, ipolyg
 	for (auto it = begin; it != last; it++) {
 		ivec2 q = *it;
 		if (q.x != EMPTY) {
-			assert(p != q);
+			assert(!equal(p, q));
 			if (relate_abxo(s.a, s.b, p, q, ab))
 				return true;
 			p = q;

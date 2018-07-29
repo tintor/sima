@@ -1,5 +1,6 @@
 #pragma once
 #include "int.h"
+#include <functional>
 
 #ifdef NDEBUG
 constexpr bool debug = false;

@@ -28,7 +28,7 @@ void translate(imesh3& m, float3 t);
 void transform(imesh3& m, float4 t[3]);
 
 struct transform3 {
-	dmat3 orientation;
+	/*dmat3 orientation;
 	dvec3 position;
 
     transform3(const dvec3& position, dquat orientation)
@@ -55,7 +55,7 @@ struct transform3 {
 
 	triangle3 to_global(const triangle3& p) const {
 		return triangle3(to_global(p.a), to_global(p.b), to_global(p.c));
-	}
+	}*/
 };
 
 transform3 combine(const transform3& a, const transform3& b);

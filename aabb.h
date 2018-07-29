@@ -11,7 +11,7 @@ struct aabb {
 		reset();
 	}
 
-	auto range_dim() const { return range(sizeof(min) / sizeof(min.x)); }
+	auto range_dim() const { return range(vec_info<Vec>::dim()); }
 
 	explicit aabb(Vec p) {
 		min = max = p;
@@ -55,7 +55,7 @@ struct aabb {
 	}
 
 	bool operator==(const aabb<Vec>& v) const {
-		return min == v.min && max == v.max;
+		return equal(min, v.min) && equal(max, v.max);
 	}
 
 	bool operator!=(const aabb<Vec>& v) const {
@@ -64,8 +64,8 @@ struct aabb {
 
 	void reset() {
 		for (auto i : range_dim()) {
-			min[i] = std::numeric_limits<decltype(min.x)>::max();
-			max[i] = std::numeric_limits<decltype(min.x)>::min();
+			min[i] = std::numeric_limits<typename vec_info<Vec>::Type>::max();
+			max[i] = std::numeric_limits<typename vec_info<Vec>::Type>::min();
 		}
 	}
 

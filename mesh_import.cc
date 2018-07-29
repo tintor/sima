@@ -35,7 +35,7 @@ imesh3 load_stl(std::string_view filename) {
             v[i].y = parse<double>(m[3]);
             v[i].z = parse<double>(m[5]);
         }
-        mesh.emplace_back(v[0], v[1], v[2]);
+        mesh.emplace_back(vconvert(v[0], ivec3), vconvert(v[1], ivec3), vconvert(v[2], ivec3));
 
         if (file.readline() != "    endloop\n")
             throw error("expected [endloop]");
@@ -80,7 +80,7 @@ imesh3 load_ply(std::string_view filename) {
         double a = parse<double>(m[1]);
         double b = parse<double>(m[3]);
 		double c = parse<double>(m[5]);
-        vertices.emplace_back(a, b, c);
+        vertices.push_back(dvec3{a, b, c});
     }
 
     std::regex face_regex(R"(3 (\d+) (\d+) (\d+)\s*)");
@@ -93,7 +93,10 @@ imesh3 load_ply(std::string_view filename) {
         int a = parse<int>(m[1]);
         int b = parse<int>(m[3]);
 		int c = parse<int>(m[5]);
-        mesh.emplace_back(vertices[a], vertices[b], vertices[c]);
+		ivec3 va = vconvert(vertices[a], ivec3);
+		ivec3 vb = vconvert(vertices[b], ivec3);
+		ivec3 vc = vconvert(vertices[c], ivec3);
+        mesh.emplace_back(va, vb, vc);
     }
 
     return mesh;

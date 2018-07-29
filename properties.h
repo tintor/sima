@@ -11,6 +11,6 @@ double volume(const imesh3& mesh);
 ivec3 center_of_mass(const imesh3& mesh);
 
 // Moment of inertia of a valid polyhedron with Center of Mass = 0 and Density = 1
-dmat3 moment_of_inertia(const imesh3& mesh);
+//dmat3 moment_of_inertia(const imesh3& mesh);
 
 bool is_aabb(const imesh3& mesh);

@@ -82,6 +82,12 @@ inline long doti(lvec3 a, lvec3 b) {
 	long z = muli(a.z, b.z);
 	return addi(addi(x, y), z);
 }
+inline long doti(ivec3 a, lvec3 b) {
+	return doti(vconvert(a, lvec3), b);
+}
+inline long doti(lvec3 a, ivec3 b) {
+	return doti(a, vconvert(b, lvec3));
+}
 inline int128 doti(llvec3 a, llvec3 b) {
 	int128 x = muli(a.x, b.x);
 	int128 y = muli(a.y, b.y);
@@ -104,15 +110,30 @@ inline lvec3 crossi(lvec3 a, lvec3 b) {
 	long z = subi(muli(a.x, b.y), muli(a.y, b.x));
 	return {x, y, z};
 }
+inline llvec3 crossi(llvec3 a, llvec3 b) {
+	cent x = subi(muli(a.y, b.z), muli(a.z, b.y));
+	cent y = subi(muli(a.z, b.x), muli(a.x, b.z));
+	cent z = subi(muli(a.x, b.y), muli(a.y, b.x));
+	return {x, y, z};
+}
+inline lvec3 crossi(ivec3 a, ivec3 b) {
+	return crossi(vconvert(a, lvec3), vconvert(b, lvec3));
+}
 
 // throws std::overflow_error in case of int64 overflow
 inline lvec3 normali(ivec3 a, ivec3 b, ivec3 c) {
 	return crossi(subi(b, a), subi(c, a));
 }
+inline llvec3 normali(lvec3 a, lvec3 b, lvec3 c) {
+	llvec3 A = vconvert(a, llvec3);
+	llvec3 B = vconvert(b, llvec3);
+	llvec3 C = vconvert(c, llvec3);
+	return crossi(subi(B, A), subi(C, A));
+}
 
 // throws std::overflow_error in case of int64 overflow
 inline bool colinear(ivec3 a, ivec3 b, ivec3 c) {
-	return crossi(subi(b, a), subi(c, a)) == lvec3(0, 0, 0);
+	return equal(crossi(subi(b, a), subi(c, a)), lvec3{0, 0, 0});
 }
 
 template<typename Vec>

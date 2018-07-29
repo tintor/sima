@@ -205,9 +205,10 @@ Text::Text() {
 	load_png_texture("font.png");
 }
 
+#ifdef xxx
 void Text::Reset(int width, int height, glm::mat4& matrix, bool down) {
-	fg_color = glm::vec4(1, 1, 1, 1);
-	bg_color = glm::vec4(0, 0, 0, 0.4);
+	fg_color = vec4{1, 1, 1, 1};
+	bg_color = vec4{0, 0, 0, 0.4};
 	glBindTexture(GL_TEXTURE_2D, text_texture);
 	glUseProgram(text_program);
 	// TODO use glm::value_ptr(matrix)
@@ -219,12 +220,13 @@ void Text::Reset(int width, int height, glm::mat4& matrix, bool down) {
 	_ty = down ? (height - _ts) : (_ts);
 	_tdy = down ? (-_ts * 2) : (_ts * 2);
 }
+#endif
 
 void Text::PrintAt(float x, float y, float n, std::string_view text) {
 	text_gen_buffers(_positionBuffer, _uvBuffer, x, y, (n == 0) ? _ts : n, text, _position_data, _uv_data);
 	// TODO use glm::value_ptr(matrix)
-	glUniform4fv(text_fg_color_loc, 1, &fg_color[0]);
-	glUniform4fv(text_bg_color_loc, 1, &bg_color[0]);
+	glUniform4fv(text_fg_color_loc, 1, reinterpret_cast<float*>(&fg_color));
+	glUniform4fv(text_bg_color_loc, 1, reinterpret_cast<float*>(&bg_color));
 	text_draw_buffers(_positionBuffer, _uvBuffer, text_position_loc, text_uv_loc, text.size());
 }
 

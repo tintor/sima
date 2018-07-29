@@ -4,7 +4,7 @@
 
 bool is_convex(const imesh3& mesh) {
 	// Extract all unique vertices
-	std::unordered_set<ivec3> vertices;
+	std::unordered_set<ivec3, std::hash<ivec3>, equal_t<ivec3>> vertices;
 	for (auto face : mesh)
 		for (auto vertex : face)
 			vertices.insert(vertex);
@@ -35,7 +35,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		if (p.x > b.x)
 			b = p;
 	}
-	if (a == b)
+	if (equal(a, b))
 		return;
 
 	// Third point C on the hull (furthest from line AB)
@@ -43,7 +43,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	ivec3 c;
 	for (auto p : points) {
 		lvec3 cross = crossi(subi(p, a), subi(p, b));
-		int128 dist2 = squaredi((llvec3)cross);
+		int128 dist2 = squaredi(vconvert(cross, llvec3));
 		if (dist2 > max_dist2) {
 			c = p;
 			max_dist2 = dist2;
@@ -58,7 +58,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	lvec3 normal = normali(a, b, c);
 	long dd = doti(normal, a);
 	for (auto p : points) {
-		int128 dist = subi(doti((llvec3)normal, (llvec3)p), dd);
+		int128 dist = subi(doti(vconvert(normal, llvec3), vconvert(p, llvec3)), dd);
 		if (std::abs(dist) > std::abs(max_dist)) {
 			d = p;
 			max_dist = dist;
@@ -85,7 +85,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	// Expand hull to include all remaining points outside of it
 	std::unordered_set<isegment3> open_edges;
 	for (auto p : points) {
-		if (p == a || p == b || p == c || p == d)
+		if (equal(p, a) || equal(p, b) || equal(p, c) || equal(p, d))
 			continue;
 		// Remove faces on hull covered by new vertex
 		open_edges.clear();
@@ -93,7 +93,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 			const itriangle3& f = hull[i];
 			// Skip if P is not in front of face F
 			lvec3 n = normali(f.a, f.b, f.c);
-			if (doti((llvec3)n, (llvec3)subi(p, f.a)) <= 0)
+			if (doti(vconvert(n, llvec3), vconvert(subi(p, f.a), llvec3)) <= 0)
 				continue;
 			// Add edges of removed face to open_edges
 			for (auto e : f.edges()) {

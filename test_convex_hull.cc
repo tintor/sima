@@ -3,12 +3,22 @@
 #include "zip.h"
 #include "properties.h"
 #include "generators.h"
-#include "catch.hpp"
 #include <random>
 #include <iostream>
 #include <algorithm>
 
-using ipoly3 = std::vector<std::vector<ivec3>>;
+using ipoly_mesh3 = std::vector<ipolygon3>;
+
+inline bool operator==(const ipoly_mesh3& a, const ipoly_mesh3& b) {
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); i++)
+		if (a[i] != b[i])
+			return false;
+	return true;
+}
+
+#include "catch.hpp"
 
 bool less(ivec3 a, ivec3 b) {
 	if (a.x != b.x)
@@ -22,7 +32,7 @@ bool less(const std::vector<ivec3>& v, size_t a, size_t b) {
 	for (auto i : range(v.size())) {
 		ivec3 aa = v[(a + i) % v.size()];
 		ivec3 bb = v[(b + i) % v.size()];
-		if (aa != bb)
+		if (!equal(aa, bb))
 			return less(aa, bb);
 	}
 	return false;
@@ -32,7 +42,7 @@ bool less(const std::vector<ivec3>& a, const std::vector<ivec3>& b) {
 	if (a.size() != b.size())
 		return a.size() < b.size();
 	for (auto [aa, bb] : czip(a, b))
-		if (aa != bb)
+		if (!equal(aa, bb))
 			return less(aa, bb);
 	return false;
 };
@@ -50,32 +60,34 @@ static std::vector<ivec3> normalize(const std::vector<ivec3>& v) {
 	return w;
 }
 
-static ipoly3 hull(std::vector<ivec3> a) {
+static ipoly_mesh3 hull(std::vector<ivec3> a) {
 	imesh3 m = convex_hull(a);
 	// convert imesh3 to ipoly3 with triangles
-	ipoly3 p;
+	ipoly_mesh3 p;
 	for (auto f : m)
 		p.push_back({ f.a, f.b, f.c });
 	// merge touching coplanar faces in ipoly3
-	
-		
+
+
 	// sort vertices in each face in ipoly3
 	for (auto& f : p)
 		normalize(f);
 	// sort faces in ipoly3
 	// TODO std::sort(p.begin(), p.end(), less);
-	return p;	
+	return p;
 }
 
 static void rotate90_flip_and_shuffle(std::vector<ivec3> v) {
 	std::default_random_engine rnd;
-	ipoly3 m = hull(v);
-	for (auto i : range(100)) {	
+	auto m = hull(v);
+	for (auto i : range(100)) {
 		std::shuffle(v.begin(), v.end(), rnd);
 		// TODO apply random (negate any axis / swap any two coordinates)
-		ipoly3 p = hull(v);
+		auto p = hull(v);
 		// TODO make sure to do reverse transform on p
-		REQUIRE(m == p);
+		REQUIRE(m.size() == p.size());
+		for (size_t i = 0; i < m.size(); i++)
+			REQUIRE(m[i] == p[i]);
 	}
 }
 
@@ -103,22 +115,22 @@ TEST_CASE("convex_hull simple") {
 	ivec3 c = {0, 1000, 0};
 	ivec3 d = {0, 0, 1000};
 
-	ipoly3 m = hull({a, b, c, d});
+	auto m = hull({a, b, c, d});
 	REQUIRE(m.size() == 4);
 
-	REQUIRE(hull({a, b, c, d, ivec3(1, 1, 1)}) == m);
-	REQUIRE(hull({a, b, c, d, ivec3(0, 1, 1)}) == m);
-	REQUIRE(hull({a, b, c, d, ivec3(1, 0, 1)}) == m);
-	REQUIRE(hull({a, b, c, d, ivec3(1, 1, 0)}) == m);
+	REQUIRE(hull({a, b, c, d, ivec3{1, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, ivec3{0, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, ivec3{1, 0, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, ivec3{1, 1, 0}}) == m);
 
-	REQUIRE(hull({a, b, c, d, ivec3(-1, 0, 0)}).size() == 4);
+	REQUIRE(hull({a, b, c, d, ivec3{-1, 0, 0}}).size() == 4);
 }
 
 // uniform inside a cube
 template<typename RandomEngine>
 ivec3 random_vector(RandomEngine& rnd, int a, int b) {
 	std::uniform_int_distribution<int> dist(a, b);
-	return ivec3(dist(rnd), dist(rnd), dist(rnd));
+	return ivec3{dist(rnd), dist(rnd), dist(rnd)};
 }
 
 TEST_CASE("convex_hull random points on cube") {
@@ -134,7 +146,7 @@ TEST_CASE("convex_hull random points on cube") {
 }
 
 TEST_CASE("convex_hull cube") {
-	auto m = generate_box(1, 1, 1);	
+	auto m = generate_box(1, 1, 1);
 	REQUIRE(is_convex(m));
 	REQUIRE(is_aabb(m));
 }

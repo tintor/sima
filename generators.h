@@ -24,19 +24,23 @@ imesh3 generate_sphere(int vertices, int radius, RND& rnd) {
 		for (auto i : range(vertices))
 			for (auto j : range(i)) {
 				dvec3 d = V[i] - V[j];
-				d *= 0.05 / glm::dot(d, d);
+				d *= 0.05 / dot(d, d);
 				delta[i] += d;
 				delta[j] -= d;
 			}
 		for (auto i : range(vertices))
-			V[i] = glm::normalize(V[i] + delta[i]);
+			V[i] = normalize(V[i] + delta[i]);
 	}
 
 	// convert dvec3 to ivec3
 	std::vector<ivec3> I;
 	I.resize(vertices);
-	for (auto i : range(vertices))
-		I[i] = round(V[i] * (double)radius);
+	for (auto i : range(vertices)) {
+		dvec3 d = round(V[i] * (double)radius);
+		I[i].x = d.x;
+		I[i].y = d.y;
+		I[i].z = d.z;
+	}
 
 	return convex_hull(I);
 }

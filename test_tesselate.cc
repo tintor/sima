@@ -14,9 +14,9 @@ inline long sq(ivec2 a, ivec2 b) {
 template<typename RNG>
 static ipolygon2 random_polygon(int size, RNG& rng) {
 	std::uniform_int_distribution<int> dist(-1000, 1000); //INT_MIN, INT_MAX);
-	std::unordered_set<ivec2> points;
+	std::unordered_set<ivec2, std::hash<ivec2>, equal_t<ivec2>> points;
 	while (points.size() < size) {
-		ivec2 p(dist(rng), dist(rng));
+		ivec2 p{dist(rng), dist(rng)};
 		points.insert(p);
 	}
 
@@ -72,7 +72,7 @@ struct Setup {
 			for (int i = 0; i < a.size()/2; i++) {
 				int x = parse<int>(a[i * 2]);
 				int y = parse<int>(a[i * 2 + 1]);
-				poly.emplace_back(x, y);
+				poly.push_back(ivec2{x, y});
 			}
 			test_cases.push_back(std::move(poly));
 		}

@@ -1,64 +1,101 @@
 #pragma once
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_AVX2
-#define GLM_ENABLE_EXPERIMENTAL
-#define GLM_FORCE_CXX14
-#include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtx/norm.hpp"
-#include "glm/gtx/transform.hpp"
-
 #include "common.h"
 #include "format.h"
 
-using glm::ivec2;
-using glm::ivec3;
-using lvec3 = glm::tvec3<long>;
-using llvec3 = glm::tvec3<int128>;
+#define vshuffle __builtin_shufflevector
+#define vconvert __builtin_convertvector
 
-using glm::vec3;
-using glm::vec4;
-using glm::dvec3;
-using glm::dvec4;
+using ivec2 = int2;
 
-using glm::mat3;
-using glm::mat4;
-using glm::dmat3;
-using glm::dmat4;
+using ivec3 = int3;
+using lvec3 = long3;
+using llvec3 = cent3;
 
-using glm::quat;
-using glm::dquat;
+using vec2 = float2;
+using dvec2 = double2;
 
-namespace glm {
+using vec3 = float3;
+using dvec3 = double3;
+
+using vec4 = float4;
+using dvec4 = double4;
 
 template<typename T>
-inline void format_e(std::string& s, std::string_view spec, glm::tvec2<T> v) {
-	::format_e(s, "", v.x);
-	s += ' ';
-	::format_e(s, "", v.y);
+struct vec_info {
+};
+
+template<>
+struct vec_info<vec2> {
+	static int dim() { return 2; }
+	using Type = float;
+};
+
+template<>
+struct vec_info<dvec2> {
+	static int dim() { return 2; }
+	using Type = double;
+};
+
+template<>
+struct vec_info<ivec2> {
+	static int dim() { return 2; }
+	using Type = int;
+};
+
+template<>
+struct vec_info<vec3> {
+	static int dim() { return 3; }
+	using Type = float;
+};
+
+template<>
+struct vec_info<dvec3> {
+	static int dim() { return 3; }
+	using Type = double;
+};
+
+template<>
+struct vec_info<ivec3> {
+	static int dim() { return 3; }
+	using Type = int;
+};
+
+inline bool equal(ivec2 a, ivec2 b) {
+	return a.x == b.x && a.y == b.y;
+}
+
+inline bool equal(ivec3 a, ivec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool equal(lvec3 a, lvec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool equal(llvec3 a, llvec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool equal(vec3 a, vec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool equal(dvec3 a, dvec3 b) {
+	return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
 template<typename T>
-inline void format_e(std::string& s, std::string_view spec, glm::tvec3<T> v) {
-	::format_e(s, "", v.x);
-	s += ' ';
-	::format_e(s, "", v.y);
-	s += ' ';
-	::format_e(s, "", v.z);
-}
-
-}
+struct equal_t {
+	bool operator()(T a, T b) const {
+		return equal(a, b);
+	}
+};
 
 namespace std {
 
-template<typename T>
-struct hash<glm::tvec2<T>> {
-	size_t operator()(const glm::tvec2<T>& v) const {
+template<>
+struct hash<ivec2> {
+	size_t operator()(ivec2 v) const {
 		size_t seed = 0;
 		hash_combine(seed, v.x);
 		hash_combine(seed, v.y);
@@ -66,9 +103,9 @@ struct hash<glm::tvec2<T>> {
 	}
 };
 
-template<typename T>
-struct hash<glm::tvec3<T>> {
-	size_t operator()(const glm::tvec3<T>& v) const {
+template<>
+struct hash<ivec3> {
+	size_t operator()(ivec3 v) const {
 		size_t seed = 0;
 		hash_combine(seed, v.x);
 		hash_combine(seed, v.y);
@@ -78,3 +115,4 @@ struct hash<glm::tvec3<T>> {
 };
 
 }
+
