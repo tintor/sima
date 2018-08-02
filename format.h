@@ -5,6 +5,7 @@
 //
 // It also adds operator<< for std::string similar to ostream (but faster as
 // ostream is heavy).
+#include "int.h"
 #include <array>
 #include <string>
 #include <string_view>
@@ -136,15 +137,13 @@ void format_int(std::string& s, std::string_view spec, Integer v) {
 	}
 
 FORMAT_INT(short)
-FORMAT_INT(unsigned short)
+FORMAT_INT(ushort)
 FORMAT_INT(int)
-FORMAT_INT(unsigned int)
+FORMAT_INT(uint)
 FORMAT_INT(long)
-FORMAT_INT(unsigned long)
-FORMAT_INT(__int128)
-FORMAT_INT(__uint128_t)
-
-using cent = __int128;
+FORMAT_INT(ulong)
+FORMAT_INT(cent)
+FORMAT_INT(ucent)
 
 inline void format_e(std::string& s, std::string_view spec, float v) {
 	// TODO pass spec to snprintf
@@ -188,57 +187,6 @@ FORMAT_VECN(long);
 FORMAT_VECN(cent);
 FORMAT_VECN(float);
 FORMAT_VECN(double);
-
-/*inline void format_e(std::string& s, std::string_view spec, int __attribute__((ext_vector_type(2))) v) {
-	s += '[';
-	format_e(s, "", v.x);
-	s += ' ';
-	format_e(s, "", v.y);
-	s += ']';
-}
-
-inline void format_e(std::string& s, std::string_view spec, float __attribute__((ext_vector_type(2))) v) {
-	s += '[';
-	format_e(s, "", v.x);
-	s += ' ';
-	format_e(s, "", v.y);
-	s += ']';
-}
-
-template<typename T>
-inline void format_e(std::string& s, std::string_view spec, T __attribute__((ext_vector_type(3))) v) {
-	s += '[';
-	format_e(s, "", v.x);
-	s += ' ';
-	format_e(s, "", v.y);
-	s += ' ';
-	format_e(s, "", v.z);
-	s += ']';
-}
-
-template<typename T>
-inline void format_e(std::string& s, std::string_view spec, T __attribute__((ext_vector_type(4))) v) {
-	s += '[';
-	format_e(s, "", v.x);
-	s += ' ';
-	format_e(s, "", v.y);
-	s += ' ';
-	format_e(s, "", v.z);
-	s += ' ';
-	format_e(s, "", v.w);
-	s += ']';
-}
-
-template<typename T>
-inline void format_e(std::string& s, std::string_view spec, T __attribute__((ext_vector_type(8))) v) {
-	s += '[';
-	format_e(s, "", v.x);
-	for (int i = 1; i < 8; i++) {
-		s += ' ';
-		format_e(s, "", v[i]);
-	}
-	s += ']';
-}*/
 
 inline void format_a(std::string& s, int skip, std::string_view spec) {
 	throw std::runtime_error("format: not enough arguments");
