@@ -31,7 +31,7 @@ struct array_ptr {
 	T& operator[](size_t idx) {
 		return _begin[idx];
 	}
-	
+
 	const T& operator[](size_t idx) const {
 		return _begin[idx];
 	}
@@ -39,13 +39,17 @@ struct array_ptr {
 	size_t size() const {
 		return _end - _begin;
 	}
-	
+
 	T* begin() {
 		return _begin;
 	}
-	
+
 	T* end() {
 		return _end;
+	}
+
+	T& back() {
+		return _end[-1];
 	}
 };
 
@@ -58,7 +62,7 @@ struct array_cptr {
 		_begin = b;
 		_end = e;
 	}
-	
+
 	array_cptr(array_ptr<T> a) {
 		_begin = a._begin;
 		_end = a._end;
@@ -86,9 +90,12 @@ struct array_cptr {
 	const T* begin() const {
 		return _begin;
 	}
-	
+
 	const T* end() const {
 		return _end;
 	}
-};
 
+	T back() const {
+		return _end[-1];
+	}
+};
