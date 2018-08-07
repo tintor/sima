@@ -5,7 +5,7 @@
 
 constexpr const char* FLOAT_REGEX = R"(-?\d+\.\d+(e[+-]\d+)?)";
 
-imesh3 load_stl(std::string_view filename) {
+imesh3 load_stl(std::string_view filename, double scale) {
     FileReader file(filename);
     std::string_view line;
 
@@ -13,7 +13,7 @@ imesh3 load_stl(std::string_view filename) {
     std::cmatch m;
 
     if (file.readline() != "solid Default\n")
-        throw error("expected [solid Default]");
+        THROW(runtime_error, "expected [solid Default]");
 
     std::regex facet_regex(R"(^\s*facet\s+)");
     std::regex vertex_regex(format(R"(^\s*vertex (%s) (%s) (%s)\s*$)", FLOAT_REGEX, FLOAT_REGEX, FLOAT_REGEX));
@@ -22,31 +22,32 @@ imesh3 load_stl(std::string_view filename) {
         if (line == "endsolid Default\n")
             break;
         if (!search(line, facet_regex))
-            throw error("expected [facet ...] or [endsolid Default] instead of [%s]", line);
+            THROW(runtime_error, "expected [facet ...] or [endsolid Default] instead of [%s]", line);
         if (file.readline() != "    outer loop\n")
-            throw error("expected [outer loop]");
+            THROW(runtime_error, "expected [outer loop]");
 
         dvec3 v[3];
         for (auto i : range(3)) {
 			line = file.readline();
             if (!match(line, vertex_regex, /*out*/m))
-                throw error("expected [vertex ...] instead of [%s]", line);
+                THROW(runtime_error, "expected [vertex ...] instead of [%s]", line);
             v[i].x = parse<double>(m[1]);
             v[i].y = parse<double>(m[3]);
             v[i].z = parse<double>(m[5]);
+			v[i] *= scale;
         }
         mesh.emplace_back(vconvert(v[0], ivec3), vconvert(v[1], ivec3), vconvert(v[2], ivec3));
 
         if (file.readline() != "    endloop\n")
-            throw error("expected [endloop]");
+            THROW(runtime_error, "expected [endloop]");
         if (file.readline() != "  endfacet\n")
-            throw error("expected [endfacet]");
+            THROW(runtime_error, "expected [endfacet]");
     }
 
     return mesh;
 }
 
-imesh3 load_ply(std::string_view filename) {
+imesh3 load_ply(std::string_view filename, double scale) {
     FileReader file(filename);
     std::string_view line;
 
@@ -58,7 +59,7 @@ imesh3 load_ply(std::string_view filename) {
     while (true) {
 		line = file.readline();
         if (line == "")
-            throw error("bad ply file header");
+            THROW(runtime_error, "bad ply file header");
         if (line == "end_header\n")
             break;
         if (match(line, element_regex, /*out*/m)) {
@@ -74,22 +75,22 @@ imesh3 load_ply(std::string_view filename) {
     while (vertices.size() < vertices.capacity()) {
 		line = file.readline();
         if (line == "")
-            throw error("unexpected end of ply file");
+            THROW(runtime_error, "unexpected end of ply file");
         if (!search(line, vertex_regex, /*out*/m))
-            throw error("expected vertex in ply file: [%s]", line);
+            THROW(runtime_error, "expected vertex in ply file: [%s]", line);
         double a = parse<double>(m[1]);
         double b = parse<double>(m[3]);
 		double c = parse<double>(m[5]);
-        vertices.push_back(dvec3{a, b, c});
+        vertices.push_back(dvec3{a, b, c} * scale);
     }
 
     std::regex face_regex(R"(3 (\d+) (\d+) (\d+)\s*)");
     while (mesh.size() < mesh.capacity()) {
         line = file.readline();
         if (line == "")
-            throw error("unexpected end of ply file");
+            THROW(runtime_error, "unexpected end of ply file");
 		if (!match(line, face_regex, /*out*/m))
-            throw error("expected face in ply file");
+            THROW(runtime_error, "expected face in ply file");
         int a = parse<int>(m[1]);
         int b = parse<int>(m[3]);
 		int c = parse<int>(m[5]);
