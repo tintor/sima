@@ -296,7 +296,7 @@ Validity is_valid(const imesh3& mesh) {
 		return Validity::NotSealed;
 
 	// check if all faces are oriented outside
-	if (signed_volume_mul6(mesh) < 0)
+	if (signed_volume(mesh) < 0)
 		return Validity::Inverted;
 
 	// Strict stronger condition than is_sealed

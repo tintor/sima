@@ -1,5 +1,6 @@
 #pragma once
 #include "triangle.h"
+#include "format.h"
 
 bool is_valid(const ipolygon2& poly);
 
