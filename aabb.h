@@ -3,6 +3,8 @@
 #include "triangle.h"
 #include "array_ptr.h"
 
+std::pair<int4, int4> compute_aabb(array_cptr<int4> vectors);
+
 template<typename Vec>
 struct aabb {
 	Vec min, max;
@@ -39,19 +41,36 @@ struct aabb {
 		add(p.c);
 	}
 
-	explicit aabb(array_cptr<Vec> p) {
+	explicit aabb(array_cptr<ivec3> p) {
 		reset();
 		for (auto v : p)
 			add(v);
 	}
 
-	explicit aabb(array_cptr<triangle<Vec>> ap) {
+	explicit aabb(array_cptr<ivec4> p) {
+		auto q = compute_aabb(p);
+		min = q.first;
+		max = q.second;
+	}
+
+private:
+	void ctor(array_cptr<triangle<Vec>> ap) {
 		reset();
 		for (auto p : ap) {
 			add(p.a);
 			add(p.b);
 			add(p.c);
 		}
+	}
+
+public:
+	explicit aabb(array_cptr<triangle<ivec3>> ap) { ctor(ap); }
+
+	explicit aabb(array_cptr<triangle<ivec4>> ap) {
+		static_assert(sizeof(triangle<ivec4>) == 3 * sizeof(ivec4));
+		auto q = compute_aabb(array_cptr(&ap.begin()->a, &ap.end()->a));
+		min = q.first;
+		max = q.second;
 	}
 
 	bool operator==(const aabb<Vec>& v) const {
