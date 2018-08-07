@@ -2,41 +2,54 @@
 #include "aabb.h"
 #include "scalar.h"
 #include "ivec.h"
+#include "primitives.h"
 
-int128 signed_volume_mul6(const imesh3& mesh) {
-	int128 volume = 0;
-	for (const itriangle3& f : mesh) {
-		int128 s = 0;
-		long z = 0;
-		for (auto [a, b] : f.edges()) {
-			z = addi(z, b.z);
-			long y = addi(a.y, b.y);
-			long x = subi(a.x, b.x);
-			s = addi(s, muli(y, x));
-		}
-		int128 v = muli(s, z);
-		volume = addi(volume, v);
-	}
-	return volume;
+double triangle_volume(ivec3 a, ivec3 b, ivec3 c) {
+	double z = a.z;
+	z += b.z;
+	z += c.z;
+	double s;
+	s = ((double)a.y + b.y) * ((double)a.x - b.x);
+	s += ((double)b.y + c.y) * ((double)b.x - c.x);
+	s += ((double)c.y + a.y) * ((double)c.x - a.x);
+	return s * z;
+}
+
+double signed_volume(ivec3 a, ivec3 b, ivec3 c, ivec3 d) {
+	double v;
+	v = triangle_volume(a, b, c);
+	v += triangle_volume(d, b, a);
+	v += triangle_volume(a, c, b);
+	v += triangle_volume(d, a, c);
+	return v / 6.0;
+}
+
+double signed_volume(const imesh3& mesh) {
+	double v = 0;
+	for (const itriangle3& f : mesh)
+		v += triangle_volume(f.a, f.b, f.c);
+	return v / 6.0;
 }
 
 double volume(const imesh3& mesh) {
-	return std::abs(signed_volume_mul6(mesh)) / 6.0;
+	return std::abs(signed_volume(mesh));
 }
 
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
-ivec3 center_of_mass(const imesh3& mesh) {
-	lvec3 P = {0, 0, 0};
-	long V = 0;
-	for (const auto& f : mesh) {
-		long v = doti(f.a, crossi(f.b, f.c));
-		lvec3 p = muli(addi(addi(f.a, f.b), f.c), v);
-		P = addi(P, p);
-		V = addi(V, v);
+dvec3 center_of_mass(const imesh3& mesh) {
+	dvec3 P = {0, 0, 0};
+	double V = 0;
+	for (const itriangle3& f : mesh) {
+		dvec3 a = vconvert(f.a, double3);
+		dvec3 b = vconvert(f.b, double3);
+	   	dvec3 c = vconvert(f.c, double3);
+		double v = dot(a, cross(b, c));
+		P += (a + b + c) * v;
+		V += v;
 	}
-	return vconvert(P / muli(V, 4), ivec3);
+	return P / (V * 4);
 }
 
 /*inline dmat3 full_mat3(double a) {
