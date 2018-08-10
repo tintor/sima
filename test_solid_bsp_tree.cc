@@ -1,0 +1,36 @@
+#include "solid_bsp_tree.h"
+#include "mesh_import.h"
+#include "is_valid.h"
+#include "properties.h"
+#include "convex_hull.h"
+#include "catch.hpp"
+#include "timestamp.h"
+
+TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
+    try {
+        imesh3 mm = load_stl("models/bunny.stl", 1000);
+        std::vector<ivec3> vertices;
+        for (const itriangle3& f : mm)
+            for (auto i : range(3))
+                vertices.push_back(f[i]);
+		print("hull...\n");
+        imesh3 ch = convex_hull(vertices);
+        print("IsValid %s\n", static_cast<int>(is_valid(mm)));
+        print("Volume %s\n", volume(mm));
+        print("CenterOfMass %s\n", center_of_mass(mm));
+        print("IsConvex %s\n", is_convex(mm));
+
+        print("IsValid %s\n", static_cast<int>(is_valid(ch)));
+        print("Volume %s\n", volume(ch));
+        print("CenterOfMass %s\n", center_of_mass(ch));
+        print("IsConvex %s\n", is_convex(ch));
+
+        std::default_random_engine rnd(0);
+
+        Timestamp ta;
+        SolidBSPTree tree(mm, 100000, rnd);
+        print("%s\n", ta.elapsed_ms());
+    } catch (std::exception& e) {
+        print("std::runtime_error %s\n", e.what());
+    }
+}

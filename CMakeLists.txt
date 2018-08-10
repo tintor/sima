@@ -8,9 +8,11 @@ project(sima)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(prod
+	aabb.cc
 	convex_hull.cc
 	is_valid.cc
 	tesselate.cc
+	transform.cc
 	properties.cc
 	generators.cc
 	solid_bsp_tree.cc
@@ -28,6 +30,10 @@ set(test
 	test.cc
 	test_aabb.cc
 	test_util.cc
+	test_aabb.cc
+	test_transform.cc
+	test_solid_bsp_tree.cc
+	test_properties.cc
 	test_generators.cc
 	test_convex_hull.cc
 	test_shape.cc
@@ -46,7 +52,7 @@ set(test
 add_executable(a.sima main.cc ${prod})
 add_executable(a.test ${prod} ${test})
 
-add_definitions(-O3 -mavx2)
+add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
 #add_definitions(-O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
 

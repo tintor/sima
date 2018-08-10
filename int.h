@@ -10,6 +10,10 @@ using uchar = unsigned char;
 using uint = unsigned int;
 using ulong = unsigned long;
 
+using cent = __int128;
+using ucent = __uint128_t;
+
+// TODO deprecate these
 using int128 = __int128;
 using uint128 = __uint128_t;
 

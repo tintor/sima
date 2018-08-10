@@ -25,6 +25,8 @@
 #include "timestamp.h"
 #include "callstack.h"
 
+#include "solid_bsp_tree.h"
+
 // Dynamics and simulation
 // =======================
 

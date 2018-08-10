@@ -1,6 +1,13 @@
 #pragma once
 #include "glm.h"
 #include "scalar.h"
+#include <random>
+
+template<typename RandomEngine>
+ivec3 random_vector(RandomEngine& rnd, int a, int b) {
+	std::uniform_int_distribution<int> dist(a, b);
+	return ivec3{dist(rnd), dist(rnd), dist(rnd)};
+}
 
 inline long gcd(lvec3 s) {
 	ulong x = std::abs(s.x);
@@ -76,6 +83,12 @@ inline llvec3 muli(llvec3 a, int128 b) {
 }
 
 // throws std::overflow_error in case of int64 overflow
+inline long doti(ivec3 a, ivec3 b) {
+	long x = (long)a.x * (long)b.x;
+	long y = (long)a.y * (long)b.y;
+	long z = (long)a.z * (long)b.z;
+	return addi(addi(x, y), z);
+}
 inline long doti(lvec3 a, lvec3 b) {
 	long x = muli(a.x, b.x);
 	long y = muli(a.y, b.y);

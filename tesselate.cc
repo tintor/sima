@@ -5,10 +5,6 @@
 #include "aabb.h"
 #include "is_valid.h"
 
-static int sign(long a) {
-	return (0 < a) - (a < 0);
-}
-
 // D - disjoint
 // O - overlap
 // V - vertex / vertex touch (could be colinear, but not overlapping)

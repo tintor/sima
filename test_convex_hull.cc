@@ -6,6 +6,9 @@
 #include <random>
 #include <iostream>
 #include <algorithm>
+#include "mesh_import.h"
+#include "is_valid.h"
+#include "timestamp.h"
 
 using ipoly_mesh3 = std::vector<ipolygon3>;
 
@@ -149,4 +152,47 @@ TEST_CASE("convex_hull cube") {
 	auto m = generate_box(1, 1, 1);
 	REQUIRE(is_convex(m));
 	REQUIRE(is_aabb(m));
+}
+
+class AutoTimestamp {
+public:
+	AutoTimestamp(std::string_view name) : _name(name) {}
+	~AutoTimestamp() { print("%s took %s ms\n", _begin.elapsed_ms()); }
+private:
+	std::string_view _name;
+	Timestamp _begin;
+};
+
+template<typename Func>
+auto measure(std::string_view name, Func func) {
+	AutoTimestamp mm(name);
+	return func();
+}
+
+#define MEASURE(X) measure(#X, [&](){ return X; } )
+
+template<typename T, typename std::enable_if<std::is_enum<T>::value>::type>
+inline void format_e(std::string& s, std::string_view spec, T v) {
+	format_s(s, "%s(%s)", typeid(T).name(), reinterpret_cast<long>(v));
+}
+
+inline void format_e(std::string& s, std::string_view spec, Validity v) {
+	format_s(s, "Validity(%s)", (int)v);
+}
+
+TEST_CASE("convex_hull bunny benchmark", "[!hide]") {
+		try{
+	std::default_random_engine rnd(0);
+	imesh3 mm = MEASURE(load_stl("models/bunny.stl", 1000));
+	/*std::vector<ivec3> vertices;
+	for (const itriangle3& f : mm)
+		for (auto i : range(3))
+			vertices.push_back(f[i]);
+	print("IsValid %s\n", MEASURE(is_valid(mm)));
+	imesh3 ch = MEASURE(convex_hull(vertices));
+	print("Volume %s\n", MEASURE(volume(ch)));
+	print("CenterOfMass %s\n", MEASURE(center_of_mass(ch)));*/
+		} catch (char const* e) {
+			print("Exception [%s]\n", e);
+		}
 }

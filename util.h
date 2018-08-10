@@ -4,6 +4,11 @@
 #include <algorithm>
 #include <regex>
 
+template<size_t S>
+bool aligned(const void* ptr) {
+	return (reinterpret_cast<size_t>(ptr) % S) == 0;
+}
+
 template<typename T>
 T min(T a, T b) {
 	return (a < b) ? a : b;
@@ -94,19 +99,19 @@ Number parse(std::pair<const char*, const char*> s) {
 
 inline bool search(std::string_view s, const std::regex& re) {
 	return std::regex_search(s.begin(), s.end(), re);
-}		
+}
 
 inline bool search(std::string_view s, const std::regex& re, std::cmatch& match) {
 	return std::regex_search(s.begin(), s.end(), /*out*/match, re);
-}		
+}
 
 inline bool match(std::string_view s, const std::regex& re) {
 	return std::regex_match(s.begin(), s.end(), re);
-}		
+}
 
 inline bool match(std::string_view s, const std::regex& re, std::cmatch& match) {
 	return std::regex_match(s.begin(), s.end(), /*out*/match, re);
-}		
+}
 
 class error : public std::runtime_error {
 public:

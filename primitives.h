@@ -248,15 +248,6 @@ struct plucker {
 
 
 namespace std {
-	template<> struct hash<dvec3> {
-		size_t operator()(const dvec3& a) const {
-			size_t seed = 0;
-			for (auto i : range(3))
-				hash_combine(seed, a[i]);
-			return seed;
-		}
-    };
-
   template<> struct hash<segment3> {
     size_t operator()(const segment3& x) const {
 		size_t seed = 0;

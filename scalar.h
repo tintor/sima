@@ -3,6 +3,18 @@
 #include "exception.h"
 #include "bits_util.h"
 
+inline int sign(int a) {
+	return (0 < a) - (a < 0);
+}
+
+inline int sign(long a) {
+	return (0 < a) - (a < 0);
+}
+
+inline int sign(int128 a) {
+	return (0 < a) - (a < 0);
+}
+
 template<typename T>
 T gcd_unsigned(T u, T v) {
     if (u == 0) return v;
