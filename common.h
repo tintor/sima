@@ -12,9 +12,6 @@ static_assert(sizeof(int) == 4);
 static_assert(sizeof(long) == 8);
 static_assert(sizeof(long long) == 8);
 
-using int128 = __int128;
-using uint128 = __uint128_t;
-
 template<typename T>
 void hash_combine(size_t& seed, const T& value) {
 	// The code is from `hash_combine` function of the Boost library. See

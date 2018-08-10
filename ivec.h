@@ -78,7 +78,7 @@ inline llvec3 subi(llvec3 a, llvec3 b) {
 inline lvec3 muli(lvec3 a, long b) {
 	return {muli(a.x, b), muli(a.y, b), muli(a.z, b)};
 }
-inline llvec3 muli(llvec3 a, int128 b) {
+inline llvec3 muli(llvec3 a, cent b) {
 	return {muli(a.x, b), muli(a.y, b), muli(a.z, b)};
 }
 
@@ -101,10 +101,10 @@ inline long doti(ivec3 a, lvec3 b) {
 inline long doti(lvec3 a, ivec3 b) {
 	return doti(a, vconvert(b, lvec3));
 }
-inline int128 doti(llvec3 a, llvec3 b) {
-	int128 x = muli(a.x, b.x);
-	int128 y = muli(a.y, b.y);
-	int128 z = muli(a.z, b.z);
+inline cent doti(llvec3 a, llvec3 b) {
+	cent x = muli(a.x, b.x);
+	cent y = muli(a.y, b.y);
+	cent z = muli(a.z, b.z);
 	return addi(addi(x, y), z);
 }
 
@@ -112,7 +112,7 @@ inline int128 doti(llvec3 a, llvec3 b) {
 inline long squaredi(lvec3 a) {
 	return doti(a, a);
 }
-inline int128 squaredi(llvec3 a) {
+inline cent squaredi(llvec3 a) {
 	return doti(a, a);
 }
 

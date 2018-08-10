@@ -13,7 +13,7 @@ inline int clz(ulong x) {
 	return __builtin_clzl(x);
 }
 
-inline int clz(__uint128_t x) {
+inline int clz(ucent x) {
 	ulong a = x >> 64;
 	ulong b = x;
 	return a == 0 ? 64 + clz(b) : clz(a);
@@ -52,7 +52,7 @@ inline ulong is_power2(ulong a) {
 	return (a & (a - 1)) == 0;
 }
 
-inline uint128 is_power2(uint128 a) {
+inline ucent is_power2(ucent a) {
 	return (a & (a - 1)) == 0;
 }
 
@@ -80,7 +80,7 @@ inline ulong round_up_power2(ulong a) {
 	return a;
 }
 
-inline uint128 round_up_power2(uint128 a) {
+inline ucent round_up_power2(ucent a) {
 	a -= 1;
 	a |= a >> 1;
 	a |= a >> 2;

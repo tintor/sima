@@ -11,7 +11,7 @@ inline int sign(long a) {
 	return (0 < a) - (a < 0);
 }
 
-inline int sign(int128 a) {
+inline int sign(cent a) {
 	return (0 < a) - (a < 0);
 }
 
@@ -45,9 +45,9 @@ inline long addi(int a, int b) {
 ADDI(long, long, int);
 ADDI(long, int, long);
 ADDI(long, long, long);
-ADDI(int128, long, int128);
-ADDI(int128, int128, long);
-ADDI(int128, int128, int128);
+ADDI(cent, long, cent);
+ADDI(cent, cent, long);
+ADDI(cent, cent, cent);
 
 inline long negi(int a) {
 	return -(long)a;
@@ -57,8 +57,8 @@ inline long negi(long a) {
 		THROW(overflow_error, "negi(%s)", a);
 	return -a;
 }
-inline int128 negi(int128 a) {
-	if (a == std::numeric_limits<int128>::min())
+inline cent negi(cent a) {
+	if (a == std::numeric_limits<cent>::min())
 		THROW(overflow_error, "negi(%s)", a);
 	return -a;
 }
@@ -75,9 +75,9 @@ inline long subi(int a, int b) {
 SUBI(long, int, long);
 SUBI(long, long, int);
 SUBI(long, long, long);
-SUBI(int128, long, int128);
-SUBI(int128, int128, long);
-SUBI(int128, int128, int128);
+SUBI(cent, long, cent);
+SUBI(cent, cent, long);
+SUBI(cent, cent, cent);
 
 inline long muli(int a, int b) {
 	return (long)a * (long)b;
@@ -91,6 +91,6 @@ inline long muli(int a, int b) {
 MULI(long, int, long);
 MULI(long, long, int);
 MULI(long, long, long);
-MULI(int128, long, int128);
-MULI(int128, int128, long);
-MULI(int128, int128, int128);
+MULI(cent, long, cent);
+MULI(cent, cent, long);
+MULI(cent, cent, cent);

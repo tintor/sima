@@ -151,11 +151,11 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		return;
 
 	// Third point C on the hull (furthest from line AB)
-	int128 max_dist2 = 0;
+	cent max_dist2 = 0;
 	ivec3 c;
 	for (auto p : points) {
 		lvec3 cross = crossi(subi(p, a), subi(p, b));
-		int128 dist2 = squaredi(vconvert(cross, llvec3));
+		cent dist2 = squaredi(vconvert(cross, llvec3));
 		if (dist2 > max_dist2) {
 			c = p;
 			max_dist2 = dist2;
@@ -165,12 +165,12 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		return;
 
 	// Fourth point D on the hull (furthest from plane ABC)
-	int128 max_dist = 0;
+	cent max_dist = 0;
 	ivec3 d;
 	lvec3 normal = normali(a, b, c);
 	long dd = doti(normal, vconvert(a, lvec3));
 	for (auto p : points) {
-		int128 dist = subi(doti(vconvert(normal, llvec3), vconvert(p, llvec3)), dd);
+		cent dist = subi(doti(vconvert(normal, llvec3), vconvert(p, llvec3)), dd);
 		if (std::abs(dist) > std::abs(max_dist)) {
 			d = p;
 			max_dist = dist;

@@ -13,14 +13,10 @@ using ulong = unsigned long;
 using cent = __int128;
 using ucent = __uint128_t;
 
-// TODO deprecate these
-using int128 = __int128;
-using uint128 = __uint128_t;
-
 using size_t = ulong;
 
 namespace std {
 
-inline int128 abs(int128 a) { return (a < 0) ? -a : a; }
+inline cent abs(cent a) { return (a < 0) ? -a : a; }
 
 }

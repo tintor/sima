@@ -50,8 +50,8 @@ TEST_CASE("clz(ulong)") {
 		REQUIRE(clz(a << i) == 63 - i);
 }
 
-TEST_CASE("clz(uint128)") {
-	uint128 a = 0x1;
+TEST_CASE("clz(ucent)") {
+	ucent a = 0x1;
 	for (int i = 0; i <= 127; i++)
 		REQUIRE(clz(a << i) == 127 - i);
 }
@@ -70,8 +70,8 @@ TEST_CASE("popcount(ulong)") {
 	REQUIRE(popcount((a << 63) | 1) == 2);
 }
 
-TEST_CASE("popcount(uint128)") {
-	uint128 a = 0x1;
+TEST_CASE("popcount(ucent)") {
+	ucent a = 0x1;
 	REQUIRE(popcount(a ^ a) == 0);
 	REQUIRE(popcount(a) == 1);
 	REQUIRE(popcount((a << 127) | 1) == 2);
@@ -143,29 +143,29 @@ TEST_CASE("popcount()") {
 	REQUIRE(b.popcount() == 2);
 }
 
-TEST_CASE("Bits(uint32_t) empty") {
-	uint32_t a = 0;
+TEST_CASE("Bits(uint) empty") {
+	uint a = 0;
 	Bits p(a);
 	REQUIRE(p.capacity() == 0);
 	REQUIRE(p.data() == nullptr);
 }
 
-TEST_CASE("Bits(uint32_t)") {
-	uint32_t a = 0x12345678;
+TEST_CASE("Bits(uint)") {
+	uint a = 0x12345678;
 	Bits p(a);
 	REQUIRE(p.capacity() == 1);
 	REQUIRE(p.data() != nullptr);
 	REQUIRE(p.data()[0] == a);
 }
 
-TEST_CASE("Bits(uint64_t) empty") {
+TEST_CASE("Bits(ulong) empty") {
 	ulong a = 0;
 	Bits p(a);
 	REQUIRE(p.capacity() == 0);
 	REQUIRE(p.data() == nullptr);
 }
 
-TEST_CASE("Bits(uint64_t)") {
+TEST_CASE("Bits(ulong)") {
 	ulong a = 0x1234567878654321lu;
 	Bits p(a);
 	REQUIRE(p.capacity() == 1);
@@ -173,26 +173,26 @@ TEST_CASE("Bits(uint64_t)") {
 	REQUIRE(p.data()[0] == a);
 }
 
-TEST_CASE("Bits(uint128_t) empty") {
-	ulong a = 0;
+TEST_CASE("Bits(ucent) empty") {
+	ucent a = 0;
 	Bits p(a);
 	REQUIRE(p.capacity() == 0);
 	REQUIRE(p.data() == nullptr);
 }
 
-TEST_CASE("Bits(uint128_t) small") {
+TEST_CASE("Bits(ucent) small") {
 	ulong a = 0x1234567878654321lu;
-	uint128 A = a;
+	ucent A = a;
 	Bits p(A);
 	REQUIRE(p.capacity() == 1);
 	REQUIRE(p.data() != nullptr);
 	REQUIRE(p.data()[0] == a);
 }
 
-TEST_CASE("Bits(uint128_t) big") {
-	uint64_t a = 3;
-	uint64_t b = 7;
-	__uint128_t A = (static_cast<__uint128_t>(a) << 64) | b;
+TEST_CASE("Bits(ucent) big") {
+	ulong a = 3;
+	ulong b = 7;
+	ucent A = (static_cast<ucent>(a) << 64) | b;
 	REQUIRE(clz(A) == 62);
 	Bits p(A);
 	REQUIRE(p.capacity() == 2);
