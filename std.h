@@ -25,10 +25,15 @@ using std::unordered_set;
 using std::map;
 using std::set;
 
+using std::unordered_multimap;
+using std::unordered_multiset;
+using std::multimap;
+using std::multiset;
+
 using std::cout;
 using std::endl;
 
-using namespace std::string_literals;
+using namespace std::literals;
 
 #ifdef NDEBUG
 constexpr bool debug = false;
