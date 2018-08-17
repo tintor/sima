@@ -1,8 +1,8 @@
 #pragma once
 #include "triangle.h"
-#include "array_ptr.h"
+#include "span.h"
 
-inline float4 transform(float4 v, mat34 matrix) {
+inline float4 transform(float4 v, fmat34 matrix) {
 	// dot products
 	float4 x = _mm_dp_ps(v, matrix.a, 0b11110001);
 	float4 y = _mm_dp_ps(v, matrix.b, 0b11110010);
@@ -12,10 +12,10 @@ inline float4 transform(float4 v, mat34 matrix) {
 	return q;
 }
 
-void transform(array_cptr<vec3_8> in, mat34 matrix, array_ptr<vec3_8> out);
+void transform(span<const vec3_8> in, fmat34 matrix, span<vec3_8> out);
 
-void translate(array_ptr<ivec4> vectors, ivec4 t);
-void translate(array_ptr<ivec3_8> vectors, ivec4 t);
+/*void translate(array_ptr<ivec4> vectors, ivec4 t);
+void translate(array_ptr<ivec3_8> vectors, ivec4 t);*/
 
 /*inline void translate(imesh3& mesh, ivec3 t) {
 	ivec3* begin = &mesh.begin()->a;

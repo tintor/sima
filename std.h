@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <string_view>
+#include <regex>
 #include <utility>
 
 #include <vector>
@@ -13,6 +14,7 @@
 
 #include <iostream>
 
+using std::regex;
 using std::string;
 using std::string_view;
 using std::pair;

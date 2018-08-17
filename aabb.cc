@@ -1,8 +1,7 @@
 #include "aabb.h"
-#include "glm.h"
 #include "util.h"
 
-std::pair<int4, int4> compute_aabb(array_cptr<int4> vectors) {
+/*pair<int4, int4> compute_aabb(span<const int4> vectors) {
 	if (vectors.size() <= 1) {
 		if (vectors.size() == 1)
 			return {vectors[0], vectors[0]};
@@ -49,4 +48,4 @@ std::pair<int4, int4> compute_aabb(array_cptr<int4> vectors) {
 	int4 min4 = vmin(min8.xyzw, vshuffle(min8, min8, 4, 5, 6, 7));
 	int4 max4 = vmax(max8.xyzw, vshuffle(max8, max8, 4, 5, 6, 7));
 	return {min4, max4};
-}
+}*/

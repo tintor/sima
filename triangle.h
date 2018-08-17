@@ -2,46 +2,50 @@
 #include "segment.h"
 #include "range.h"
 #include "scalar.h"
+#include "edges.h"
 #include <vector>
 
-template<typename V>
+template<typename Vec>
 struct triangle {
-	V a, b, c;
+	Vec a, b, c;
 
 	triangle() { }
-	triangle(const triangle& v) : a(v.a), b(v.b), c(v.c) { }
-	triangle(V a, V b, V c) : a(a), b(b), c(c) { }
+	constexpr triangle(Vec a, Vec b, Vec c) : a(a), b(b), c(c) { }
+	constexpr triangle(const triangle& v) : a(v.a), b(v.b), c(v.c) { }
 
-	V& operator[](int idx) { return (&a)[idx]; }
-	V operator[](int idx) const { return (&a)[idx]; }
+	Vec& operator[](int idx) { return (&a)[idx]; }
+	Vec operator[](int idx) const { return (&a)[idx]; }
 
-	std::array<segment<V>, 3> edges() const { return {segment<V>{a, b}, segment<V>{b, c}, segment<V>{c, a}}; }
-	std::array<segment<V&>, 3> edges() { return {segment<V&>{a, b}, {b, c}, {c, a}}; }
+	array<segment<Vec>, 3> edges() const { return {segment{a, b}, segment{b, c}, segment{c, a}}; }
+	array<segment<Vec&>, 3> edges() { return {segment{a, b}, segment{b, c}, segment{c, a}}; }
 
-	bool operator==(const triangle& v) const { return equal(a, v.a) && equal(b, v.b) && equal(c, v.c); }
-	bool operator!=(const triangle& v) const { return !operator==(v); }
+	bool operator==(triangle v) const { return equal(a, v.a) && equal(b, v.b) && equal(c, v.c); }
+	bool operator!=(triangle v) const { return !operator==(v); }
 
-	V* begin() { return &a; }
-	V* end() { return &a + 3; }
+	auto begin() { return &a; }
+	auto end() { return &a + 3; }
 
-	const V* begin() const { return &a; }
-	const V* end() const { return &a + 3; }
+	using const_iterator = const Vec*;
+	auto begin() const { return &a; }
+	auto end() const { return &a + 3; }
 };
 
-template<typename T>
-void format_e(std::string& s, std::string_view spec, triangle<T> v) {
+using triangle2 = triangle<double2>;
+using triangle3 = triangle<double3>;
+
+template<typename Vec>
+void format_e(string& s, string_view spec, triangle<Vec> v) {
 	format_s(s, "(%s, %s, %s)", v.a, v.b, v.c);
 }
 
-using itriangle2 = triangle<ivec2>;
-using itriangle3 = triangle<ivec3>;
+// TODO move polygon and mesh stuff outside
 
-using ipolygon2 = std::vector<ivec2>;
-using ipolygon3 = std::vector<ivec3>;
+using polygon2 = vector<double2>;
+using polygon3 = vector<double3>;
 
 // TODO remove
 template<typename T>
-inline bool equal(const std::vector<T>& a, const std::vector<T>& b) {
+inline bool equal(const vector<T>& a, const vector<T>& b) {
 	if (a.size() != b.size())
 		return false;
 	for (size_t i = 0; i < a.size(); i++)
@@ -50,7 +54,7 @@ inline bool equal(const std::vector<T>& a, const std::vector<T>& b) {
 	return true;
 }
 
-inline bool operator==(const ipolygon2& a, const ipolygon2& b) {
+inline bool operator==(const polygon2& a, const polygon2& b) {
 	if (a.size() != b.size())
 		return false;
 	for (size_t i = 0; i < a.size(); i++)
@@ -59,7 +63,7 @@ inline bool operator==(const ipolygon2& a, const ipolygon2& b) {
 	return true;
 }
 
-inline bool operator==(const ipolygon3& a, const ipolygon3& b) {
+inline bool operator==(const polygon3& a, const polygon3& b) {
 	if (a.size() != b.size())
 		return false;
 	for (size_t i = 0; i < a.size(); i++)
@@ -68,23 +72,15 @@ inline bool operator==(const ipolygon3& a, const ipolygon3& b) {
 	return true;
 }
 
-inline bool operator!=(const ipolygon3& a, const ipolygon3& b) {
+inline bool operator!=(const polygon3& a, const polygon3& b) {
 	return !operator==(a, b);
 }
 
-// TODO move to own file
-template<typename V>
-struct polygon {
-	std::vector<V> vertices;
+using mesh2 = vector<triangle2>;
+using mesh3 = vector<triangle3>;
 
-	// TODO edges iterator
-};
-
-using imesh2 = std::vector<itriangle2>;
-using imesh3 = std::vector<itriangle3>;
-
-inline std::string wkt(const ipolygon2& poly) {
-	std::string s;
+inline string wkt(const polygon2& poly) {
+	string s;
 	s += "POLYGON (";
 	if (poly.size() > 0) {
 		for (auto p : poly) {
@@ -97,13 +93,13 @@ inline std::string wkt(const ipolygon2& poly) {
 	return s;
 }
 
-inline std::string wkt(const imesh2& mesh) {
-	std::string s;
+inline string wkt(const mesh2& mesh) {
+	string s;
 	s += "MULTIPOLYGON ((";
 	for (auto i : range(mesh.size())) {
 		if (i != 0)
 			s += ", ";
-		const itriangle2& m = mesh[i];
+		const triangle2& m = mesh[i];
 		s += '(';
 		format_e(s, "", m.a);
 		s += ", ";
@@ -118,36 +114,24 @@ inline std::string wkt(const imesh2& mesh) {
 	return s;
 }
 
-// overflow safe
-inline long edge_area(ivec2 a, ivec2 b) {
-	return ((long)a.x + (long)b.x) * ((long)a.y - (long)b.y);
+inline double edge_area(double2 a, double2 b) {
+	return (a.x + b.x) * (a.y - b.y);
 }
 
-// throws on overflow
-inline long area(const ipolygon2& poly) {
-	long area = 0;
-	if (poly.size() > 0) {
-	    auto a = poly.back();
-		for (auto b : poly) {
-			// This is a little faster than calling edge_area instead?
-			area = addi(area, muli(addi(a.x, b.x), subi(a.y, b.y)));
-			//area = addi(area, edge_area(a, b));
-			a = b;
-		}
-	}
+inline double area(const polygon2& poly) {
+	double area = 0;
+	if (poly.size() > 0)
+		for (auto [a, b] : edgesOf(poly))
+			area += edge_area(a, b);
 	return area;
 }
 
-// throws on overflow
-inline long area(ivec2 a, ivec2 b, ivec2 c) {
-	long ab = edge_area(a, b);
-	long bc = edge_area(b, c);
-	long ca = edge_area(c, a);
-	long z = addi(ab, bc);
-	return addi(z, ca);
+inline double area(double2 a, double2 b, double2 c) {
+	return edge_area(a, b) + edge_area(b, c) + edge_area(c, a);
 }
 
-// throws on overflow
-inline long area(itriangle2 m) {
+inline double area(triangle2 m) {
 	return area(m.a, m.b, m.c);
 }
+
+inline double3 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }

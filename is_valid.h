@@ -2,7 +2,7 @@
 #include "triangle.h"
 #include "format.h"
 
-bool is_valid(const ipolygon2& poly);
+bool is_valid(const polygon2& poly);
 
 enum class Validity {
 	OK = 0,
@@ -16,6 +16,8 @@ enum class Validity {
 	OverlappingFaces = 8,
 };
 
-Validity is_valid(const imesh3& mesh);
+Validity is_valid(const mesh3& mesh);
 
-void make_valid(imesh3& mesh);
+Validity is_valid(const mesh3& mesh);
+
+void make_valid(mesh3& mesh);

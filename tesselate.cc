@@ -5,17 +5,19 @@
 #include "aabb.h"
 #include "is_valid.h"
 
+// TODO review entire file after conversion from int -> double
+
 // D - disjoint
 // O - overlap
 // V - vertex / vertex touch (could be colinear, but not overlapping)
 // X - interior intersection
 // A - T intersection: A or B is touching interior of PQ
 // B - T intersection: P or Q is touching interior of AB
-char relate(ivec2 a, ivec2 b, ivec2 p, ivec2 q) {
+char relate(double2 a, double2 b, double2 p, double2 q) {
 	int sp = sign(area(p, a, b));
 	int sq = sign(area(q, a, b));
 	if (sp == 0 && sq == 0) { // colinear
-		if (aabb<ivec2>(a, b).overlaps(aabb<ivec2>(p, q)))
+		if (aabb2(a, b).intersects(aabb2(p, q)))  // TODO overlaps changed to intersects
 			return 'O';
 		if (equal(a, p) || equal(a, q) || equal(b, p) || equal(b, q))
 			return 'V';
@@ -37,18 +39,18 @@ char relate(ivec2 a, ivec2 b, ivec2 p, ivec2 q) {
 }
 
 // same as relate(), but faster
-bool relate_abxo(ivec2 a, ivec2 b, ivec2 p, ivec2 q, long ab) {
-	long pa = edge_area(p, a);
-	long bp = edge_area(b, p);
-	long sp = pa + ab + bp; // not overflow safe!
+bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab) {
+	double pa = edge_area(p, a);
+	double bp = edge_area(b, p);
+	double sp = pa + ab + bp;
 
-	long qa = edge_area(q, a);
-	long bq = edge_area(b, q);
-	long sq = qa + ab + bq; // not overflow safe!
+	double qa = edge_area(q, a);
+	double bq = edge_area(b, q);
+	double sq = qa + ab + bq;
 
 	if (sp == 0) {
 		if (sq == 0) // colinear
-			return aabb<ivec2>(a, b).overlaps(aabb<ivec2>(p, q));
+			return aabb2(a, b).intersects(aabb2(p, q)); // TODO overlaps changed to intersects
 		if (equal(a, p) || equal(b, p))
 			return false;
 	} else {
@@ -60,21 +62,20 @@ bool relate_abxo(ivec2 a, ivec2 b, ivec2 p, ivec2 q, long ab) {
 			return false;
 	}
 
-    long pq = edge_area(p, q);
-	long z3 = pq + qa; // not overflow safe!
+    double pq = edge_area(p, q);
+    double z3 = pq + qa;
+	double z4 = bp + pq;
 	int sign_sa = (pa < z3) - (z3 < pa);
-
-	long z4 = bp + pq; // not overflow safe!
 	int sign_sb = (bq < z4) - (z4 < bq);
 	return sign_sa * sign_sb <= 0;
 }
 
 const int EMPTY = std::numeric_limits<int>::min();
 
-bool intersects_polyline(isegment2 s, long ab, ipolygon2::iterator begin, ipolygon2::iterator last) {
-	ivec2 p = *last++;
+bool intersects_polyline(segment2 s, long ab, polygon2::iterator begin, polygon2::iterator last) {
+	double2 p = *last++;
 	for (auto it = begin; it != last; it++) {
-		ivec2 q = *it;
+		double2 q = *it;
 		if (q.x != EMPTY) {
 			assert(!equal(p, q));
 			if (relate_abxo(s.a, s.b, p, q, ab))
@@ -85,13 +86,13 @@ bool intersects_polyline(isegment2 s, long ab, ipolygon2::iterator begin, ipolyg
 	return false;
 }
 
-void tesselate(ipolygon2 poly, imesh2& tess) {
+void tesselate(polygon2 poly, mesh2& tess) {
 	assert(is_valid(poly));
 	auto orig_tess_size = tess.size();
 	auto orig_poly_size = poly.size();
 	tess.reserve(tess.size() + poly.size() - 2);
 
-	long w = area(poly);
+	double w = area(poly);
 	auto n = poly.size();
 
 	// TODO use bits to avoid modifying poly!
@@ -102,12 +103,12 @@ void tesselate(ipolygon2 poly, imesh2& tess) {
 	auto a = last;
 	auto b = begin;
 	auto c = begin + 1;
-	long ab = edge_area(*a, *b);
-	long bc = edge_area(*b, *c);
-	long ca = edge_area(*c, *a);
+	double ab = edge_area(*a, *b);
+	double bc = edge_area(*b, *c);
+	double ca = edge_area(*c, *a);
 	if (n > 3)
 	while (true) {
-		long v = ab + bc + ca;
+		double v = ab + bc + ca;
 		if (abs(w) == abs(w - v) + abs(v) && !intersects_polyline({*c, *a}, ca, begin, last)) {
 			w -= v;
 			tess.emplace_back(*a, *b, *c);

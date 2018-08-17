@@ -1,26 +1,24 @@
 #include "convex_hull.h"
 #include "is_valid.h"
-#include "ivec.h"
 #include "properties.h"
 #include "aabb.h"
 #include "util.h"
 #include "primitives.h"
+#include "exception.h"
 
-inline dvec3 dvec(ivec3 a) { return vconvert(a, dvec3); }
-
-bool is_convex(const imesh3& mesh) {
+bool is_convex(const mesh3& mesh) {
 	// TODO set might be unncessary complication
 	// Extract all unique vertices
-	std::unordered_set<ivec3, std::hash<ivec3>, equal_t<ivec3>> vertices;
+	unordered_set<double3, std::hash<double3>, equal_t<double3>> vertices;
 	for (auto face : mesh)
 		for (auto vertex : face)
 			vertices.insert(vertex);
 	// Check if every face has all vertices on its negative side
 	for (auto face : mesh) {
-		dvec3 n = normal(dvec(face.a), dvec(face.b), dvec(face.c));
-		double d = dot(n, dvec(face.a));
+		double3 n = compute_normal(face);
+		double d = dot(n, face.a);
 		for (auto v : vertices)
-			if (dot(n, dvec(v)) > d)
+			if (dot(n, v) > d)
 				return false;
 	}
 	return true;
@@ -49,13 +47,13 @@ bool is_convex(const imesh3& mesh) {
 	// - find the furthest vertex among all and add it next -> update distances of vertices that were in
 
 // TODO maybe precompute this in separate array
-uint boundary_dist(aabb<ivec3> box, ivec3 v) {
-	std::array<uint, 3> m;
+double boundary_dist(aabb3 box, double3 v) {
+	double3 m;
 	for (auto i : range(3)) {
-		int a = box.min[i], b = box.max[i];
+		double a = box.min[i], b = box.max[i];
 		m[i] = (v[i] >= (a + b) / 2) ? (b - v[i]) : (v[i] - a);
 	}
-	return min(m[0], m[1], m[2]);
+	return min(m.x, m.y, m.z);
 }
 
 // convex_hull algorithms:
@@ -96,21 +94,21 @@ uint boundary_dist(aabb<ivec3> box, ivec3 v) {
 //    idea is to build hull of simplified point set first, which is a "good" approximation of the point set
 //    (problem, one dimension could be thinner than other two, so after a few rounding we end up with 2d case)
 
-void convex_hull_fast(array_cptr<ivec3> points, imesh3& hull) {
+void convex_hull_fast(span<const double3> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;
 
 	// 1) compute aabb
-	aabb<ivec3> box(points);
+	aabb3 box(points);
 
 	// 2) sort points by reverse manhattan distance from the AABB (after manhattan dist, use lex order)
 	std::unique_ptr<uint[]> order(new uint[points.size()]);
 	for (uint i = 0; i < points.size(); i++)
 		order[i] = i;
-	const ivec3* pts = points.begin();
+	const double3* pts = points.begin();
 	std::sort(order.get(), order.get() + points.size(), [pts, &box] (uint a, uint b) {
-		ivec3 A = pts[a], B = pts[b];
+		double3 A = pts[a], B = pts[b];
 		uint da = boundary_dist(box, A);
 	    uint db = boundary_dist(box, B);
 		if (da < db) return true;
@@ -134,13 +132,13 @@ void convex_hull_fast(array_cptr<ivec3> points, imesh3& hull) {
 	THROW(not_implemented);
 }
 
-void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
+void convex_hull(span<const double3> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;
 
 	// First two points (A and B) on the hull (extremes on X axis)
-	ivec3 a = points[0], b = points[0];
+	double3 a = points[0], b = points[0];
 	for (auto p : points) {
 		if (p.x < a.x)
 			a = p;
@@ -151,11 +149,10 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		return;
 
 	// Third point C on the hull (furthest from line AB)
-	cent max_dist2 = 0;
-	ivec3 c;
+	double max_dist2 = 0;
+	double3 c;
 	for (auto p : points) {
-		lvec3 cross = crossi(subi(p, a), subi(p, b));
-		cent dist2 = squaredi(vconvert(cross, llvec3));
+		double dist2 = squared(cross(p - a, p - b));
 		if (dist2 > max_dist2) {
 			c = p;
 			max_dist2 = dist2;
@@ -165,12 +162,12 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		return;
 
 	// Fourth point D on the hull (furthest from plane ABC)
-	cent max_dist = 0;
-	ivec3 d;
-	lvec3 normal = normali(a, b, c);
-	long dd = doti(normal, vconvert(a, lvec3));
+	double max_dist = 0;
+	double3 d;
+	double3 normal = compute_normal(a, b, c);
+	double dd = dot(normal, a);
 	for (auto p : points) {
-		cent dist = subi(doti(vconvert(normal, llvec3), vconvert(p, llvec3)), dd);
+		double dist = dot(normal, p) - dd;
 		if (std::abs(dist) > std::abs(max_dist)) {
 			d = p;
 			max_dist = dist;
@@ -195,7 +192,7 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 	}
 
 	// Expand hull to include all remaining points outside of it
-	std::unordered_set<isegment3> open_edges;
+	unordered_set<segment3> open_edges;
 	uint i = 0;
 	for (auto p : points) {
 		if (points.size() >= 50000 && i++ % (1 << 14) == 0)
@@ -205,10 +202,10 @@ void convex_hull(array_cptr<ivec3> points, imesh3& hull) {
 		// Remove faces on hull covered by new vertex
 		open_edges.clear();
 		for (size_t i = 0; i < hull.size(); i++) {
-			const itriangle3& f = hull[i];
+			const triangle3& f = hull[i];
 			// Skip if P is not in front of face F
-			lvec3 n = normali(f.a, f.b, f.c);
-			if (doti(vconvert(n, llvec3), vconvert(subi(p, f.a), llvec3)) <= 0)
+			double3 normal = compute_normal(f);
+			if (dot(normal, p - f.a) <= 0)
 				continue;
 			// Add edges of removed face to open_edges
 			for (auto e : f.edges()) {

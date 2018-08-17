@@ -1,72 +1,136 @@
 #pragma once
-#include "glm.h"
+#include "vector.h"
+#include "hash.h"
+#include <cassert>
 
-// infinite on both sides unlike segment3
-template<typename V>
-struct line {
-	V a, b;
-
-	V& operator[](int idx) { return (&a)[idx]; }
-	V operator[](int idx) const { return (&a)[idx]; }
-
-	bool operator==(const line& v) const { return equal(a, v.a) && equal(b, v.b); }
-	bool operator!=(const line& v) const { return !(operator==(v)); }
-};
-
-template<typename V>
+// finite part of line between two points
+template<typename Vec>
 struct segment {
-	V a, b;
+	Vec a, b;
 
-	segment() {}
-	segment(V a, V b) : a(a), b(b) {}
+	constexpr segment(Vec a, Vec b) : a(a), b(b) { }
+	constexpr segment(const segment& s) : a(s.a), b(s.b) { }
 
-	V& operator[](int idx) { return (&a)[idx]; }
-	V operator[](int idx) const { return (&a)[idx]; }
-
-	bool operator==(const segment& v) const { return equal(a, v.a) && equal(b, v.b); }
-	bool operator!=(const segment& v) const { return !(operator==(v)); }
+	constexpr bool operator==(segment v) const { return equal(a, v.a) && equal(b, v.b); }
+	constexpr bool operator!=(segment v) const { return !(operator==(v)); }
 
 	segment reversed() const { return {b, a}; }
+
+	Vec linear(double t) const { return a + (b - a) * t; }
+
+	// Inverse of linear
+	double param(Vec p) const {
+		Vec d = b - a;
+		return dot(p - a, d) / dot(d, d);
+	}
+
+	// Return point on segment that is nearest to P
+	Vec nearest(Vec p) const {
+		Vec d = b - a;
+		double t = dot(p - a, d);
+		if (t <= 0)
+			return a;
+		if (t >= dot(d, d))
+			return b;
+		return a + d * (t / dot(d, d));
+	}
 };
 
-template<typename T>
-void format_e(std::string& s, std::string_view spec, line<T> v) {
-	format_s(s, "(%s, %s)", v.a, v.b);
+using segment2 = segment<double2>;
+using segment3 = segment<double3>;
+
+// starts from a, and goes to infinity
+struct ray3 {
+	const double3 unit_dir, origin;
+
+	ray3(const ray3& s) : unit_dir(s.unit_dir), origin(s.origin) { }
+	ray3(segment3 s) : unit_dir(normalize(s.b - s.a)), origin(s.a) { }
+	ray3(double3 a, double3 b) : unit_dir(normalize(b - a)), origin(a) { }
+
+	bool operator==(ray3 v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
+	bool operator!=(ray3 v) const { return !(operator==(v)); }
+
+	double3 linear(double t) const { return origin + unit_dir * t; }
+
+	// Inverse of linear
+	double param(double3 p) const {
+		return dot(p - origin, unit_dir);
+	}
+};
+
+// TODO raw_line3: which just stores points A and B (no normalization)
+
+// infinite on both sides unlike segment
+// Note: dir may be flipped after construction!
+struct line3 {
+	const double3 unit_dir, origin;
+
+	static double3 normalize_dir(double3 d) {
+		if (d.x < 0)
+			return -d;
+		if (d.x == 0 && d.y < 0)
+			return -d;
+		if (d.x == 0 && d.y == 0 && d.z < 0)
+			return -d;
+		return d;
+	}
+
+	line3(const line3& s) : unit_dir(s.unit_dir), origin(s.origin) { }
+	line3(ray3 s)
+		: unit_dir(normalize_dir(s.unit_dir))
+		, origin(s.origin - unit_dir * dot(s.origin, unit_dir)) {
+	}
+	line3(segment3 s) : line3(ray3(s)) { }
+	line3(double3 a, double3 b) : line3(segment3{a, b}) { }
+
+	// TODO(marko) equality condition should check if lines are overlapping
+	bool operator==(line3 v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
+	bool operator!=(line3 v) const { return !(operator==(v)); }
+
+	double3 linear(double t) const { return origin + unit_dir * t; }
+
+	double3 nearest(double3 p) const {
+		return origin + unit_dir * dot(p - origin, unit_dir);
+	}
+};
+
+// Tested and stable!
+enum class NearestCase {
+	RayRay = 0,
+	RayPoint = 1,
+	PointPoint = 2,
+};
+
+pair<segment3, NearestCase> nearest(segment3 p, segment3 q);
+
+inline void format_e(string& s, string_view spec, line3 v) {
+	format_s(s, "line(%s, %s)", v.origin, v.unit_dir);
 }
 
-template<typename T>
-void format_e(std::string& s, std::string_view spec, segment<T> v) {
-	format_s(s, "(%s, %s)", v.a, v.b);
+inline void format_e(string& s, string_view spec, ray3 v) {
+	format_s(s, "ray(%s, %s)", v.origin, v.unit_dir);
 }
 
-using iline2 = line<ivec2>;
-using iline3 = line<ivec3>;
-
-using isegment2 = segment<ivec2>;
-using isegment3 = segment<ivec3>;
-using lsegment3 = segment<lvec3>;
-
-using segment2_ref = segment<ivec2&>;
-using segment3_ref = segment<ivec3&>;
+inline void format_e(string& s, string_view spec, segment3 v) {
+	format_s(s, "segment(%s, %s)", v.a, v.b);
+}
 
 namespace std {
 
-template<typename V> struct hash<line<V>> {
-	size_t operator()(const line<V>& s) const {
-		size_t seed = 0;
-		hash_combine(seed, s.a);
-		hash_combine(seed, s.b);
-		return seed;
-	}
+template<> struct hash<line3> {
+	size_t operator()(line3 s) const { return ::hash(s.origin, s.unit_dir); }
 };
 
-template<typename V> struct hash<segment<V>> {
-	size_t operator()(const segment<V>& s) const {
-		size_t seed = 0;
-		hash_combine(seed, s.a);
-		hash_combine(seed, s.b);
-		return seed;
-	}
+template<> struct hash<ray3> {
+	size_t operator()(ray3 s) const { return ::hash(s.origin, s.unit_dir); }
 };
 
+template<typename Vec> struct hash<segment<Vec>> {
+	size_t operator()(segment<Vec> s) const { return ::hash(s.a, s.b); }
+};
+
+}
+
+inline auto angle(segment3 p, segment3 q) {
+	return angle(p.b - p.a, q.b - q.a);
 }

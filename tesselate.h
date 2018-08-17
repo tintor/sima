@@ -3,10 +3,10 @@
 
 // ear cutting algorithm
 // assumes that P is valid and has not duplicate vertices or overlapping edges
-void tesselate(ipolygon2 poly, /*out*/imesh2& tess);
+void tesselate(polygon2 poly, /*out*/mesh2& tess);
 
-inline imesh2 tesselate(ipolygon2 poly) {
-	imesh2 tess;
+inline mesh2 tesselate(polygon2 poly) {
+	mesh2 tess;
 	tesselate(poly, /*out*/tess);
 	return tess;
 }

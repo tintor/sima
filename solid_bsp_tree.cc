@@ -1,22 +1,19 @@
 #include "solid_bsp_tree.h"
 #include "aabb.h"
 #include "util.h"
-#include "ivec.h"
 #include "properties.h"
-
-int classify(ivec3 v, const iplane3& p) {
-	return sign(p.distance(v));
-}
+#include "exception.h"
+#include "primitives.h"
 
 void SolidBSPTree::evaluate_candidate(
-		const iplane3& candidate,
+		plane candidate,
 		BuildData& data,
-		const std::vector<uint>& mesh,
+		const vector<uint>& mesh,
 		uint* samples_begin,
 		uint* samples_end,
 		long& best_heuristic,
 		Hist& best_hist,
-		iplane3& best_candidate) {
+		plane& best_candidate) {
 	size_t psamples = 0;
 	for (auto it = samples_begin; it != samples_end; it++)
 		if (candidate.distance(data.samples[*it]) > 0)
@@ -29,11 +26,11 @@ void SolidBSPTree::evaluate_candidate(
 	Hist hist{ 0, 0, 0, 0 };
 	long h = best_heuristic;
 	for (auto f : mesh) {
-		const itriangle3& face = data.faces[mesh[f]];
+		const triangle3& face = data.faces[mesh[f]];
 
-		int ai = classify(face.a, candidate);
-		int bi = classify(face.b, candidate);
-		int ci = classify(face.c, candidate);
+		int ai = candidate.classify(face.a);
+		int bi = candidate.classify(face.b);
+		int ci = candidate.classify(face.c);
 
 		int mn = min(ai, bi, ci);
 		int mx = max(ai, bi, ci);
@@ -71,8 +68,8 @@ void SolidBSPTree::evaluate_candidate(
 }
 
 // Returns average query depth across all samples
-std::pair<uint, float> SolidBSPTree::build_internal(
-		BuildData& data, const std::vector<uint>& mesh, uint* samples_begin, uint* samples_end) {
+pair<uint, float> SolidBSPTree::build_internal(
+		BuildData& data, const vector<uint>& mesh, uint* samples_begin, uint* samples_end) {
 	const uint Outside = 0;
 	const uint Inside = 0xFFFFFFFF;
 
@@ -80,21 +77,21 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 		print("build_internal: %s\n", mesh.size());
 
 	if (mesh.empty())
-		return std::pair<uint, float>(Outside, 0.0);
+		return pair<uint, float>(Outside, 0.0);
 
 	if (mesh.size() == 1) {
 		int i = add_node();
-		node[i].divider = iplane3(data.faces[mesh[0]]);
+		node[i].divider = plane(data.faces[mesh[0]]);
 		node[i].positive = Outside;
 		node[i].negative = Inside;
 		percent[i] = float(std::distance(samples_begin, samples_end)) / data.samples.size();
 		hist[i] = { 0, 0, 0, 0 };
 		hist[i].overlap = 1;
-		box_size[i] = aabb<ivec3>(data.faces[mesh[0]]).size();
-		return std::pair<uint, double>(i, 1.0);
+		box_size[i] = aabb3(data.faces[mesh[0]]).size();
+		return pair<uint, double>(i, 1.0);
 	}
 
-	std::vector<uint16_t> vertices;
+	vector<uint16_t> vertices;
 	vertices.reserve(mesh.size() * 3);
 	for (auto f : mesh) {
 		vertices.push_back(data.ifaces[f].a);
@@ -106,7 +103,7 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 	const auto samples = std::distance(samples_begin, samples_end);
 	long best_heuristic = std::numeric_limits<long>::max();
 	Hist best_hist { 0, 0, 0, 0 };
-	iplane3 best_candidate;
+	plane best_candidate;
 
 	// TODO if Faces * Samples is too high then skip that too, and just use linear major axis algo
 
@@ -115,33 +112,34 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 		// Consider only subset of candidates
 		if (mesh.size() <= 10000) for (auto f : mesh) {
 			// TODO precompute
-			iplane3 candidate({data.vertices[data.ifaces[f].a], data.vertices[data.ifaces[f].b], data.vertices[data.ifaces[f].c]});
+			auto& v = data.vertices;
+			plane candidate(vertices[data.ifaces[f].a], vertices[data.ifaces[f].b], vertices[data.ifaces[f].c]);
 			evaluate_candidate(candidate, data, mesh, samples_begin, samples_end,
 					best_heuristic, best_hist, best_candidate);
 		}
 		for (auto major_axis : range(3)) {
-			ivec3 normal{0, 0, 0};
+			double3 normal{0, 0, 0};
 			normal[major_axis] = 1;
 
 			// sort vertices along the major axis
-			const ivec3* vertex_list = &(data.vertices[0]);
+			const double3* vertex_list = &(data.vertices[0]);
 			std::sort(vertices.begin(), vertices.end(), [major_axis, vertex_list](uint16_t va, uint vb){
 				return vertex_list[va][major_axis] < vertex_list[vb][major_axis];
 			});
 
 			// sort samples along the major axis
-			const ivec3* sample_list = &(data.samples[0]);
+			const double3* sample_list = &(data.samples[0]);
 			std::sort(samples_begin, samples_end, [major_axis, sample_list](uint sa, uint sb){
 				return sample_list[sa][major_axis] < sample_list[sb][major_axis];
 			});
 
 			double v_prev = -1e100;
 			for (auto v : vertices) {
-				ivec3 vv = data.vertices[v];
+				double3 vv = data.vertices[v];
 				if (-vv[major_axis] == v_prev)
 					continue;
 				v_prev = vv[major_axis];
-				iplane3 candidate(normal, -vv[major_axis]);
+				plane candidate(normal, -vv[major_axis]);
 				// TODO pre-sort samples outside of vertex loop to avoid re-partitioning
 				evaluate_candidate(candidate, data, mesh, samples_begin, samples_end,
 						best_heuristic, best_hist, best_candidate);
@@ -151,7 +149,7 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 		// Consider all candidates
 		// Expensive! O(Vertices^3 * Samples)
 		for (auto a : range(vertices.size())) for (auto b : range(a)) for (auto c : range(b)) {
-			iplane3 candidate({data.vertices[vertices[a]], data.vertices[vertices[b]], data.vertices[vertices[c]]});
+			plane candidate(data.vertices[vertices[a]], data.vertices[vertices[b]], data.vertices[vertices[c]]);
 			evaluate_candidate(candidate, data, mesh, samples_begin, samples_end,
 					best_heuristic, best_hist, best_candidate);
 		}
@@ -163,15 +161,15 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 			print("out of samples: %s\n", mesh.size());
 		// Out of samples -> split using new heuristic ignoring samples: abs(positive - negative) + 8 * splits
 		for (auto a : range(vertices.size())) for (auto b : range(a)) for (auto c : range(b)) {
-			iplane3 candidate({data.vertices[vertices[a]], data.vertices[vertices[b]], data.vertices[vertices[c]]});
+			plane candidate(data.vertices[vertices[a]], data.vertices[vertices[b]], data.vertices[vertices[c]]);
 
 			Hist hist{ 0, 0, 0, 0 };
 			for (auto f : range(mesh.size())) {
-				const itriangle3& face = data.faces[mesh[f]];
+				const triangle3& face = data.faces[mesh[f]];
 
-				int ai = classify(face.a, candidate);
-				int bi = classify(face.b, candidate);
-				int ci = classify(face.c, candidate);
+				int ai = candidate.classify(face.a);
+				int bi = candidate.classify(face.b);
+				int ci = candidate.classify(face.c);
 
 				int mn = min(ai, bi, ci);
 				int mx = max(ai, bi, ci);
@@ -208,15 +206,15 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 	const auto psamples = std::distance(samples_begin, split);
 	const auto nsamples = std::distance(split, samples_end);
 
-	std::vector<uint> pmesh, nmesh;
+	vector<uint> pmesh, nmesh;
 	pmesh.reserve(best_hist.positive + best_hist.stradle);
 	nmesh.reserve(best_hist.negative + best_hist.stradle);
 	for (auto f : mesh) {
-		const itriangle3& face = data.faces[f];
+		const triangle3& face = data.faces[f];
 
-		int ai = classify(face.a, best_candidate);
-		int bi = classify(face.b, best_candidate);
-		int ci = classify(face.c, best_candidate);
+		int ai = best_candidate.classify(face.a);
+		int bi = best_candidate.classify(face.b);
+		int ci = best_candidate.classify(face.c);
 
 		if (ai > 0 || bi > 0 || ci > 0)
 			pmesh.push_back(f);
@@ -224,13 +222,12 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 			nmesh.push_back(f);
 	}
 
-
-	aabb<ivec3> box;
+	aabb3 box;
 	for (auto iv : vertices)
 		box.add(data.vertices[iv]);
 
 	uint i = add_node();
-	release(vertices);
+	vertices.shrink_to_fit();
 
 	auto presult = build_internal(data, pmesh, samples_begin, split);
 	if (pmesh.size() == 0) {
@@ -249,7 +246,7 @@ std::pair<uint, float> SolidBSPTree::build_internal(
 	node[i].negative = nresult.first;
 	double score = 1 + (psamples * presult.second + nsamples * nresult.second) / samples;
 	box_size[i] = box.size();
-	return std::pair<uint, double>(i, score);
+	return pair<uint, double>(i, score);
 }
 
 void SolidBSPTree::print_tree(uint n, int depth) {
@@ -272,33 +269,29 @@ void SolidBSPTree::print_tree(uint n, int depth) {
 	print_tree(node[n].negative, depth + 1);
 }
 
-bool intersects_convex(ivec3 v, const imesh3& mesh) {
+bool intersects_convex(double3 v, const mesh3& mesh) {
 	for (auto face : mesh) {
-		lvec3 normal = normali(face.a, face.b, face.c);
-		if (doti(vconvert(normal, lvec3), vconvert(subi(v, face.a), lvec3)) > 0)
+		double3 normal = compute_normal(face);
+		if (dot(normal, v - face.a) > 0)
 			return false;
 	}
 	return true;
 }
 
-double distance(ivec3 v, isegment3 s) {
-	THROW(not_implemented);
-}
-
-bool intersects(const ivec3& v, const itriangle3* mesh_begin, const itriangle3* mesh_end) {
+bool intersects(double3 v, const triangle3* mesh_begin, const triangle3* mesh_end) {
 	// Can't just take the sdist sign of min_dist as two faces that share the edge
 	// can have the same dist but different sgn(sdist)
 	double min_dist = std::numeric_limits<double>::max(), max_sdist = 0;
 	constexpr double eps = 1e-5; // ??? arbitrary, need to account for rounding errors
 	// when computing distance(vertex, face)
 	for (auto m = mesh_begin; m != mesh_end; m += 1) {
-		const itriangle3& face = *m;
-		iplane3 p(face); // TODO precompute this
+		const triangle3& face = *m;
+		plane p(face); // TODO precompute this
 
 		double dist, sdist;
 		for (auto [a, b] : face.edges())
-			if (iplane3::sign(a, b, a + p.normal, v) > 0) {
-				dist = distance(v, isegment3{a, b});
+			if (plane::sign(a, b, a + p.normal(), v) > 0) {
+				dist = distance(v, segment3{a, b});
 				if (dist > min_dist + eps)
 					goto next;
 
@@ -323,23 +316,11 @@ bool intersects(const ivec3& v, const itriangle3* mesh_begin, const itriangle3* 
 	return max_sdist <= 0;
 }
 
-bool intersects(const ivec3& v, const imesh3& mesh) {
+bool intersects(double3 v, const mesh3& mesh) {
 	return ::intersects(v, &mesh[0], &mesh[0] + mesh.size());
 }
 
-// TODO move to primitives.hh
-template<typename RND>
-ivec3 box_uniform_random(aabb<ivec3> box, RND& rnd) {
-	ivec3 d = box.size();
-	int dmax = max(d.x, d.y, d.z);
-	while (true) {
-		ivec3 v = random_vector(rnd, 0, dmax);
-		if (v.x <= d.x && v.y <= d.y && v.z <= d.z)
-			return box.min + v;
-	}
-}
-
-bool SolidBSPTree::intersects(ivec3 v) {
+bool SolidBSPTree::intersects(double3 v) {
 	const uint Inside = 0xFFFFFFFF;
 	const uint Outside = 0;
 
@@ -354,22 +335,22 @@ bool SolidBSPTree::intersects(ivec3 v) {
 	}
 }
 
-SolidBSPTree::SolidBSPTree(const imesh3& mesh, uint num_samples, std::default_random_engine& rnd) {
+SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_random_engine& rnd) {
 	BuildData data;
 	data.rnd = rnd;
-	aabb<ivec3> box(mesh);
+	aabb3 box(mesh);
 
 	// Init samples
 	data.samples.resize(num_samples);
-	std::vector<uint> isamples(num_samples);
+	vector<uint> isamples(num_samples);
 	for(auto i : range(num_samples)) {
-		data.samples[i] = box_uniform_random(box, data.rnd);
+		data.samples[i] = uniform3(data.rnd, box);
 		isamples[i] = i;
 	}
 
 	// Init vertices and imesh
-	std::unordered_map<ivec3, uint16_t, std::hash<ivec3>, equal_t<ivec3>> vec_index;
-	std::vector<uint> imesh;
+	unordered_map<double3, uint16_t, std::hash<double3>, equal_t<double3>> vec_index;
+	vector<uint> imesh;
 	for (const auto& face : mesh) {
 		const auto& a = face[0];
 		if (vec_index.count(a) == 0) {
@@ -401,10 +382,10 @@ SolidBSPTree::SolidBSPTree(const imesh3& mesh, uint num_samples, std::default_ra
 
 	int ab = 0, aa = 0, bb = 0;
 	double n = num_samples;
-	std::vector<ivec3> tester;
+	vector<double3> tester;
 	tester.resize(n);
 	for (auto j : range(n))
-		tester[j] = box_uniform_random(box, data.rnd);
+		tester[j] = uniform3(data.rnd, box);
 
 	for (auto j : range(n)) {
 		auto v = tester[j];
@@ -418,7 +399,7 @@ SolidBSPTree::SolidBSPTree(const imesh3& mesh, uint num_samples, std::default_ra
 			ab += 1;
 	}
 
-	ivec3 d = box.size();
-	double v = volume(mesh) / ((double)d.x * d.y * d.z);
+	double3 d = box.size();
+	double v = volume(mesh) / (d.x * d.y * d.z);
 	print("Same %.05f, A %.05f, Tree %.05f Volume %.05f", ab / n, aa / n, bb / n, v);
 }

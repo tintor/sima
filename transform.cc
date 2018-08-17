@@ -1,6 +1,7 @@
 #include "transform.h"
 #include "format.h"
 #include "util.h"
+#include "exception.h"
 
 // 7 instructions
 // input a.w is ignored (as long as matrix is fully initialized 4x4)
@@ -26,7 +27,7 @@ float8 transform(float8 a, float8 m[4]) {
 }
 
 // inner loop is 15 instructions for 8 vectors!
-void transform(array_cptr<vec3_8> in, mat34 m, array_ptr<vec3_8> out) {
+void transform(span<const vec3_8> in, fmat34 m, span<vec3_8> out) {
 	if (in.size() != out.size())
 		THROW(invalid_argument, "array sizes must be the same");
 	if (!aligned<32>(in.begin()) || !aligned<32>(out.begin()))
@@ -73,7 +74,7 @@ void transform(array_cptr<vec3_8> in, mat34 m, array_ptr<vec3_8> out) {
 	}
 }
 
-void translate(array_ptr<ivec3_8> vectors, ivec4 t) {
+/*void translate(span<vec3_8> vectors, ivec4 t) {
 	if (!aligned<32>(vectors.begin()))
 		THROW(invalid_argument, "address must be 32-byte aligned");
 
@@ -88,7 +89,7 @@ void translate(array_ptr<ivec3_8> vectors, ivec4 t) {
 	}
 }
 
-void translate(array_ptr<ivec4> vectors, ivec4 offset) {
+void translate(span<ivec4> vectors, ivec4 offset) {
 	ivec8* it = reinterpret_cast<ivec8*>(vectors.begin());
 	ivec8* end = it + vectors.size() / 2;
 	if (!aligned<32>(vectors.begin()))
@@ -100,4 +101,4 @@ void translate(array_ptr<ivec4> vectors, ivec4 offset) {
 
 	if (vectors.size() % 2 == 1)
 		vectors.back() += offset;
-}
+}*/

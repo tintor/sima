@@ -1,4 +1,5 @@
 #include "util.h"
+#include "string_util.h"
 #include "catch.hpp"
 
 TEST_CASE("min", "[util]") {

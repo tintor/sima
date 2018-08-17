@@ -24,10 +24,12 @@ set(prod
 	timestamp.cc
 	mesh_import.cc
 	callstack.cc
+	sphere.cc
 	lodepng/lodepng.cc)
 
 set(test
 	test.cc
+	test_span.cc
 	test_aabb.cc
 	test_util.cc
 	test_aabb.cc

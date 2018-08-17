@@ -1,17 +1,17 @@
 #include "csg.h"
 
-static imesh3 combine(const imesh3& a, const imesh3& b) {
-	return imesh3();
+static mesh3 combine(const mesh3& a, const mesh3& b) {
+	return mesh3();
 }
 
-imesh3 csg_intersection(const imesh3& a, const imesh3& b) {
-	return imesh3();
+mesh3 csg_intersection(const mesh3& a, const mesh3& b) {
+	return mesh3();
 }
 
-imesh3 csg_union(const imesh3& a, const imesh3& b) {
-	return imesh3();
+mesh3 csg_union(const mesh3& a, const mesh3& b) {
+	return mesh3();
 }
 
-imesh3 csg_difference(const imesh3& a, const imesh3& b) {
-	return imesh3();
+mesh3 csg_difference(const mesh3& a, const mesh3& b) {
+	return mesh3();
 }

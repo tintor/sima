@@ -10,7 +10,6 @@
 #endif
 #include <GLFW/glfw3.h>
 
-#include "glm.h"
 #include "format.h"
 
 void Error(const char* name);
@@ -36,8 +35,8 @@ public:
 	}
 	void PrintAt(float x, float y, float n, std::string_view);
 
-	vec4 fg_color;
-	vec4 bg_color;
+	float4 fg_color;
+	float4 bg_color;
 
 private:
 	float _tx;

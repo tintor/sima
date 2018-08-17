@@ -36,10 +36,10 @@ struct Body {
     double mass;
     //dmat3 inertial_tensor;
     // mutable
-	dvec3 position;
-	dvec4 orientation;
-	dvec3 velocity;
-	dvec3 angular_velocity;
+	double3 position;
+	double4 orientation;
+	double3 velocity;
+	double3 angular_velocity;
 };
 
 class Joint {
@@ -50,30 +50,30 @@ class Joint {
 };
 
 class BallJoint {
-	dvec3 pa, pb;
+	double3 pa, pb;
 };
 
 class HingeJoint {
-	dvec3 pa, da, pb, db;
-	dvec3 ra, rb; // just for computing relative angle (must be unit and normal to da / db)
+	double3 pa, da, pb, db;
+	double3 ra, rb; // just for computing relative angle (must be unit and normal to da / db)
 };
 
 // Open chain articulated only
 // TODO describe children with relative coordinates, but allow computation of absolute ones
 class ArticulatedBody {
 	Body m_body;
-	std::vector<std::pair<ArticulatedBody, Joint>> m_children;
+	vector<pair<ArticulatedBody, Joint>> m_children;
 };
 
 // TODO update to use custom integrator
 void update(Body& body, double dt) {
-    dvec3 bias_velocity, bias_angular_velocity;
+    double3 bias_velocity, bias_angular_velocity;
     body.position += dt * (body.velocity + bias_velocity);
     // dq/dt = w*q/2  =>  q' = q + (w*q)*(dt/2)
     //body.angular_velocity * body.orientation;
     //body.orientation = glm::normalize(body.orientation + (body.angular_velocity + bias_angular_velocity) * body.orientation * (dt / 2));
 
-    dvec3 torque, force;
+    double3 torque, force;
     body.velocity += force * (dt / body.mass);
     //auto invI = glm::inverse(body.inertial_tensor);
     //auto I = body.inertial_tensor;
@@ -86,12 +86,12 @@ void update(Body& body, double dt) {
 Text* text = nullptr;
 
 struct FpvCamera {
-    vec3 position;
-    vec4 orientation;
+    double3 position;
+    double4 orientation;
 };
 FpvCamera camera;
 
-vec3 g_position{0,0,0};
+double3 g_position{0,0,0};
 float g_yaw=0, g_pitch=0;
 //glm::mat4 g_orientation;
 
@@ -138,7 +138,7 @@ void model_init(GLFWwindow* window) {
 	return Result;
 }*/
 
-/*mat44 rotate(mat44 const& m, float angle, vec3 const& v) {
+/*mat44 rotate(mat44 const& m, float angle, double3 const& v) {
 	T const a = angle;
 	T const c = cos(a);
 	T const s = sin(a);
@@ -175,26 +175,26 @@ void render_init() {
 	glViewport(0, 0, render_width, render_height);
 
 	/*::perspective = glm::perspective<float>(M_PI / 180 * 90, render_width / (float)render_height, 0.03, 1000);
-	perspective_rotation = glm::rotate<float>(::perspective, 0, glm::vec3(1, 0, 0));
-	perspective_rotation = glm::rotate<float>(perspective_rotation, 0, glm::vec3(0, 1, 0));
-	perspective_rotation = glm::rotate<float>(perspective_rotation, float(M_PI / 2), glm::vec3(-1, 0, 0));*/
+	perspective_rotation = glm::rotate<float>(::perspective, 0, glm::double3(1, 0, 0));
+	perspective_rotation = glm::rotate<float>(perspective_rotation, 0, glm::double3(0, 1, 0));
+	perspective_rotation = glm::rotate<float>(perspective_rotation, float(M_PI / 2), glm::double3(-1, 0, 0));*/
 
 	text = new Text;
-	text->fg_color = vec4{1, 1, 1, 1};
-	text->bg_color = vec4{0, 0, 0, 1};
+	text->fg_color = float4{1, 1, 1, 1};
+	text->bg_color = float4{0, 0, 0, 1};
 }
 
 struct Triangle {
-    vec3 vertex[3];
-    vec3 color;
+    double3 vertex[3];
+    double3 color;
 };
 
 struct Line {
-    vec3 vectex[2];
-    vec3 color;
+    double3 vectex[2];
+    double3 color;
 };
 
-void render_line(vec3 vertex_a, vec3 vertex_b, vec3 color) {
+void render_line(double3 vertex_a, double3 vertex_b, double3 color) {
 
 }
 
@@ -205,9 +205,9 @@ void render_world(const glm::mat4& matrix) {
     // TODO floor checkerbox
     // TODO two boxes in space
     //glDisable(GL_DEPTH_TEST);
-    render_line(vec3{0,0,0}, vec3{3,0,0}, vec3{1,1,1});
-    render_line(vec3{0,0,0}, vec3{0,2,0}, vec3{1,1,1});
-    render_line(vec3{0,0,0}, vec3{0,0,1}, vec3{1,1,1});
+    render_line(double3{0,0,0}, double3{3,0,0}, double3{1,1,1});
+    render_line(double3{0,0,0}, double3{0,2,0}, double3{1,1,1});
+    render_line(double3{0,0,0}, double3{0,0,1}, double3{1,1,1});
 }
 #endif
 
@@ -225,7 +225,7 @@ void turn(float dx, float dy) {
         g_pitch += dy;
         if (g_pitch > M_PI / 2 * 0.999) g_pitch = M_PI / 2 * 0.999;
         if (g_pitch < -M_PI / 2 * 0.999) g_pitch = -M_PI / 2 * 0.999;
-        //g_orientation = glm::rotate(glm::rotate(glm::mat4(), -g_yaw, glm::vec3(0, 0, 1)), -g_pitch, glm::vec3(1, 0, 0));
+        //g_orientation = glm::rotate(glm::rotate(glm::mat4(), -g_yaw, glm::double3(0, 0, 1)), -g_pitch, glm::double3(1, 0, 0));
 }
 
 void model_orientation(GLFWwindow* window) {
@@ -240,9 +240,9 @@ void model_orientation(GLFWwindow* window) {
                 turn((cursor_x - last_cursor_x) / 150, (cursor_y - last_cursor_y) / 150);
                 last_cursor_x = cursor_x;
                 last_cursor_y = cursor_y;
-                //perspective_rotation = glm::rotate(::perspective, g_pitch, glm::vec3(1, 0, 0));
-                //perspective_rotation = glm::rotate(perspective_rotation, g_yaw, glm::vec3(0, 1, 0));
-                //perspective_rotation = glm::rotate(perspective_rotation, float(M_PI / 2), glm::vec3(-1, 0, 0));
+                //perspective_rotation = glm::rotate(::perspective, g_pitch, glm::double3(1, 0, 0));
+                //perspective_rotation = glm::rotate(perspective_rotation, g_yaw, glm::double3(0, 1, 0));
+                //perspective_rotation = glm::rotate(perspective_rotation, float(M_PI / 2), glm::double3(-1, 0, 0));
         }
 }
 
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
 		//model_frame(window, frame_ms);
 		//glm::mat4 matrix = glm::translate(perspective_rotation, g_position);
 		//Frustum frustum(matrix);
-		//g_player.cpos = glm::ivec3(glm::floor(g_player.position)) >> ChunkSizeBits;*/
+		//g_player.cpos = glm::idouble3(glm::floor(g_player.position)) >> ChunkSizeBits;*/
 
         //render_world(matrix);
 		render_gui();

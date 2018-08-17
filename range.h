@@ -65,7 +65,7 @@ template <typename T> struct range {
 };
 
 template <typename T>
-void format_e(std::string& s, std::string_view spec, range<T> v) {
+void format_e(string& s, string_view spec, range<T> v) {
 	using namespace std::literals;
 	s += "range("sv;
 	if (*v.begin() != 0 || std::abs(v.inc()) != 1) {

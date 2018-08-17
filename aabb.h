@@ -1,9 +1,9 @@
 #pragma once
 #include "range.h"
 #include "triangle.h"
-#include "array_ptr.h"
+#include "span.h"
 
-std::pair<int4, int4> compute_aabb(array_cptr<int4> vectors);
+pair<int4, int4> compute_aabb(span<const int4> vectors);
 
 template<typename Vec>
 struct aabb {
@@ -12,8 +12,6 @@ struct aabb {
 	aabb() {
 		reset();
 	}
-
-	auto range_dim() const { return range(vec_info<Vec>::dim()); }
 
 	explicit aabb(Vec p) {
 		min = max = p;
@@ -30,31 +28,24 @@ struct aabb {
 		add(c);
 	}
 
-	explicit aabb(const segment<Vec>& p) {
+	explicit aabb(segment<Vec> p) {
 		min = max = p.a;
 		add(p.b);
 	}
 
-	explicit aabb(const triangle<Vec>& p) {
+	explicit aabb(triangle<Vec> p) {
 		min = max = p.a;
 		add(p.b);
 		add(p.c);
 	}
 
-	explicit aabb(array_cptr<ivec3> p) {
+	explicit aabb(span<const Vec> p) {
 		reset();
 		for (auto v : p)
 			add(v);
 	}
 
-	explicit aabb(array_cptr<ivec4> p) {
-		auto q = compute_aabb(p);
-		min = q.first;
-		max = q.second;
-	}
-
-private:
-	void ctor(array_cptr<triangle<Vec>> ap) {
+	explicit aabb(span<const triangle<Vec>> ap) {
 		reset();
 		for (auto p : ap) {
 			add(p.a);
@@ -63,33 +54,18 @@ private:
 		}
 	}
 
-public:
-	explicit aabb(array_cptr<triangle<ivec3>> ap) { ctor(ap); }
-
-	explicit aabb(array_cptr<triangle<ivec4>> ap) {
-		static_assert(sizeof(triangle<ivec4>) == 3 * sizeof(ivec4));
-		auto q = compute_aabb(array_cptr(&ap.begin()->a, &ap.end()->a));
-		min = q.first;
-		max = q.second;
-	}
-
-	bool operator==(const aabb<Vec>& v) const {
-		return equal(min, v.min) && equal(max, v.max);
-	}
-
-	bool operator!=(const aabb<Vec>& v) const {
-		return !operator==(v);
-	}
+	bool operator==(aabb v) const { return equal(min, v.min) && equal(max, v.max); }
+	bool operator!=(aabb v) const { return !operator==(v); }
 
 	void reset() {
-		for (auto i : range_dim()) {
-			min[i] = std::numeric_limits<typename vec_info<Vec>::Type>::max();
-			max[i] = std::numeric_limits<typename vec_info<Vec>::Type>::min();
+		for (auto i : range(3)) {
+			min[i] = std::numeric_limits<double>::max();
+			max[i] = std::numeric_limits<double>::min();
 		}
 	}
 
 	void add(Vec v) {
-		for (auto i : range_dim()) {
+		for (auto i : range(3)) {
 			if (v[i] < min[i])
 				min[i] = v[i];
 			if (v[i] > max[i])
@@ -98,7 +74,7 @@ public:
 	}
 
 	bool valid() const {
-		for (auto i : range_dim())
+		for (auto i : range(3))
 			if (min[i] > max[i])
 				return false;
 		return true;
@@ -114,16 +90,8 @@ public:
 		return (min + max) / 2;
 	}
 
-	// strictly inside!
-	bool inside(ivec3 e) const {
-		for (auto i : range_dim())
-			if (e[i] <= min[i] || e[i] >= max[i])
-				return false;
-		return true;
-	}
-
-	bool intersects(ivec3 e) const {
-		for (auto i : range_dim())
+	bool intersects(Vec e) const {
+		for (auto i : range(3))
 			if (e[i] < min[i] || e[i] > max[i])
 				return false;
 		return true;
@@ -134,31 +102,59 @@ public:
 		return bmin < amax && amin < bmax;
 	}
 
-	template<typename T>
-	static bool intersects(T amin, T amax, T bmin, T bmax) {
-		return bmin <= amax && amin <= bmax;
-	}
-
-	bool overlaps(const aabb& e) const {
-		for (auto i : range_dim())
+	bool overlaps(aabb e) const {
+		for (auto i : range(3))
 			if (!overlaps(min[i], max[i], e.min[i], e.max[i]))
 				return false;
 		return true;
 	}
 
-	bool intersects(const aabb& e) const {
-		for (auto i : range_dim())
+	template<typename T>
+	static bool intersects(T amin, T amax, T bmin, T bmax) {
+		return bmin <= amax && amin <= bmax;
+	}
+
+	bool intersects(aabb e) const {
+		for (auto i : range(3))
 			if (!intersects(min[i], max[i], e.min[i], e.max[i]))
 				return false;
 		return true;
 	}
 };
 
-template<typename T>
-void format_e(std::string& s, std::string_view spec, const aabb<T>& box) {
+// double only!
+using aabb2 = aabb<double2>;
+using aabb3 = aabb<double3>;
+
+template<typename Vec>
+void format_e(string& s, string_view spec, aabb<Vec> box) {
 	s += "aabb(";
 	format_e(s, "", box.min);
 	s += ", ";
 	format_e(s, "", box.max);
 	s += ')';
+}
+
+// uniform inside a box (not very efficient)
+template<typename RND>
+double2 uniform2(RND& rnd, aabb2 box) {
+	auto s = box.size();
+	double m = max(s.x, s.y);
+	while (true) {
+		double2 v = uniform2(rnd, 0, m) + box.min;
+		if (box.intersects(v))
+			return v;
+	}
+}
+
+// uniform inside a box (not very efficient)
+template<typename RND>
+double3 uniform3(RND& rnd, aabb3 box) {
+	auto s = box.size();
+	double m = max(s.x, s.y, s.z);
+	while (true) {
+		double3 v = uniform3(rnd, 0, m) + box.min;
+		if (box.intersects(v))
+			return v;
+	}
 }

@@ -8,13 +8,13 @@
 
 TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
     try {
-        imesh3 mm = load_stl("models/bunny.stl", 1000);
-        std::vector<ivec3> vertices;
-        for (const itriangle3& f : mm)
+        mesh3 mm = load_stl("models/bunny.stl");
+        vector<double3> vertices;
+        for (const triangle3& f : mm)
             for (auto i : range(3))
                 vertices.push_back(f[i]);
 		print("hull...\n");
-        imesh3 ch = convex_hull(vertices);
+        mesh3 ch = convex_hull(vertices);
         print("IsValid %s\n", static_cast<int>(is_valid(mm)));
         print("Volume %s\n", volume(mm));
         print("CenterOfMass %s\n", center_of_mass(mm));

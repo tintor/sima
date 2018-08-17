@@ -1,21 +1,20 @@
 #include "properties.h"
 #include "aabb.h"
 #include "scalar.h"
-#include "ivec.h"
 #include "primitives.h"
 
-double triangle_volume(ivec3 a, ivec3 b, ivec3 c) {
+double triangle_volume(double3 a, double3 b, double3 c) {
 	double z = a.z;
 	z += b.z;
 	z += c.z;
 	double s;
-	s = ((double)a.y + b.y) * ((double)a.x - b.x);
-	s += ((double)b.y + c.y) * ((double)b.x - c.x);
-	s += ((double)c.y + a.y) * ((double)c.x - a.x);
+	s = (a.y + b.y) * (a.x - b.x);
+	s += (b.y + c.y) * (b.x - c.x);
+	s += (c.y + a.y) * (c.x - a.x);
 	return s * z;
 }
 
-double signed_volume(ivec3 a, ivec3 b, ivec3 c, ivec3 d) {
+double signed_volume(double3 a, double3 b, double3 c, double3 d) {
 	double v;
 	v = triangle_volume(a, b, c);
 	v += triangle_volume(d, b, a);
@@ -24,29 +23,26 @@ double signed_volume(ivec3 a, ivec3 b, ivec3 c, ivec3 d) {
 	return v / 6.0;
 }
 
-double signed_volume(const imesh3& mesh) {
+double signed_volume(const mesh3& mesh) {
 	double v = 0;
-	for (const itriangle3& f : mesh)
+	for (const triangle3& f : mesh)
 		v += triangle_volume(f.a, f.b, f.c);
 	return v / 6.0;
 }
 
-double volume(const imesh3& mesh) {
+double volume(const mesh3& mesh) {
 	return std::abs(signed_volume(mesh));
 }
 
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
-dvec3 center_of_mass(const imesh3& mesh) {
-	dvec3 P = {0, 0, 0};
+double3 center_of_mass(const mesh3& mesh) {
+	double3 P = {0, 0, 0};
 	double V = 0;
-	for (const itriangle3& f : mesh) {
-		dvec3 a = vconvert(f.a, double3);
-		dvec3 b = vconvert(f.b, double3);
-	   	dvec3 c = vconvert(f.c, double3);
-		double v = dot(a, cross(b, c));
-		P += (a + b + c) * v;
+	for (const triangle3& f : mesh) {
+		double v = dot(f.a, cross(f.b, f.c));
+		P += (f.a + f.b + f.c) * v;
 		V += v;
 	}
 	return P / (V * 4);
@@ -72,12 +68,12 @@ dmat3 moment_of_inertia(const imesh3& mesh) {
 	return full_mat3(C[0][0] + C[1][1] + C[2][2]) - C; // C -> I
 }*/
 
-bool is_aabb(const imesh3& mesh) {
-	aabb<ivec3> box(mesh);
+bool is_aabb(const mesh3& mesh) {
+	aabb3 box(mesh);
 
 	// All vertices must be made from extreme coordinates
 	for (auto f : mesh)
-		for (ivec3 v : f)
+		for (double3 v : f)
 			if (v.x != box.min[0] && v.x != box.max[0]
 			 && v.y != box.min[1] && v.y != box.max[1]
 			 && v.z != box.min[2] && v.z != box.max[2])
