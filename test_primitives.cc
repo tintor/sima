@@ -117,17 +117,3 @@ TEST_CASE("distance(triangle3, triangle3)") {
     CHECK(distance(triangle3(vec3(0,0,0), vec3(2,0,0), vec3(0,2,0)), triangle3(vec3(0,0,1), vec3(2,0,1), vec3(0,2,1))) == 1);
 }
 
-TEST_CASE("merge_spheres()") {
-	std::default_random_engine rnd;
-	double e = 1;
-	while (e > 1e-10) {
-		sphere a = make_sphere(uniform3(rnd, -1, 1) * 1000.0, 1);
-		sphere b = make_sphere(center(a) + e * uniform_dir3(rnd), 1);
-		sphere c = merge_spheres(a, b);
-		REQUIRE(radius(c) >= radius(a));
-		REQUIRE(radius(c) >= radius(b));
-		REQUIRE(squared(center(c) - center(a)) <= squared(radius(c) - radius(a)) * 1.01);
-		REQUIRE(squared(center(c) - center(b)) <= squared(radius(c) - radius(b)) * 1.01);
-		e *= 0.9;
-	}
-}
