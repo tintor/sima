@@ -27,7 +27,7 @@ ulong hash(T a, Args... args) {
 namespace std {
 
 template <typename A, typename B> struct hash<pair<A, B>> {
-	size_t operator()(const pair<A, B>& x) const { return hash(x.first, x.second); }
+	size_t operator()(const pair<A, B>& x) const { return ::hash(x.first, x.second); }
 };
 
 }
