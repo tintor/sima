@@ -7,12 +7,13 @@
 #include "exception.h"
 
 bool is_convex(const mesh3& mesh) {
-	// TODO set might be unncessary complication
 	// Extract all unique vertices
-	unordered_set<double3, std::hash<double3>, equal_t<double3>> vertices;
+	aligned_vector<point3> vertices;
+	vertices.reserve(mesh.size() * 3);
 	for (auto face : mesh)
 		for (auto vertex : face)
-			vertices.insert(vertex);
+			vertices.push_back(point3(vertex));
+	remove_dups(vertices);
 	// Check if every face has all vertices on its negative side
 	for (auto face : mesh) {
 		double3 n = compute_normal(face);

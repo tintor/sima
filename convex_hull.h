@@ -13,8 +13,3 @@ inline mesh3 convex_hull(span<const double3> points) {
 	convex_hull(points, /*out*/hull);
 	return hull;
 }
-
-inline mesh3 convex_hull(const vector<double3>& points) {
-	return convex_hull(span<const double3>(points.data(), points.size()));
-}
-
