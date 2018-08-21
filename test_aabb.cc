@@ -9,8 +9,9 @@ TEST_CASE("aabb3 basic", "[aabb]") {
 	REQUIRE(equal(box.min, double3{2, -1, 0}));
 	REQUIRE(equal(box.max, double3{4, 7, 3}));
 	REQUIRE(equal(box.size(), double3{2, 8, 3}));
-	REQUIRE(equal(box.center(), double3{3, 3, 1}));
-	REQUIRE(format("%s", box) == "aabb(2 -1 0, 4 7 3)");
+	REQUIRE(equal(box.center(), double3{3, 3, 1.5}));
+	REQUIRE(format("%.1lf", box) == "aabb(2.0 -1.0 0.0, 4.0 7.0 3.0)");
+	REQUIRE(format("%.0lf", box) == "aabb(2 -1 0, 4 7 3)");
 }
 
 TEST_CASE("aabb::operator==", "[aabb]") {

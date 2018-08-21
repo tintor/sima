@@ -58,39 +58,32 @@ struct aabb {
 	bool operator!=(aabb v) const { return !operator==(v); }
 
 	void reset() {
-		for (auto i : range(3)) {
-			min[i] = std::numeric_limits<double>::max();
-			max[i] = std::numeric_limits<double>::min();
-		}
+		broadcast(min, std::numeric_limits<double>::max());
+		broadcast(max, std::numeric_limits<double>::min());
 	}
 
 	void add(Vec v) {
-		for (auto i : range(3)) {
-			if (v[i] < min[i])
-				min[i] = v[i];
-			if (v[i] > max[i])
-				max[i] = v[i];
-		}
+		min = vmin(v, min);
+		max = vmax(v, max);
 	}
 
 	bool valid() const {
-		for (auto i : range(3))
-			if (min[i] > max[i])
-				return false;
-		return true;
+		return all(min <= max);
 	}
 
-	Vec size() const {
+	auto size() const {
 		assert(valid());
 		return max - min;
 	}
 
 	Vec center() const {
 		assert(valid());
-		return (min + max) / 2;
+		// TODO ooptimize
+		return min + (max - min) / 2;
 	}
 
 	bool intersects(Vec e) const {
+		// TODO vector intrinsics
 		for (auto i : range(3))
 			if (e[i] < min[i] || e[i] > max[i])
 				return false;
@@ -103,6 +96,7 @@ struct aabb {
 	}
 
 	bool overlaps(aabb e) const {
+		// TODO vector intrinsics
 		for (auto i : range(3))
 			if (!overlaps(min[i], max[i], e.min[i], e.max[i]))
 				return false;
@@ -115,6 +109,7 @@ struct aabb {
 	}
 
 	bool intersects(aabb e) const {
+		// TODO vector intrinsics
 		for (auto i : range(3))
 			if (!intersects(min[i], max[i], e.min[i], e.max[i]))
 				return false;
@@ -125,13 +120,15 @@ struct aabb {
 // double only!
 using aabb2 = aabb<double2>;
 using aabb3 = aabb<double3>;
+using aabb4 = aabb<double4>;
+using aabb3p = aabb<point3>;
 
 template<typename Vec>
 void format_e(string& s, string_view spec, aabb<Vec> box) {
 	s += "aabb(";
-	format_e(s, "", box.min);
+	format_e(s, spec, box.min);
 	s += ", ";
-	format_e(s, "", box.max);
+	format_e(s, spec, box.max);
 	s += ')';
 }
 
