@@ -49,6 +49,7 @@ set(test
 	test_format.cc
 	test_range.cc
 	test_map.cc
+	test_sphere.cc
 	test_zip.cc)
 
 add_executable(a.sima main.cc ${prod})
