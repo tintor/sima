@@ -3,7 +3,7 @@
 #include "range.h"
 #include "scalar.h"
 #include "edges.h"
-#include <vector>
+#include "align_alloc.h"
 
 template<typename Vec>
 struct triangle {
@@ -41,7 +41,7 @@ void format_e(string& s, string_view spec, triangle<Vec> v) {
 // TODO move polygon and mesh stuff outside
 
 using polygon2 = vector<double2>;
-using polygon3 = vector<double3>;
+using polygon3 = aligned_vector<double3>;
 
 // TODO remove
 template<typename T>
@@ -76,8 +76,9 @@ inline bool operator!=(const polygon3& a, const polygon3& b) {
 	return !operator==(a, b);
 }
 
+// Triangle meshes
 using mesh2 = vector<triangle2>;
-using mesh3 = vector<triangle3>;
+using mesh3 = aligned_vector<triangle3>;
 
 inline string wkt(const polygon2& poly) {
 	string s;
