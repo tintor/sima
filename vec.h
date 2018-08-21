@@ -54,16 +54,29 @@ struct equal_t {
 	}
 };
 
+// SIMD helpers
+inline double3 d3(double4 v) { return v.xyz; }
+inline double4 d4(double3 v) { return vshuffle(v, v, 0, 1, 2, -1); }
 
 inline int8 vmin(int8 a, int8 b) { return _mm256_min_epi32(a, b); }
 inline int4 vmin(int4 a, int4 b) { return _mm_min_epi32(a, b); }
+
 inline float8 vmin(float8 a, float8 b) { return _mm256_min_ps(a, b); }
 inline float4 vmin(float4 a, float4 b) { return _mm_min_ps(a, b); }
 
+inline double2 vmin(double2 a, double2 b) { return _mm_min_pd(a, b); }
+inline double3 vmin(double3 a, double3 b) { return d3(_mm256_min_pd(d4(a), d4(b))); }
+inline double4 vmin(double4 a, double4 b) { return _mm256_min_pd(a, b); }
+
 inline int8 vmax(int8 a, int8 b) { return _mm256_max_epi32(a, b); }
 inline int4 vmax(int4 a, int4 b) { return _mm_max_epi32(a, b); }
+
 inline float8 vmax(float8 a, float8 b) { return _mm256_max_ps(a, b); }
 inline float4 vmax(float4 a, float4 b) { return _mm_max_ps(a, b); }
+
+inline double2 vmax(double2 a, double2 b) { return _mm_max_pd(a, b); }
+inline double3 vmax(double3 a, double3 b) { return d3(_mm256_max_pd(d4(a), d4(b))); }
+inline double4 vmax(double4 a, double4 b) { return _mm256_max_pd(a, b); }
 
 inline int hmin(int8 a) {
      auto b = vmin(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
@@ -99,3 +112,12 @@ inline float4 as_float(int4 a) { return _mm_cvtepi32_ps(a); }
 // Note: destination must be one of the arguments, otherwise it will not compile to 1 instruction
 inline float4 fma(float4 a, float4 b, float4 c) { return _mm_fmadd_ps(a, b, c); }
 inline float8 fma(float8 a, float8 b, float8 c) { return _mm256_fmadd_ps(a, b, c); }
+inline double4 fma(double4 a, double4 b, double4 c) { return _mm256_fmadd_pd(a, b, c); }
+
+inline bool all(int2 v) { return v[0] && v[1]; }
+inline bool all(int3 v) { return v[0] && v[1] && v[2]; }
+inline bool all(int4 v) { return v[0] && v[1] && v[2] && v[3]; }
+
+inline bool any(int2 v) { return v[0] || v[1]; }
+inline bool any(int3 v) { return v[0] || v[1] || v[2]; }
+inline bool any(int4 v) { return v[0] || v[1] || v[2] || v[3]; }
