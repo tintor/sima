@@ -27,9 +27,31 @@ public:
 
 	template<size_t N>
 	constexpr span(const std::array<M, N>& v) : span(v.data(), v.data() + v.size()) { }
-	constexpr span(const std::vector<M>& v) : span(v.data(), v.data() + v.size()) { }
+
+	template<size_t N>
+	constexpr span(std::array<T, N>& v) : span(v.data(), v.data() + v.size()) { }
+
+	template<typename A>
+	constexpr span(const std::vector<M, A>& v) : span(v.data(), v.data() + v.size()) { }
+
+	template<typename A>
+	constexpr span(std::vector<T, A>& v) : span(v.data(), v.data() + v.size()) { }
+
+	constexpr span(const std::initializer_list<M>& v) : span(v.begin(), v.end()) { }
 
 	constexpr T& operator[](size_t idx) const { assert(idx < size()); return _data[idx * stride()]; }
+
+	constexpr bool operator==(span v) const noexcept {
+		if (size() != v.size())
+			return false;
+		for (size_t i = 0; i < size(); i++)
+			if (operator[](i) != v[i])
+				return false;
+		return true;
+	}
+	constexpr bool operator!=(span v) const noexcept {
+		return !operator==(v);
+	}
 
 	constexpr T* data() const { return _data; }
 	constexpr size_t size() const { return _size; }
@@ -54,6 +76,9 @@ public:
 		return span(_data + begin * stride(), new_size, stride() * new_stride);
 	}
 
+	constexpr span pop_front() const { return subspan(1, size() - 1); }
+	constexpr span pop_back() const { return subspan(0, size() - 1); }
+
 	constexpr span first(size_t count) const { return subspan(0, count); }
 	constexpr span last(size_t count) const { assert(count <= size()); return subspan(size() - count, count); }
 	constexpr span reverse() const { return subspan(size() - 1, size(), -stride()); }
@@ -63,10 +88,3 @@ private:
 	uint _size;
 	int _stride;
 };
-
-/*template<typename T, size_t N>
-span<const T> Span(const std::array<T, N>& v) { return {v.data(), v.data() + N}; }
-
-template<typename T>
-span<const T> Span(const std::vector<T>& v) { return {v.data(), v.data() + v.size()}; }
-*/
