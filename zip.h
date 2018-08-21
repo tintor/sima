@@ -1,10 +1,11 @@
 #pragma once
 #include <vector>
+#include "span.h"
 
 template<typename A, typename B>
 class zip {
 public:
-	zip(std::vector<A>& a, std::vector<B>& b) {
+	zip(span<A> a, span<B> b) {
 		_a = a.data();
 		_b = b.data();
 		_n = std::min(a.size(), b.size());
@@ -30,7 +31,7 @@ private:
 template<typename A, typename B>
 class czip {
 public:
-	czip(const std::vector<A>& a, const std::vector<B>& b) {
+	czip(span<const A> a, span<const B> b) {
 		_a = a.data();
 		_b = b.data();
 		_n = std::min(a.size(), b.size());
