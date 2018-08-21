@@ -31,7 +31,7 @@ bool less(double3 a, double3 b) {
 	return a.z < b.z;
 }
 
-bool less(const vector<double3>& v, size_t a, size_t b) {
+bool less(span<const double3> v, size_t a, size_t b) {
 	for (auto i : range(v.size())) {
 		double3 aa = v[(a + i) % v.size()];
 		double3 bb = v[(b + i) % v.size()];
@@ -41,7 +41,7 @@ bool less(const vector<double3>& v, size_t a, size_t b) {
 	return false;
 };
 
-bool less(const vector<double3>& a, const vector<double3>& b) {
+bool less(span<const double3> a, span<const double3> b) {
 	if (a.size() != b.size())
 		return a.size() < b.size();
 	for (auto [aa, bb] : czip(a, b))
@@ -50,20 +50,20 @@ bool less(const vector<double3>& a, const vector<double3>& b) {
 	return false;
 };
 
-static vector<double3> normalize(const vector<double3>& v) {
+static aligned_vector<double3> normalize(span<const double3> v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
 		if (less(v, i, m))
 			m = i;
-	vector<double3> w;
+	aligned_vector<double3> w;
 	w.resize(n);
 	for (auto i : range(n))
 		w[i] = v[(i + m) % n];
 	return w;
 }
 
-static poly_mesh3 hull(vector<double3> a) {
+static poly_mesh3 hull(span<const double3> a) {
 	mesh3 m = convex_hull(a);
 	// convert mesh3 to ipoly3 with triangles
 	poly_mesh3 p;
@@ -80,7 +80,7 @@ static poly_mesh3 hull(vector<double3> a) {
 	return p;
 }
 
-static void rotate90_flip_and_shuffle(vector<double3> v) {
+/*static void rotate90_flip_and_shuffle(vector<double3> v) {
 	std::default_random_engine rnd;
 	auto m = hull(v);
 	for (auto i : range(100)) {
@@ -92,27 +92,27 @@ static void rotate90_flip_and_shuffle(vector<double3> v) {
 		for (size_t i = 0; i < m.size(); i++)
 			REQUIRE(m[i] == p[i]);
 	}
-}
+}*/
 
-TEST_CASE("convex_hull trivial") {
+TEST_CASE("convex_hull trivial", "[convex_hull]") {
 	double3 a = {0, 0, 0};
 	double3 b = {1, 0, 0};
 	double3 c = {0, 1, 0};
 	double3 d = {0, 0, 1};
-	REQUIRE(convex_hull(vector<double3>{}) == mesh3());
-	REQUIRE(convex_hull(vector{a}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, c}) == mesh3());
+	REQUIRE(convex_hull({}).empty());
+	REQUIRE(convex_hull({a}) == mesh3());
+	REQUIRE(convex_hull({a, b}) == mesh3());
+	REQUIRE(convex_hull({a, b, c}) == mesh3());
 
-	REQUIRE(convex_hull(vector{a, a, a, a}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, a, b}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, c, a}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, c, b}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, c, c}) == mesh3());
-	REQUIRE(convex_hull(vector{a, b, c, d}).size() == 4);
+	REQUIRE(convex_hull({a, a, a, a}) == mesh3());
+	REQUIRE(convex_hull({a, b, a, b}) == mesh3());
+	REQUIRE(convex_hull({a, b, c, a}) == mesh3());
+	REQUIRE(convex_hull({a, b, c, b}) == mesh3());
+	REQUIRE(convex_hull({a, b, c, c}) == mesh3());
+	REQUIRE(convex_hull({a, b, c, d}).size() == 4);
 }
 
-TEST_CASE("convex_hull simple") {
+TEST_CASE("convex_hull simple", "[convex_hull]") {
 	double3 a = {0, 0, 0};
 	double3 b = {1000, 0, 0};
 	double3 c = {0, 1000, 0};
@@ -129,10 +129,10 @@ TEST_CASE("convex_hull simple") {
 	REQUIRE(hull({a, b, c, d, double3{-1, 0, 0}}).size() == 4);
 }
 
-TEST_CASE("convex_hull random points on cube") {
+TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 	std::default_random_engine rnd;
 	for (int vertices = 4; vertices <= 200; vertices++) {
-		vector<double3> V(vertices);
+		aligned_vector<double3> V(vertices);
 		for (auto i : range(vertices))
 			V[i] = uniform3(rnd, -100, 100);
 		mesh3 m = convex_hull(V);
@@ -141,7 +141,7 @@ TEST_CASE("convex_hull random points on cube") {
 	}
 }
 
-TEST_CASE("convex_hull cube") {
+TEST_CASE("convex_hull cube", "[convex_hull]") {
 	auto m = generate_box(double3{1, 1, 1});
 	REQUIRE(is_convex(m));
 	REQUIRE(is_aabb(m));
@@ -173,7 +173,7 @@ inline void format_e(string& s, string_view spec, Validity v) {
 	format_s(s, "Validity(%s)", (int)v);
 }
 
-TEST_CASE("convex_hull bunny benchmark", "[!hide]") {
+TEST_CASE("convex_hull bunny benchmark", "[!hide][convex_hull]") {
 		try{
 	std::default_random_engine rnd(0);
 	mesh3 mm = MEASURE(load_stl("models/bunny.stl"));
