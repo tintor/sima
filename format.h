@@ -313,6 +313,27 @@ inline void format_e(string& s, string_view spec, long double v) {
 	s += string_view(buffer.data(), length);
 }
 
+template<typename T>
+void format_e(string& s, string_view spec, complex<T> v) {
+	double re = v.real(), im = v.imag();
+	if (im > 0) {
+		if (re != 0)
+			format_e(s, spec, re);
+		s += '+';
+		format_e(s, spec, im);
+		s += 'i';
+		return;
+	}
+	if (im < 0) {
+		if (re != 0)
+			format_e(s, spec, re);
+		format_e(s, spec, im);
+		s += 'i';
+		return;
+	}
+	format_e(s, spec, re);
+}
+
 #define FORMAT_VEC(T, N) \
 using T##N = T __attribute__((ext_vector_type(N))); \
 inline void format_e(string& s, string_view spec, T##N v) { \

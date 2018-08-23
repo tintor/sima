@@ -3,6 +3,7 @@
 #include <string_view>
 #include <regex>
 #include <utility>
+#include <complex>
 
 #include <vector>
 #include <array>
@@ -18,6 +19,7 @@ using std::regex;
 using std::string;
 using std::string_view;
 using std::pair;
+using std::complex;
 
 using std::vector;
 using std::array;
