@@ -14,3 +14,5 @@ double3 center_of_mass(const mesh3& mesh);
 //dmat3 moment_of_inertia(const imesh3& mesh);
 
 bool is_aabb(const mesh3& mesh);
+
+double3 eigen_vector(span<const double3> points);

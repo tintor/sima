@@ -2,6 +2,7 @@
 #include "aabb.h"
 #include "scalar.h"
 #include "primitives.h"
+#include <Eigen/Dense>
 
 double triangle_volume(double3 a, double3 b, double3 c) {
 	double z = a.z;
@@ -88,4 +89,42 @@ bool is_aabb(const mesh3& mesh) {
 			return false;
 	}
 	return true;
+}
+
+double3 eigen_vector(span<const double3> points) {
+	// compute mean
+	double3 m = {0, 0, 0};
+	for (auto p : points)
+		m += p;
+	m /= points.size();
+
+	// compute matrix
+	double3 ss = {0, 0, 0};
+	double xy = 0, xz = 0, yz = 0;
+	for (auto p : points) {
+		p -= m;
+		ss += p * p;
+		xy += p.x * p.y;
+		xz += p.x * p.z;
+		yz += p.y * p.z;
+	}
+
+	Eigen::MatrixXd a = Eigen::MatrixXd::Zero(3, 3);
+	a(0, 0) = ss.x;
+	a(1, 1) = ss.y;
+	a(2, 2) = ss.z;
+	a(0, 1) = a(1, 0) = xy;
+	a(0, 2) = a(2, 0) = xz;
+	a(1, 2) = a(2, 1) = yz;
+
+	Eigen::EigenSolver<Eigen::MatrixXd> es(a, true);
+	auto values = es.eigenvalues();
+	int i = 0;
+	if (values(1).real() < values(i).real())
+		i = 1;
+	if (values(2).real() < values(i).real())
+		i = 2;
+
+	auto vectors = es.eigenvectors();
+	return {vectors(0, i).real(), vectors(1, i).real(), vectors(2, i).real()};
 }
