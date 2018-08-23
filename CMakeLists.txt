@@ -68,7 +68,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 add_subdirectory(glfw)
 include_directories(glfw/include)
 include_directories(lodepng)
-include_directories(../cpp_template_library)
+include_directories(../libraries)
 
 if (APPLE)
     target_link_libraries(a.sima glfw ${GLFW_LIBRARIES})
