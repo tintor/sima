@@ -38,7 +38,7 @@ double min_eigenvalue(double xx, double yy, double zz, double xy, double xz, dou
 // - all points on one line
 // - all points uniform in cube
 // - all points on sphere surface
-TEST_CASE("eigen", "[eigen]") {
+TEST_CASE("eigen - plane normal", "[eigen]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
 	aligned_vector<double3> points;
@@ -55,6 +55,6 @@ TEST_CASE("eigen", "[eigen]") {
 		}
 		double3 n = eigen_vector(points);
 		double dn = dot(normal, n);
-		REQUIRE(abs(dn) >= 1 - 1e-7);
+		REQUIRE(abs(dn) >= 1 - 1e-6);
 	}
 }
