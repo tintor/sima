@@ -33,6 +33,7 @@ set(test
 	test_aabb.cc
 	test_util.cc
 	test_aabb.cc
+	test_is_valid.cc
 	test_transform.cc
 	test_solid_bsp_tree.cc
 	test_properties.cc
