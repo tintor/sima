@@ -4,19 +4,19 @@
 #include "util.h"
 #include <random>
 
-TEST_CASE("aabb3 basic", "[aabb]") {
-	aabb3 box(double3{2, 7, 0}, double3{4, -1, 3});
-	REQUIRE(equal(box.min, double3{2, -1, 0}));
-	REQUIRE(equal(box.max, double3{4, 7, 3}));
-	REQUIRE(equal(box.size(), double3{2, 8, 3}));
-	REQUIRE(equal(box.center(), double3{3, 3, 1.5}));
-	REQUIRE(format("%.1lf", box) == "aabb(2.0 -1.0 0.0, 4.0 7.0 3.0)");
-	REQUIRE(format("%.0lf", box) == "aabb(2 -1 0, 4 7 3)");
+TEST_CASE("aabb4 basic", "[aabb]") {
+	aabb4 box(double4{2, 7, 0, 0}, double4{4, -1, 3, 0});
+	REQUIRE(equal(box.min, double4{2, -1, 0, 0}));
+	REQUIRE(equal(box.max, double4{4, 7, 3, 0}));
+	REQUIRE(equal(box.size(), double4{2, 8, 3, 0}));
+	REQUIRE(equal(box.center(), double4{3, 3, 1.5, 0}));
+	REQUIRE(format("%.1lf", box) == "aabb(2.0 -1.0 0.0 0.0, 4.0 7.0 3.0 0.0)");
+	REQUIRE(format("%.0lf", box) == "aabb(2 -1 0 0, 4 7 3 0)");
 }
 
 TEST_CASE("aabb::operator==", "[aabb]") {
-	double3 a = {0, 0, 0}, b = {1, 1, 1}, c = {1, 1, 0};
-	aabb3 ab(segment3{a, b}), ac(segment3{a, c});
+	double4 a = {0, 0, 0, 1}, b = {1, 1, 1, 1}, c = {1, 1, 0, 1};
+	aabb4 ab(segment3{a, b}), ac(segment3{a, c});
 	REQUIRE(ab == ab);
 	REQUIRE(!(ab != ab));
 	REQUIRE(!(ab == ac));
@@ -24,14 +24,14 @@ TEST_CASE("aabb::operator==", "[aabb]") {
 }
 
 TEST_CASE("aabb::add()", "[aabb]") {
-	double3 a = {0, 0, 0}, b = {1, 1, 1};
-	aabb3 box(segment3{a, b});
+	double4 a = {0, 0, 0, 1}, b = {1, 1, 1, 1};
+	aabb4 box(segment3{a, b});
 
 	box.add(a);
 	REQUIRE(equal(box.min, a));
 	REQUIRE(equal(box.max, b));
 
-	double3 c = {0, 0, 1}, d = {0, 4, 0};
+	double4 c = {0, 0, 1, 1}, d = {0, 4, 0, 1};
 	box.add(a - c);
 	REQUIRE(equal(box.min, a - c));
 	REQUIRE(equal(box.max, b));

@@ -37,23 +37,24 @@ struct segment {
 };
 
 using segment2 = segment<double2>;
-using segment3 = segment<double3>;
+using segment3 = segment<point3>;
 
 // starts from a, and goes to infinity
 struct ray3 {
-	const double3 unit_dir, origin;
+	const double4 unit_dir;
+   	const point3 origin;
 
 	ray3(const ray3& s) : unit_dir(s.unit_dir), origin(s.origin) { }
 	ray3(segment3 s) : unit_dir(normalize(s.b - s.a)), origin(s.a) { }
-	ray3(double3 a, double3 b) : unit_dir(normalize(b - a)), origin(a) { }
+	ray3(double4 a, double4 b) : unit_dir(normalize(b - a)), origin(a) { }
 
 	bool operator==(ray3 v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
 	bool operator!=(ray3 v) const { return !(operator==(v)); }
 
-	double3 linear(double t) const { return origin + unit_dir * t; }
+	double4 linear(double t) const { return origin + unit_dir * t; }
 
 	// Inverse of linear
-	double param(double3 p) const {
+	double param(double4 p) const {
 		return dot(p - origin, unit_dir);
 	}
 };
@@ -63,9 +64,9 @@ struct ray3 {
 // infinite on both sides unlike segment
 // Note: dir may be flipped after construction!
 struct line3 {
-	const double3 unit_dir, origin;
+	const double4 unit_dir, origin;
 
-	static double3 normalize_dir(double3 d) {
+	static double4 normalize_dir(double4 d) {
 		if (d.x < 0)
 			return -d;
 		if (d.x == 0 && d.y < 0)
@@ -81,15 +82,15 @@ struct line3 {
 		, origin(s.origin - unit_dir * dot(s.origin, unit_dir)) {
 	}
 	line3(segment3 s) : line3(ray3(s)) { }
-	line3(double3 a, double3 b) : line3(segment3{a, b}) { }
+	line3(double4 a, double4 b) : line3(segment3{a, b}) { }
 
 	// TODO(marko) equality condition should check if lines are overlapping
 	bool operator==(line3 v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
 	bool operator!=(line3 v) const { return !(operator==(v)); }
 
-	double3 linear(double t) const { return origin + unit_dir * t; }
+	double4 linear(double t) const { return origin + unit_dir * t; }
 
-	double3 nearest(double3 p) const {
+	double4 nearest(double4 p) const {
 		return origin + unit_dir * dot(p - origin, unit_dir);
 	}
 };

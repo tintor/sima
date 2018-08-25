@@ -23,7 +23,7 @@ inline bool operator==(const poly_mesh3& a, const poly_mesh3& b) {
 
 #include "catch.hpp"
 
-bool less(double3 a, double3 b) {
+bool less(double4 a, double4 b) {
 	if (a.x != b.x)
 		return a.x < b.x;
 	if (a.y != b.y)
@@ -31,17 +31,17 @@ bool less(double3 a, double3 b) {
 	return a.z < b.z;
 }
 
-bool less(span<const double3> v, size_t a, size_t b) {
+bool less(span<const double4> v, size_t a, size_t b) {
 	for (auto i : range(v.size())) {
-		double3 aa = v[(a + i) % v.size()];
-		double3 bb = v[(b + i) % v.size()];
+		double4 aa = v[(a + i) % v.size()];
+		double4 bb = v[(b + i) % v.size()];
 		if (!equal(aa, bb))
 			return less(aa, bb);
 	}
 	return false;
 };
 
-bool less(span<const double3> a, span<const double3> b) {
+bool less(span<const double4> a, span<const double4> b) {
 	if (a.size() != b.size())
 		return a.size() < b.size();
 	for (auto [aa, bb] : czip(a, b))
@@ -50,20 +50,20 @@ bool less(span<const double3> a, span<const double3> b) {
 	return false;
 };
 
-static aligned_vector<double3> normalize(span<const double3> v) {
+static aligned_vector<double4> normalize(span<const double4> v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
 		if (less(v, i, m))
 			m = i;
-	aligned_vector<double3> w;
+	aligned_vector<double4> w;
 	w.resize(n);
 	for (auto i : range(n))
 		w[i] = v[(i + m) % n];
 	return w;
 }
 
-static poly_mesh3 hull(span<const double3> a) {
+static poly_mesh3 hull(span<const double4> a) {
 	mesh3 m = convex_hull(a);
 	// convert mesh3 to ipoly3 with triangles
 	poly_mesh3 p;
@@ -80,7 +80,7 @@ static poly_mesh3 hull(span<const double3> a) {
 	return p;
 }
 
-/*static void rotate90_flip_and_shuffle(vector<double3> v) {
+/*static void rotate90_flip_and_shuffle(vector<double4> v) {
 	std::default_random_engine rnd;
 	auto m = hull(v);
 	for (auto i : range(100)) {
@@ -95,10 +95,10 @@ static poly_mesh3 hull(span<const double3> a) {
 }*/
 
 TEST_CASE("convex_hull trivial", "[convex_hull]") {
-	double3 a = {0, 0, 0};
-	double3 b = {1, 0, 0};
-	double3 c = {0, 1, 0};
-	double3 d = {0, 0, 1};
+	double4 a = {0, 0, 0, 1};
+	double4 b = {1, 0, 0, 1};
+	double4 c = {0, 1, 0, 1};
+	double4 d = {0, 0, 1, 1};
 	REQUIRE(convex_hull({}).empty());
 	REQUIRE(convex_hull({a}) == mesh3());
 	REQUIRE(convex_hull({a, b}) == mesh3());
@@ -113,26 +113,26 @@ TEST_CASE("convex_hull trivial", "[convex_hull]") {
 }
 
 TEST_CASE("convex_hull simple", "[convex_hull]") {
-	double3 a = {0, 0, 0};
-	double3 b = {1000, 0, 0};
-	double3 c = {0, 1000, 0};
-	double3 d = {0, 0, 1000};
+	double4 a = {0, 0, 0, 1};
+	double4 b = {1000, 0, 0, 1};
+	double4 c = {0, 1000, 0, 1};
+	double4 d = {0, 0, 1000, 1};
 
 	auto m = hull({a, b, c, d});
 	REQUIRE(m.size() == 4);
 
-	REQUIRE(hull({a, b, c, d, double3{1, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{0, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{1, 0, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{1, 1, 0}}) == m);
+	REQUIRE(hull({a, b, c, d, double4{1, 1, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double4{0, 1, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double4{1, 0, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double4{1, 1, 0, 1}}) == m);
 
-	REQUIRE(hull({a, b, c, d, double3{-1, 0, 0}}).size() == 4);
+	REQUIRE(hull({a, b, c, d, double4{-1, 0, 0, 1}}).size() == 4);
 }
 
 TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 	std::default_random_engine rnd;
 	for (int vertices = 4; vertices <= 200; vertices++) {
-		aligned_vector<double3> V(vertices);
+		aligned_vector<double4> V(vertices);
 		for (auto i : range(vertices))
 			V[i] = uniform3(rnd, -100, 100);
 		mesh3 m = convex_hull(V);
@@ -142,7 +142,7 @@ TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 }
 
 TEST_CASE("convex_hull cube", "[convex_hull]") {
-	auto m = generate_box(double3{1, 1, 1});
+	auto m = generate_box(1, 1, 1);
 	REQUIRE(is_convex(m));
 	REQUIRE(is_aabb(m));
 }
@@ -177,7 +177,7 @@ TEST_CASE("convex_hull bunny benchmark", "[!hide][convex_hull]") {
 		try{
 	std::default_random_engine rnd(0);
 	mesh3 mm = MEASURE(load_stl("models/bunny.stl"));
-	/*vector<double3> vertices;
+	/*vector<double4> vertices;
 	for (const itriangle3& f : mm)
 		for (auto i : range(3))
 			vertices.push_back(f[i]);

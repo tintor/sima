@@ -4,30 +4,30 @@
 #include "convex_hull.h"
 #include "primitives.h"
 
-mesh3 generate_box(double3 size);
+mesh3 generate_box(double4 size);
 
 inline mesh3 generate_box(double sx, double sy, double sz) {
-	return generate_box(double3{sx, sy, sz});
+	return generate_box(double4{sx, sy, sz, 1});
 }
 
 template<typename RND>
 mesh3 generate_sphere(uint vertices, double radius, RND& rnd) {
 	// generate N random vertices on sphere
-	aligned_vector<double3> V;
+	aligned_vector<double4> V;
 	V.resize(vertices);
 	for (auto i : range(vertices))
 		V[i] = uniform_dir3(rnd);
 
 	// increase the distance between the closest two vertices
 	// (as random clumps vertices together)
-	aligned_vector<double3> delta;
+	aligned_vector<double4> delta;
 	delta.resize(vertices);
 	for (auto e : range(40)) {
-		for (double3& v : delta)
+		for (double4& v : delta)
 			v = {0, 0, 0};
 		for (auto i : range(vertices))
 			for (auto j : range(i)) {
-				double3 d = V[i] - V[j];
+				double4 d = V[i] - V[j];
 				d *= 0.05 / dot(d, d);
 				delta[i] += d;
 				delta[j] -= d;
@@ -36,7 +36,7 @@ mesh3 generate_sphere(uint vertices, double radius, RND& rnd) {
 			V[i] = normalize(V[i] + delta[i]);
 	}
 
-	aligned_vector<double3> I;
+	aligned_vector<double4> I;
 	I.resize(vertices);
 	for (auto i : range(vertices))
 		I[i] = V[i] * radius;
@@ -58,7 +58,7 @@ mesh3 generate_icosahedron(double radius);
 
 mesh3 generate_prism(const polygon2& poly, double zmin, double zmax);
 
-mesh3 generate_pipe(span<const double3> path, double radius, double vertices);
+mesh3 generate_pipe(span<const double4> path, double radius, double vertices);
 
 mesh3 generate_regular_polyhedra2(span<const pair<int, int>> faces);
 mesh3 generate_regular_polyhedra(span<const span<const int>> faces);

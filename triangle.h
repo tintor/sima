@@ -31,7 +31,7 @@ struct triangle {
 };
 
 using triangle2 = triangle<double2>;
-using triangle3 = triangle<double3>;
+using triangle3 = triangle<double4>;
 
 template<typename Vec>
 void format_e(string& s, string_view spec, triangle<Vec> v) {
@@ -41,7 +41,7 @@ void format_e(string& s, string_view spec, triangle<Vec> v) {
 // TODO move polygon and mesh stuff outside
 
 using polygon2 = vector<double2>;
-using polygon3 = aligned_vector<double3>;
+using polygon3 = aligned_vector<double4>;
 
 // TODO remove
 template<typename T>
@@ -135,4 +135,4 @@ inline double area(triangle2 m) {
 	return area(m.a, m.b, m.c);
 }
 
-inline double3 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }
+inline double4 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }

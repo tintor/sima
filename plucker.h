@@ -2,9 +2,9 @@
 #include "format.h"
 
 struct plucker {
-	double3 u, v;
+	double4 u, v;
 
-	static plucker from_line(double3 a, double3 b) {
+	static plucker from_line(double4 a, double4 b) {
 		return plucker{b - a, cross(b, a)};
 	}
 

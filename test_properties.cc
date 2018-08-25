@@ -41,19 +41,20 @@ double min_eigenvalue(double xx, double yy, double zz, double xy, double xz, dou
 TEST_CASE("eigen - plane normal", "[eigen]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	aligned_vector<point3> points;
 	points.resize(20);
 	for (int j = 0; j < 200000; j++) {
-		double3 normal = normalize(uniform3(rnd, -1, 1));
+		double4 normal = uniform_dir3(rnd);
 		for (int i = 0; i < points.size(); i++) {
-			double3 a = uniform3(rnd, -1, 1);
+			point3 a(uniform3(rnd, -1, 1));
+			REQUIRE(a.w == 1);
 			double aa = dot(a, normal);
 			a -= aa * normal;
 			double eps = 1e-4;
 			a += uniform(rnd, -eps, +eps) * normal;
 			points[i] = a;
 		}
-		double3 n = eigen_vector(points);
+		double4 n = eigen_vector(points);
 		double dn = dot(normal, n);
 		REQUIRE(abs(dn) >= 1 - 1e-6);
 	}

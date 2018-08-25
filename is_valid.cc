@@ -47,12 +47,12 @@ bool is_valid(const polygon2& poly) {
 
 // if vertex/edge touch only return false
 bool edge_overlap(triangle3 p, triangle3 q) {
-	if (!aabb3(p).intersects(aabb3(q)))
+	if (!aabb4(p).intersects(aabb4(q)))
 		return false;
 	for (segment3 pe : edgesOf(p))
 		for (segment3 qe : edgesOf(q))
 			if (colinear(pe.a, qe.a, qe.b) && colinear(pe.b, qe.a, qe.b))
-				return aabb3(pe).intersects(aabb3(qe));
+				return aabb4(pe).intersects(aabb4(qe));
 	return false;
 }
 
@@ -72,18 +72,18 @@ bool contains_multiple_components(const mesh3& mesh) {
 
 bool face_cuts_into_other_face(const mesh3& mesh) {
 	for (const triangle3& m : mesh) {
-		auto box = aabb3(m.a);
-		double3 cross_cb = cross(m.c, m.b);
-		double3 cross_ba = cross(m.b, m.a);
-		double3 cross_ac = cross(m.a, m.c);
-		double3 sub_cb = m.c - m.b;
-		double3 sub_ac = m.a - m.c;
+		auto box = aabb4(m.a);
+		double4 cross_cb = cross(m.c, m.b);
+		double4 cross_ba = cross(m.b, m.a);
+		double4 cross_ac = cross(m.a, m.c);
+		double4 sub_cb = m.c - m.b;
+		double4 sub_ac = m.a - m.c;
 
 		for (triangle3 n : mesh)
-			if (aabb3(n).intersects(box))
+			if (aabb4(n).intersects(box))
 				for (segment3 e : edgesOf(n)) {
-					double3 d = e.b - e.a;
-					double3 n = cross(d, e.b);
+					double4 d = e.b - e.a;
+					double4 n = cross(d, e.b);
 					long s = dot(n, sub_cb);
 					long t = dot(n, sub_ac);
 					if (dot(d, cross_cb) > -s && dot(d, cross_ac) > -t && dot(d, cross_ba) > s + t)
@@ -106,17 +106,17 @@ bool contains_open_edge(const mesh3& mesh) {
 
 // assume all three points are colinear
 // assume A and B are on the same side of P
-static bool closer_to(double3 p, double3 a, double3 b) {
+static bool closer_to(double4 p, double4 a, double4 b) {
 	assert(colinear(a, b, p));
-	assert(aabb3(p, a).intersects(aabb3(p, b)));
+	assert(aabb4(p, a).intersects(aabb4(p, b)));
 	return (p.x <= a.x && a.x < b.x) || (p.y <= a.y && a.y < b.y) || (p.z <= a.z && a.z < b.z)
 		|| (p.x >= a.x && a.x > b.x) || (p.y >= a.y && a.y > b.y) || (p.z >= a.z && a.z > b.z);
 }
 
 struct Point {
-	double3 pos;
-	double3 angle_pos;
-	double3 angle_off;
+	double4 pos;
+	double4 angle_pos;
+	double4 angle_off;
 	bool begin;
 	bool ccw; // when looking in the direction of line, is positive side of triangle pointing CCW?
 };
@@ -129,16 +129,16 @@ void format_e(string& s, string_view spec, const Point& p) {
 // angle between planes [line,A] and [line,REF]
 // returns angle in range [-PI, PI]
 // TODO [line] is not used?
-double compute_angle(line3 line, double3 pos, double3 off, double3 dir, double3 ref, double3 cross_dir_ref) {
-	double3 da = off - pos;
-	double3 e = normalize(da - dir * dot(da, dir));
+double compute_angle(line3 line, double4 pos, double4 off, double4 dir, double4 ref, double4 cross_dir_ref) {
+	double4 da = off - pos;
+	double4 e = normalize(da - dir * dot(da, dir));
 	double alpha = angle(e, ref);
 	return dot(e, cross_dir_ref) < 0 ? -alpha : alpha;
 }
 
 struct LineData {
 	vector<Point> points;
-	double3 dir;
+	double4 dir;
 };
 
 bool is_sealed(const mesh3& mesh) {
@@ -146,8 +146,8 @@ bool is_sealed(const mesh3& mesh) {
 	unordered_map<line3, LineData> lines;
 	for (const triangle3& f : mesh)
 		for (int i : range(3)) {
-			double3 a = f[i], b = f[(i + 1) % 3], c = f[(i + 2) % 3];
-			double3 d = normalize(b - a);
+			double4 a = f[i], b = f[(i + 1) % 3], c = f[(i + 2) % 3];
+			double4 d = normalize(b - a);
 			bool flip = d.x < 0 || (d.x == 0 && d.y < 0) || (d.x == 0 && d.y == 0 && d.z < 0);
 			if (flip)
 				d = -d;
@@ -158,7 +158,7 @@ bool is_sealed(const mesh3& mesh) {
 			data.dir = d;
 		}
 	for (auto& [line, data] : lines) {
-		double3 line_a = line.origin;
+		double4 line_a = line.origin;
 		std::sort(data.points.begin(), data.points.end(), [&line_a](const Point& a, const Point& b) {
 			// TODO verify ordering logic!
 			return closer_to(line_a, a.pos, b.pos) || (equal(a.pos, b.pos) && !a.begin && b.begin);
@@ -168,9 +168,9 @@ bool is_sealed(const mesh3& mesh) {
 	// Verify all edges are sealed and no seal is penetrating any other seal
 	for (const auto& [line, data] : lines) {
 		// coordinate system to compute angles in!
-		double3 d = data.dir;
-		double3 r = normalize(any_normal(d));
-		double3 dr = normalize(cross(d, r));
+		double4 d = data.dir;
+		double4 r = normalize(any_normal(d));
+		double4 dr = normalize(cross(d, r));
 
 		auto less = [](pair<double, bool> a, pair<double, bool> b) {
 			return a.first < b.first;
@@ -198,17 +198,17 @@ bool is_sealed(const mesh3& mesh) {
 	return true;
 }
 
-bool are_coplanar_faces_overlapping(const triangle3& p, const triangle3& q, double3 normal) {
+bool are_coplanar_faces_overlapping(triangle3 p, triangle3 q, double4 normal) {
 	for (auto i : range(3)) {
-		double3 ma = p[i];
-		double3 mb = p[(i + 1) % 3];
-		double3 mc = ma + normal;
-		double3 c = p[(i + 2) % 3];
+		double4 ma = p[i];
+		double4 mb = p[(i + 1) % 3];
+		double4 mc = ma + normal;
+		double4 c = p[(i + 2) % 3];
 
-		double3 normal = compute_normal(ma, mb, mc);
-		double pc = dot(vconvert(p.c, double3) - ma, normal); // TODO possible typo bug
+		double4 normal = compute_normal(ma, mb, mc);
+		double pc = dot(p.c - ma, normal); // TODO possible typo bug
 		bool outside = true;
-		for (double3 v : q) {
+		for (double4 v : q) {
 			double qa = dot(v - ma, normal);
 			if ((pc > 0 && qa > 0) || (pc < 0 && qa < 0)) {
 				outside = false;
@@ -224,13 +224,10 @@ bool are_coplanar_faces_overlapping(const triangle3& p, const triangle3& q, doub
 bool contains_overlapping_faces(const mesh3& mesh) {
 	// are there two faces whose intersection is 2d?
 	for (auto i : range(mesh.size())) {
-		const triangle3& p = mesh[i];
-		// TODO compute normal as double
-		double3 n = compute_normal(p.a, p.b, p.c);
+		auto p = mesh[i];
+		double4 n = compute_normal(p.a, p.b, p.c);
 		for (auto j : range(i)) {
-			const triangle3& q = mesh[j];
-			// TODO this can overflow
-			// TODO compute dot product as double, then round it to int
+			auto q = mesh[j];
 			if (dot(q.a - p.a, n) != 0)
 				continue;
 			if (dot(q.b - p.a, n) != 0)
@@ -249,8 +246,8 @@ Validity is_valid(const mesh3& mesh) {
 		return Validity::TooFewFaces;
 
 	// All faces must be valid
-	for (const triangle3& f : mesh)
-		if (colinear(f.a, f.b, f.c))
+	for (auto f : mesh)
+		if (colinear(f[0], f[1], f[2]))
 			return Validity::InvalidFace;
 
 	if (contains_multiple_components(mesh))

@@ -4,7 +4,7 @@
 #include "primitives.h"
 #include <Eigen/Dense>
 
-double triangle_volume(double3 a, double3 b, double3 c) {
+double triangle_volume(double4 a, double4 b, double4 c) {
 	double z = a.z;
 	z += b.z;
 	z += c.z;
@@ -15,7 +15,7 @@ double triangle_volume(double3 a, double3 b, double3 c) {
 	return s * z;
 }
 
-double signed_volume(double3 a, double3 b, double3 c, double3 d) {
+double signed_volume(double4 a, double4 b, double4 c, double4 d) {
 	double v;
 	v = triangle_volume(a, b, c);
 	v += triangle_volume(d, b, a);
@@ -38,8 +38,8 @@ double volume(const mesh3& mesh) {
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
-double3 center_of_mass(const mesh3& mesh) {
-	double3 P = {0, 0, 0};
+double4 center_of_mass(const mesh3& mesh) {
+	double4 P = {0, 0, 0};
 	double V = 0;
 	for (const triangle3& f : mesh) {
 		double v = dot(f.a, cross(f.b, f.c));
@@ -70,11 +70,11 @@ dmat3 moment_of_inertia(const imesh3& mesh) {
 }*/
 
 bool is_aabb(const mesh3& mesh) {
-	aabb3 box(mesh);
+	aabb4 box(mesh);
 
 	// All vertices must be made from extreme coordinates
 	for (auto f : mesh)
-		for (double3 v : f)
+		for (double4 v : f)
 			if (v.x != box.min[0] && v.x != box.max[0]
 			 && v.y != box.min[1] && v.y != box.max[1]
 			 && v.z != box.min[2] && v.z != box.max[2])
@@ -91,15 +91,15 @@ bool is_aabb(const mesh3& mesh) {
 	return true;
 }
 
-double3 eigen_vector(span<const double3> points) {
+double4 eigen_vector(span<const point3> points) {
 	// compute mean
-	double3 m = {0, 0, 0};
-	for (auto p : points)
+	double4 m = {0, 0, 0, 0};
+	for (point3 p : points)
 		m += p;
 	m /= points.size();
 
 	// compute matrix
-	double3 ss = {0, 0, 0};
+	double4 ss = {0, 0, 0, 0};
 	double xy = 0, xz = 0, yz = 0;
 	for (auto p : points) {
 		p -= m;
@@ -126,5 +126,5 @@ double3 eigen_vector(span<const double3> points) {
 		i = 2;
 
 	auto vectors = es.eigenvectors();
-	return {vectors(0, i).real(), vectors(1, i).real(), vectors(2, i).real()};
+	return {vectors(0, i).real(), vectors(1, i).real(), vectors(2, i).real(), 0};
 }

@@ -36,6 +36,7 @@ using std::multiset;
 
 using std::cout;
 using std::endl;
+using std::swap;
 
 using namespace std::literals;
 
@@ -57,3 +58,5 @@ private:
 	bool _has_value;
 	T _value;
 };
+
+constexpr double PI = M_PI;

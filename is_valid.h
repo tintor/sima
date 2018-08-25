@@ -1,5 +1,6 @@
 #pragma once
-#include "triangle.h"
+#include "mesh.h"
+#include "triangle.h" // for polygon2
 #include "format.h"
 
 bool is_valid(const polygon2& poly);
@@ -14,10 +15,11 @@ enum class Validity {
 	NotSealed = 6,
 	Inverted = 7,
 	OverlappingFaces = 8,
+	NonPlanarFace = 9,
 };
 
 Validity is_valid(const mesh3& mesh);
+Validity is_valid(const xmesh3& mesh);
 
-Validity is_valid(const mesh3& mesh);
-
-void make_valid(mesh3& mesh);
+void make_valid(mesh3& m);
+void make_valid(xmesh3& m);

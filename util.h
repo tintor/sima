@@ -69,3 +69,9 @@ void remove_dups(Vector& v) {
        std::sort(v.begin(), v.end());
        v.erase(std::unique(v.begin(), v.end()), v.end());
 }
+
+template<typename Vector, typename Func>
+void remove_dups(Vector& v, const Func& less, const Func& equal) {
+       std::sort(v.begin(), v.end(), less);
+       v.erase(std::unique(v.begin(), v.end(), equal), v.end());
+}

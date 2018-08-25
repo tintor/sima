@@ -3,7 +3,7 @@
 
 // line segment
 pair<segment3, NearestCase> nearest(segment3 p, segment3 q) {
-	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+	double4 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	double aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
 	constexpr double inf = std::numeric_limits<double>::max();
 	constexpr double tiny = 1e-8;
@@ -57,7 +57,7 @@ pair<segment3, NearestCase> nearest(segment3 p, segment3 q) {
 }
 
 double squared_distance(segment3 p, segment3 q) {
-	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+	double4 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	double aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
 	constexpr double inf = std::numeric_limits<double>::max();
 	constexpr double tiny = 1e-8;
@@ -91,47 +91,47 @@ double squared_distance(segment3 p, segment3 q) {
 	return min(d1, d2, d3, d4, d5, d6, d7, d8);
 }
 
-double squared_distance(line3 e, double3 p) {
-	double3 pa = p - e.origin;
+double squared_distance(line3 e, double4 p) {
+	double4 pa = p - e.origin;
     return squared(pa - e.unit_dir * dot(pa, e.unit_dir));
 }
 
 // TODO
 double squared_distance(segment3 p, segment3 q);
-double squared_distance(line3 m, double3 p);
+double squared_distance(line3 m, double4 p);
 
-double distance(double3 a, double3 b) { return length(a - b); }
+double distance(double4 a, double4 b) { return length(a - b); }
 
-double distance(double3 a, segment3 b) { return distance(a, b.nearest(a)); }
-double distance(segment3 a, double3 b) { return distance(b, a); }
+double distance(double4 a, segment3 b) { return distance(a, b.nearest(a)); }
+double distance(segment3 a, double4 b) { return distance(b, a); }
 
 double distance(segment3 a, segment3 b) {
     return sqrt(squared_distance(a, b));
 }
 
-constexpr bool inside_triangle_prism(double3 p, triangle3 m, double3 normal) {
+constexpr bool inside_triangle_prism(double4 p, triangle3 m, double4 normal) {
 	for (auto [a, b] : edgesOf(m))
 		if (plane::sign(a, b, a + normal, p) > 0)
 			return false;
 	return true;
 }
 
-double distance(double3 p, triangle3 m) {
-    double3 normal = compute_normal(m);
+double distance(double4 p, triangle3 m) {
+    double4 normal = compute_normal(m);
 	for (auto [a, b] : edgesOf(m))
 		if (plane::sign(a, b, a + normal, p) > 0)
 			return distance(p, segment3(a, b));
 	return abs(dot(normal, p - m.a));
 }
 
-double distance(double3 v, triangle3 m, const plane& p) {
+double distance(double4 v, triangle3 m, const plane& p) {
 	for (auto [a, b] : edgesOf(m))
 		if (plane::sign(a, b, a + p.normal(), v) > 0)
 			return distance(v, segment3(a, b));
 	return abs(p.distance(v));
 }
 
-double distance(triangle3 m, double3 v) { return distance(v, m); }
+double distance(triangle3 m, double4 v) { return distance(v, m); }
 
 // from RealTimeCollisionDetection book
 bool intersects(line3 e, triangle3 m) {
@@ -154,7 +154,7 @@ bool intersects2(line3 e, triangle3 m) {
 }
 
 // from RealTimeCollisionDetection book
-bool intersection(line3 e, triangle3 m, /*out*/double3& result) {
+bool intersection(line3 e, triangle3 m, /*out*/double4& result) {
 	auto pa = m.a - e.origin;
 	auto pb = m.b - e.origin;
 	auto pc = m.c - e.origin;
@@ -296,6 +296,6 @@ double distance(triangle3 p, triangle3 q) {
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
 // If edge is concave than angle will be >PI
-double edge_angle(double3 a, double3 b, double3 c, double3 d) {
+double edge_angle(double4 a, double4 b, double4 c, double4 d) {
 	THROW(not_implemented);
 }
