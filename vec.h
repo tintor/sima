@@ -24,25 +24,25 @@ struct mat34 {
     double4 a, b, c;
 };
 
-template<typename T>
-struct vec_info {
-};
+inline bool all(int2 v) { return v.x != 0 && v.y != 0; }
+inline bool all(int4 v) { return _mm_movemask_ps(v) == 0xF; }
+inline bool any(int2 v) { return v.x != 0 || v.y != 0; }
+inline bool any(int4 v) { return _mm_movemask_ps(v) != 0; }
 
-#define VEC_INFO(T, N) template<> struct vec_info<T##N> { static int dim() { return N; } using Type = T; };
+inline bool all(long2 v) { return _mm_movemask_pd(v) == 0x3; }
+inline bool all(long4 v) { return _mm256_movemask_pd(v) == 0xF; }
+inline bool any(long2 v) { return _mm_movemask_pd(v) != 0; }
+inline bool any(long4 v) { return _mm256_movemask_pd(v) != 0; }
 
-#define EQUAL2(T) inline bool equal(T a, T b) { return a.x == b.x && a.y == b.y; }
-#define EQUAL4(T) inline bool equal(T a, T b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
+inline bool equal(double2 a, double2 b) { return all(a == b); }
+inline bool equal(double4 a, double4 b) { return all(a == b); }
 
-// TODO consider using crc32 avx instruction for hash code
-#define STD_HASH(X) namespace std { template<> struct hash X; }
-#define HASH2(T) STD_HASH(<T##2> { size_t operator()(T##2 v) const { return ::hash(v.x, v.y); } })
-#define HASH4(T) STD_HASH(<T##4> { size_t operator()(T##4 v) const { return ::hash(v.x, v.y, v.z, v.w); } })
+// requires AVX512
+//inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
+//inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
 
-#define VEC(T, N) EQUAL##N(T##N); VEC_INFO(T, N); HASH##N(T);
-#define VECX(N) VEC(int, N); VEC(long, N); VEC(cent, N); VEC(float, N); VEC(double, N);
-
-VECX(2);
-VECX(4);
+inline hash operator<<(hash h, double2 a) { return h << a.x << a.y; }
+inline hash operator<<(hash h, double4 a) { return h << a.x << a.y << a.z << a.w; }
 
 template<typename T>
 struct equal_t {
@@ -105,9 +105,3 @@ inline float4 as_float(int4 a) { return _mm_cvtepi32_ps(a); }
 inline float4 fma(float4 a, float4 b, float4 c) { return _mm_fmadd_ps(a, b, c); }
 inline float8 fma(float8 a, float8 b, float8 c) { return _mm256_fmadd_ps(a, b, c); }
 inline double4 fma(double4 a, double4 b, double4 c) { return _mm256_fmadd_pd(a, b, c); }
-
-inline bool all(int2 v) { return v[0] && v[1]; }
-inline bool all(int4 v) { return v[0] && v[1] && v[2] && v[3]; }
-
-inline bool any(int2 v) { return v[0] || v[1]; }
-inline bool any(int4 v) { return v[0] || v[1] || v[2] || v[3]; }
