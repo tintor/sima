@@ -25,6 +25,7 @@ set(prod
 	mesh_import.cc
 	callstack.cc
 	sphere.cc
+	segment.cc
 	lodepng/lodepng.cc)
 
 set(test
