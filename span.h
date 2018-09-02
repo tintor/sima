@@ -14,6 +14,8 @@ template<typename T>
 class span {
 public:
 	using M = typename std::remove_const<T>::type;
+	using iterator = T*;
+	using const_iterator = const T*;
 
 	constexpr span(T* data, size_t size, ssize_t stride = 1)
 			: _data(data), _size(size), _stride(stride) {
@@ -64,6 +66,9 @@ public:
 
 	constexpr T& front() { return begin()[0]; }
 	constexpr T& back() { return end()[-1]; }
+
+	constexpr const T& front() const { return begin()[0]; }
+	constexpr const T& back() const { return end()[-1]; }
 
 	constexpr span subspan(size_t begin, size_t new_size, ssize_t new_stride = 1) const {
 		assert(new_stride != 0);
