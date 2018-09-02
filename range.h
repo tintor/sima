@@ -1,6 +1,5 @@
 #pragma once
 #include "format.h"
-#include "variant.h"
 
 // T can be any number-like type
 template <typename T> struct range {
@@ -18,43 +17,25 @@ template <typename T> struct range {
 	}
 
 	struct iterator {
-		iterator(T pos, T inc) : _var(Var0{pos, inc}) {}
-		iterator(const T* end_ptr) : _var(end_ptr) {}
+		iterator(T pos, const range& _range) : _pos(pos), _range(_range) {}
 
-		T& operator*() { assert(!is_end()); return pos(); }
-		T operator*() const { return is_end() ? end() : pos(); }
-		void operator++() { pos() += inc(); }
-		void operator++(int) { pos() += inc(); }
-		void operator--() { pos() -= inc(); }
-		void operator--(int) { pos() -= inc(); }
+		T& operator*() { return _pos; }
+		T operator*() const { return _pos; }
+		void operator++() { _pos += inc(); }
+		void operator++(int) { _pos += inc(); }
+		void operator--() { _pos -= inc(); }
+		void operator--(int) { _pos -= inc(); }
+		bool operator!=(iterator) { return (inc() > 0) ? (_pos < end()) : (_pos > end()); }
+	private:
+		T inc() const { return _range._inc; }
+		T end() const { return _range._end_ptr ? *_range._end_ptr : _range._end; }
 
-		bool operator!=(iterator e) {
-			if (is_end()) {
-				if (e.is_end())
-					return end() == e.end();
-				return (e.inc() > 0) ? (e.pos() < pos()) : (e.pos() > pos());
-			}
-			if (e.is_end())
-				return (inc() > 0) ? (pos() < e.end()) : (pos() > e.end());
-			assert(inc() == e.inc());
-			return (inc() > 0) ? (pos() < e.pos()) : (pos() > e.pos());
-		}
-
-	  private:
-		T& pos() { return mpark::get<0>(_var).pos; }
-		T pos() const { return mpark::get<0>(_var).pos; }
-		T inc() const { return mpark::get<0>(_var).inc; }
-		T end() const { return *mpark::get<1>(_var); }
-		bool is_end() const { return _var.index() != 0; }
-
-		struct Var0 {
-			T pos, inc;
-		};
-		mpark::variant<Var0, const T*> _var;
+		T _pos;
+		const range& _range;
 	};
 
-	iterator begin() const { return iterator(_begin, _inc); }
-	iterator end() const { return iterator(_end_ptr); }
+	iterator begin() const { return iterator(_begin, *this); }
+	iterator end() const { return iterator(_end_ptr ? *_end_ptr : _end, *this); }
 	T inc() const { return _inc; }
 
   private:
