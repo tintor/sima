@@ -40,23 +40,13 @@ using std::swap;
 
 using namespace std::literals;
 
+#include "optional.h"
+#include "span.h"
+
 #ifdef NDEBUG
 constexpr bool debug = false;
 #else
 constexpr bool debug = true;
 #endif
-
-template<typename T>
-class optional {
-public:
-	optional() : _has_value(false) { }
-	optional(T value) : _has_value(true), _value(value) { }
-	bool has_value() const { return _has_value; }
-	T& operator*() { assert(_has_value); return _value; }
-	T* operator->() { assert(_has_value); return &_value; }
-private:
-	bool _has_value;
-	T _value;
-};
 
 constexpr double PI = M_PI;
