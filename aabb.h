@@ -82,39 +82,33 @@ struct aabb {
 	}
 
 	bool intersects(Vec e) const {
-		// TODO vector intrinsics
-		for (auto i : range(3))
-			if (e[i] < min[i] || e[i] > max[i])
-				return false;
-		return true;
+		return all(min <= e && e <= max);
 	}
 
-	template<typename T>
-	static bool overlaps(T amin, T amax, T bmin, T bmax) {
-		return bmin < amax && amin < bmax;
+	bool contains(Vec e) const {
+		return all(min <= e && e <= max);
 	}
 
+	// TODO need to add tolerance
 	bool overlaps(aabb e) const {
-		// TODO vector intrinsics
-		for (auto i : range(3))
-			if (!overlaps(min[i], max[i], e.min[i], e.max[i]))
-				return false;
-		return true;
-	}
-
-	template<typename T>
-	static bool intersects(T amin, T amax, T bmin, T bmax) {
-		return bmin <= amax && amin <= bmax;
+		return all(e.min < max && min < e.max);
 	}
 
 	bool intersects(aabb e) const {
-		// TODO vector intrinsics
-		for (auto i : range(3))
-			if (!intersects(min[i], max[i], e.min[i], e.max[i]))
-				return false;
-		return true;
+		return all(e.min <= max && min <= e.max);
+	}
+
+	bool contains(aabb e) const {
+		return all(min <= e.min && e.max <= max);
 	}
 };
+
+template<typename T>
+bool Overlaps(aabb<T> a, aabb<T> b) { return a.overlaps(b); }
+template<typename T>
+bool Intersects(aabb<T> a, aabb<T> b) { return a.intersects(b); }
+template<typename T>
+bool Contains(aabb<T> a, aabb<T> b) { return a.contains(b); }
 
 // double only!
 using aabb2 = aabb<double2>;
