@@ -4,6 +4,7 @@
 #include "scalar.h"
 #include "edges.h"
 #include "align_alloc.h"
+#include "auto.h"
 
 template<typename Vec>
 struct triangle {
@@ -17,7 +18,6 @@ struct triangle {
 	Vec operator[](int idx) const { return (&a)[idx]; }
 
 	array<segment<Vec>, 3> edges() const { return {segment{a, b}, segment{b, c}, segment{c, a}}; }
-	array<segment<Vec&>, 3> edges() { return {segment{a, b}, segment{b, c}, segment{c, a}}; }
 
 	bool operator==(triangle v) const { return equal(a, v.a) && equal(b, v.b) && equal(c, v.c); }
 	bool operator!=(triangle v) const { return !operator==(v); }
@@ -29,6 +29,11 @@ struct triangle {
 	auto begin() const { return &a; }
 	auto end() const { return &a + 3; }
 };
+
+template<typename T>
+constexpr auto Edges(const triangle<T>& m) {
+	return m.edges();
+}
 
 using triangle2 = triangle<double2>;
 using triangle3 = triangle<double4>;
@@ -42,6 +47,59 @@ void format_e(string& s, string_view spec, triangle<Vec> v) {
 
 using polygon2 = vector<double2>;
 using polygon3 = aligned_vector<double4>;
+
+// polygon2 with holes
+template<typename Vec>
+class xpolygon {
+public:
+	void add(Vec p) {
+		_vertices.push_back(p);
+		_offsets.back() += 1;
+	}
+
+	void add(span<const Vec> poly) {
+		_vertices << poly;
+		_offsets.push_back(_offsets.back() + poly.size());
+	}
+
+	span<const Vec> operator[](uint idx) const {
+		return span<const Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
+	}
+
+	uint size() const { return _offsets.size() - 1; }
+
+private:
+	aligned_vector<Vec> _vertices;
+	vector<uint> _offsets;
+};
+
+using xpolygon2 = xpolygon<double2>;
+using xpolygon3 = xpolygon<double4>;
+
+template<typename Vec>
+struct xpolygon_edge_iter {
+	int ring = 0;
+	int vertex = 0;
+	const xpolygon<Vec>& poly;
+
+	xpolygon_edge_iter(const xpolygon<Vec>& poly) : poly(poly) { }
+
+	optional<segment<Vec>> next() {
+		if (vertex >= poly[ring].size()) {
+			vertex = 0;
+			ring += 1;
+		}
+		if (ring >= poly.size()) return {};
+		span<const Vec> r = poly[ring];
+		ON_SCOPE_EXIT(vertex += 1);
+		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
+	}
+};
+
+template<typename T>
+constexpr auto Edges(const xpolygon<T>& poly) {
+	return iterable(xpolygon_edge_iter<T>(poly));
+}
 
 // TODO remove
 template<typename T>
@@ -115,24 +173,28 @@ inline string wkt(const mesh2& mesh) {
 	return s;
 }
 
-inline double edge_area(double2 a, double2 b) {
-	return (a.x + b.x) * (a.y - b.y);
-}
-
-inline double area(const polygon2& poly) {
+inline double signed_double_area(const polygon2& poly) {
 	double area = 0;
 	if (poly.size() > 0)
-		for (auto [a, b] : edgesOf(poly))
-			area += edge_area(a, b);
+		for (auto [a, b] : Edges(poly))
+			area += signed_double_edge_area(a, b);
 	return area;
 }
 
+inline double signed_double_area(triangle2 m) {
+	return signed_double_area(m.a, m.b, m.c);
+}
+
 inline double area(double2 a, double2 b, double2 c) {
-	return edge_area(a, b) + edge_area(b, c) + edge_area(c, a);
+	return abs(signed_double_area(a, b, c)) / 2;
 }
 
 inline double area(triangle2 m) {
-	return area(m.a, m.b, m.c);
+	return abs(signed_double_area(m)) / 2;
+}
+
+inline double area(const polygon2& poly) {
+	return abs(signed_double_area(poly));
 }
 
 inline double4 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }
