@@ -56,3 +56,7 @@ inline bool intersects(triangle3 q, plane p, double eps) {
 	double c = p.distance(q.c);
 	return (a <= eps || b <= eps || c <= eps) && (a >= -eps || b >= -eps || c >= -eps);
 }
+
+inline int Classify(plane p, double4 v) {
+	return Classify(p.distance(v));
+}
