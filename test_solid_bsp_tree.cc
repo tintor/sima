@@ -15,12 +15,12 @@ TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
                 vertices.push_back(f[i]);
 		print("hull...\n");
         mesh3 ch = convex_hull(vertices);
-        print("IsValid %s\n", static_cast<int>(is_valid(mm)));
+        print("IsValid %s\n", static_cast<int>(IsValid(mm)));
         print("Volume %s\n", Volume(mm));
         print("CenterOfMass %s\n", CenterOfMass(mm));
         print("IsConvex %s\n", is_convex(mm));
 
-        print("IsValid %s\n", static_cast<int>(is_valid(ch)));
+        print("IsValid %s\n", static_cast<int>(IsValid(ch)));
         print("Volume %s\n", Volume(ch));
         print("CenterOfMass %s\n", CenterOfMass(ch));
         print("IsConvex %s\n", is_convex(ch));

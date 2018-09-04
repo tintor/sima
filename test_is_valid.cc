@@ -9,7 +9,7 @@ bool is_valid2(string_view text) {
 		REQUIRE(s.size() == 2);
 		poly.push_back(double2{parse<double>(s[0]), parse<double>(s[1])});
 	}
-	return is_valid(poly);
+	return IsValid(poly);
 }
 
 TEST_CASE("is_valid(polygon2)", "[is_valid]") {

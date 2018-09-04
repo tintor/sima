@@ -136,7 +136,7 @@ TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 		for (auto i : range(vertices))
 			V[i] = uniform3(rnd, -100, 100);
 		mesh3 m = convex_hull(V);
-		REQUIRE(is_valid(m) == Validity::OK);
+		REQUIRE(IsValid(m) == Validity::OK);
 		REQUIRE(is_convex(m));
 	}
 }

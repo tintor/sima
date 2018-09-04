@@ -5,6 +5,7 @@
 #include "aabb.h"
 #include "string_util.h"
 #include <random>
+#include "is_valid.h"
 
 inline double sq(double2 a, double2 b) {
 	return squared(a - b);
@@ -36,8 +37,6 @@ static polygon2 random_polygon(int size, RNG& rng) {
 	}
 	return poly;
 }
-
-bool is_valid(const polygon2& poly);
 
 vector<polygon2> test_cases;
 
@@ -81,7 +80,7 @@ struct Setup {
 			if (i % 16 == 0)
 				print("prepare %s\n", i);
 			polygon2 poly;
-			while (!is_valid(poly))
+			while (!IsValid(poly))
 				poly = random_polygon(i, rng);
 			test_cases.push_back(poly);
 			for (double2 e : poly)

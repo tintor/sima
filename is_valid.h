@@ -3,8 +3,8 @@
 #include "triangle.h" // for polygon2
 #include "format.h"
 
-bool is_valid(const polygon2& poly);
-bool is_valid(const xpolygon2& poly);
+bool IsValid(const polygon2& poly);
+bool IsValid(const xpolygon2& poly);
 
 enum class Validity {
 	OK = 0,
@@ -19,8 +19,8 @@ enum class Validity {
 	NonPlanarFace = 9,
 };
 
-Validity is_valid(const mesh3& mesh);
-Validity is_valid(const xmesh3& mesh);
+Validity IsValid(const mesh3& mesh);
+Validity IsValid(const xmesh3& mesh);
 
-void make_valid(mesh3& m);
-void make_valid(xmesh3& m);
+void MakeValid(mesh3& m);
+void MakeValid(xmesh3& m);

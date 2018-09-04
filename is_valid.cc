@@ -9,7 +9,7 @@
 // from tesselate.cc
 bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab);
 
-bool is_valid(const polygon2& poly) {
+bool IsValid(const polygon2& poly) {
 	auto n = poly.size();
 	if (n < 3)
 		return false;
@@ -33,7 +33,7 @@ bool is_valid(const polygon2& poly) {
 	return true;
 }
 
-bool is_valid(const xpolygon2& poly) {
+bool IsValid(const xpolygon2& poly) {
 	THROW(not_implemented);
 }
 
@@ -245,7 +245,7 @@ bool contains_overlapping_faces(const mesh3& mesh) {
 	return false;
 }
 
-Validity is_valid(const mesh3& mesh) {
+Validity IsValid(const mesh3& mesh) {
 	if (mesh.size() < 4)
 		return Validity::TooFewFaces;
 
@@ -389,9 +389,12 @@ int Classify(plane p, face f) {
 	int zero = count[1];
 	int pos = count[2];
 
-	if (neg == 0 && pos > 0) return (zero > 0) ? +1 : +2;
-	if (neg > 0 && pos == 0) return (zero > 0) ? -1 : -2;
-	if (neg == 0 && zero == 0 && pos == 0) return 0;
+	if (neg == 0 && pos > 0)
+		return (zero > 0) ? +1 : +2;
+	if (neg > 0 && pos == 0)
+		return (zero > 0) ? -1 : -2;
+	if (neg == 0 && zero == 0 && pos == 0)
+		return 0;
 	return -100;
 }
 
@@ -429,7 +432,7 @@ bool IsSealed(const xmesh3& mesh) {
 	return true;
 }
 
-Validity is_valid(const xmesh3& mesh) {
+Validity IsValid(const xmesh3& mesh) {
 	if (mesh.size() < 4)
 		return Validity::TooFewFaces;
 
@@ -438,7 +441,7 @@ Validity is_valid(const xmesh3& mesh) {
 		if (!AreCoplanar(best_fit_plane(f.vertices()), f))
 			return Validity::NonPlanarFace;
 		xpolygon2 poly = project(f, ProjectionAxis(f));
-		if (!is_valid(poly))
+		if (!IsValid(poly))
 			return Validity::InvalidFace;
 	}
 
@@ -461,10 +464,10 @@ Validity is_valid(const xmesh3& mesh) {
 	return Validity::OK;
 }
 
-void make_valid(mesh3& mesh) {
+void MakeValid(mesh3& mesh) {
 	THROW(not_implemented);
 }
 
-void make_valid(xmesh3& mesh) {
+void MakeValid(xmesh3& mesh) {
 	THROW(not_implemented);
 }
