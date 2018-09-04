@@ -2,6 +2,7 @@
 #include "tesselate.h"
 #include "align_alloc.h"
 #include "auto.h"
+#include "properties.h"
 
 mesh3 generate_box(double4 size) {
 	aligned_vector<double4> vertices;
@@ -75,7 +76,7 @@ void print_volume(int e, span<const double4> vertex, span<const Edge> edges) {
 		auto a = vertex[edges[i * 3].a];
 		auto b = vertex[edges[i * 3 + 1].a];
 		auto c = vertex[edges[i * 3 + 2].a];
-		volume += triangle_volume(a, b, c);
+		volume += SignedTriangleVolume6(a, b, c);
 	}
 	volume /= 6;
 	print("%s: volume %s\n", e, abs(volume));
@@ -138,7 +139,7 @@ mesh3 generate_regular_polyhedra(span<const span<const int>> faces) {
 	return generate_regular_polyhedra(edges);
 }
 
-double print_volume2(int e, span<const double4> vertex, unordered_map<pair<int, int>, double>& edges) {
+double print_volume2(int e, span<const double4> vertex, unordered_map<pair<int, int>, double, hash_t<pair<int, int>>>& edges) {
 	double loss = 0;
 	const double Inf = std::numeric_limits<double>::max();
 	// for each vertex find its top3 nearest vertices (#1 and #2 should be at distance 0, #3 at distance 1)
@@ -175,7 +176,7 @@ mesh3 generate_regular_polyhedra2(span<const pair<int, int>> faces) {
 
 	aligned_vector<double4> vertex(count), delta(count);
 
-	unordered_map<pair<int, int>, double> edges;
+	unordered_map<pair<int, int>, double, hash_t<pair<int, int>>> edges;
 	count = 0;
 	for (auto f : faces) {
 		double len = length(vec(0, f.first) - vec(1, f.first));

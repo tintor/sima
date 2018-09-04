@@ -10,7 +10,7 @@ TEST_CASE("generate_cylinder", "[generators]") {
 	auto m = generate_cylinder(500, r, r, -h/2, h/2);
 
 	double ev = r * r * h * M_PI;
-	double av = volume(m);
+	double av = Volume(m);
 	REQUIRE(abs(av - ev) / ev < 0.01);
 }
 
@@ -20,7 +20,7 @@ TEST_CASE("generate_cone", "[generators]") {
 	auto m = generate_cylinder(500, r, 0, -h/2, h/2);
 
 	double ev = r * r * h * M_PI / 3;
-	double av = volume(m);
+	double av = Volume(m);
 	REQUIRE(abs(av - ev) / ev < 0.01);
 }
 
@@ -31,7 +31,7 @@ TEST_CASE("generate_sphere", "[generators]") {
 	auto m = generate_sphere(n, r, rnd);
 
 	double ev = 4.0 / 3 * M_PI * r * r * r;
-	double av = volume(m);
+	double av = Volume(m);
 	REQUIRE(m.size() == n * 2 - 4);
 	REQUIRE(abs(av - ev) / ev < 0.012);
 }

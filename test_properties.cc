@@ -8,7 +8,7 @@
 // TODO rotate mesh
 TEST_CASE("volume_of_cube", "[properties]") {
 	auto m = generate_box(2, 3, 5);
-	REQUIRE(signed_volume(m) == 240);
+	REQUIRE(SignedVolume(m) == 240);
 }
 
 double min_eigenvalue(double xx, double yy, double zz, double xy, double xz, double yz) {

@@ -12,7 +12,7 @@ inline double sq(double2 a, double2 b) {
 
 template<typename RNG>
 static polygon2 random_polygon(int size, RNG& rng) {
-	unordered_set<double2, std::hash<double2>, equal_t<double2>> points;
+	unordered_set<double2, hash_t<double2>, equal_t<double2>> points;
 	while (points.size() < size)
 		points.insert(uniform2(rng, -1000, 1000));
 
@@ -108,15 +108,15 @@ TEST_CASE("tesselate_500_verify") {
 		REQUIRE(std::abs(poly_area) == tess_area);
 
 		// verify that all edges are unique
-		unordered_set<segment2> edges;
+		unordered_set<segment2, hash_t<segment2>> edges;
 		for (triangle2 triangle : tess)
-			for (auto e : edgesOf(triangle)) {
+			for (auto e : Edges(triangle)) {
 				REQUIRE(edges.count(e) == 0);
 				edges.insert(e);
 			}
 
 		// all edges should have their opposite except for edges on polygon boundary
-		unordered_set<segment2> poly_edges;
+		unordered_set<segment2, hash_t<segment2>> poly_edges;
 		auto a = poly.back();
 		for (auto b : poly) {
 			poly_edges.insert({a, b});

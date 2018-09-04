@@ -4,6 +4,7 @@
 #include "format.h"
 
 bool is_valid(const polygon2& poly);
+bool is_valid(const xpolygon2& poly);
 
 enum class Validity {
 	OK = 0,

@@ -349,7 +349,7 @@ SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_ran
 	}
 
 	// Init vertices and imesh
-	unordered_map<double4, uint16_t, std::hash<double4>, equal_t<double4>> vec_index;
+	unordered_map<double4, uint16_t, hash_t<double4>, equal_t<double4>> vec_index;
 	vector<uint> imesh;
 	for (const auto& face : mesh) {
 		const auto& a = face[0];
@@ -400,6 +400,6 @@ SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_ran
 	}
 
 	double4 d = box.size();
-	double v = volume(mesh) / (d.x * d.y * d.z);
+	double v = Volume(mesh) / (d.x * d.y * d.z);
 	print("Same %.05f, A %.05f, Tree %.05f Volume %.05f", ab / n, aa / n, bb / n, v);
 }

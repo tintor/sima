@@ -193,11 +193,11 @@ void convex_hull(span<const double4> points, mesh3& hull) {
 	}
 
 	// Expand hull to include all remaining points outside of it
-	unordered_set<segment3> open_edges;
+	unordered_set<segment3, hash_t<segment3>> open_edges;
 	uint i = 0;
 	for (auto p : points) {
 		if (points.size() >= 50000 && i++ % (1 << 14) == 0)
-			print("%.2f hull_vertices=%s hull_volume=%s\n", double(i) / points.size(), hull.size(), volume(hull));
+			print("%.2f hull_vertices=%s hull_volume=%s\n", double(i) / points.size(), hull.size(), Volume(hull));
 		if (equal(p, a) || equal(p, b) || equal(p, c) || equal(p, d))
 			continue;
 		// Remove faces on hull covered by new vertex

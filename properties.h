@@ -1,14 +1,18 @@
 #pragma once
 #include "triangle.h"
 #include "plane.h"
+#include "mesh.h"
 
-// Volume of a valid polyhedron
-double volume(const mesh3& mesh);
-double signed_volume(const mesh3& mesh);
-double triangle_volume(double4 a, double4 b, double4 c);
+double SignedTriangleVolume6(double4 a, double4 b, double4 c);
 
-// Center of mass of a valid polyhedron
-double4 center_of_mass(const mesh3& mesh);
+double SignedVolume(const mesh3& mesh);
+double SignedVolume(const xmesh3& mesh);
+
+inline double Volume(const mesh3& mesh) { return std::abs(SignedVolume(mesh)); }
+inline double Volume(const xmesh3& mesh) { return std::abs(SignedVolume(mesh)); }
+
+double4 CenterOfMass(const mesh3& mesh);
+double4 CenterOfMass(const xmesh3& mesh);
 
 // Moment of inertia of a valid polyhedron with Center of Mass = 0 and Density = 1
 //dmat3 moment_of_inertia(const imesh3& mesh);

@@ -1,10 +1,10 @@
+#include <Eigen/Dense>
 #include "properties.h"
 #include "aabb.h"
 #include "scalar.h"
 #include "primitives.h"
-#include <Eigen/Dense>
 
-double triangle_volume(double4 a, double4 b, double4 c) {
+double SignedTriangleVolume6(double4 a, double4 b, double4 c) {
 	double z = a.z;
 	z += b.z;
 	z += c.z;
@@ -15,30 +15,35 @@ double triangle_volume(double4 a, double4 b, double4 c) {
 	return s * z;
 }
 
-double signed_volume(double4 a, double4 b, double4 c, double4 d) {
-	double v;
-	v = triangle_volume(a, b, c);
-	v += triangle_volume(d, b, a);
-	v += triangle_volume(a, c, b);
-	v += triangle_volume(d, a, c);
-	return v / 6.0;
+double SignedRingVolume6(span<const point3> ring) {
+	double z = 0;
+	for (auto e : ring)
+		 z += e.z;
+	double s = 0;
+	for (auto e : Edges(ring))
+		s += (e.a.y + e.b.y) * (e.a.x - e.b.x);
+	return s * z;
 }
 
-double signed_volume(const mesh3& mesh) {
+double SignedVolume(const mesh3& mesh) {
 	double v = 0;
 	for (const triangle3& f : mesh)
-		v += triangle_volume(f.a, f.b, f.c);
+		v += SignedTriangleVolume6(f.a, f.b, f.c);
 	return v / 6.0;
 }
 
-double volume(const mesh3& mesh) {
-	return std::abs(signed_volume(mesh));
+double SignedVolume(const xmesh3& mesh) {
+	double v = 0;
+	for (face f : mesh)
+		for (auto ring : f)
+		v += SignedRingVolume6(ring);
+	return v / 6.0;
 }
 
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
-double4 center_of_mass(const mesh3& mesh) {
+double4 CenterOfMass(const mesh3& mesh) {
 	double4 P = {0, 0, 0};
 	double V = 0;
 	for (const triangle3& f : mesh) {

@@ -16,13 +16,13 @@ TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
 		print("hull...\n");
         mesh3 ch = convex_hull(vertices);
         print("IsValid %s\n", static_cast<int>(is_valid(mm)));
-        print("Volume %s\n", volume(mm));
-        print("CenterOfMass %s\n", center_of_mass(mm));
+        print("Volume %s\n", Volume(mm));
+        print("CenterOfMass %s\n", CenterOfMass(mm));
         print("IsConvex %s\n", is_convex(mm));
 
         print("IsValid %s\n", static_cast<int>(is_valid(ch)));
-        print("Volume %s\n", volume(ch));
-        print("CenterOfMass %s\n", center_of_mass(ch));
+        print("Volume %s\n", Volume(ch));
+        print("CenterOfMass %s\n", CenterOfMass(ch));
         print("IsConvex %s\n", is_convex(ch));
 
         std::default_random_engine rnd(0);
