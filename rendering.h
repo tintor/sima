@@ -35,8 +35,8 @@ public:
 	}
 	void PrintAt(float x, float y, float n, std::string_view);
 
-	float4 fg_color;
-	float4 bg_color;
+	double4 fg_color;
+	double4 bg_color;
 
 private:
 	float _tx;
