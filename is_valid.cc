@@ -314,11 +314,6 @@ int Classify(const Polygon2& a, double2 p) {
 	return ((crossings / 2) & 1) ? -1 : 1;
 }
 
-template<typename Vec>
-Vec AnyVertex(const vector<Vec>& p) { return p[0]; }
-template<typename Vec>
-Vec AnyVertex(const xpolygon<Vec>& p) { return p[0][0]; }
-
 // +1 disjoint
 //  0 touch
 // -1 overlap

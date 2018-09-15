@@ -198,3 +198,8 @@ inline double area(const polygon2& poly) {
 }
 
 inline double4 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }
+
+template<typename Vec>
+Vec AnyVertex(const vector<Vec>& p) { return p[0]; }
+template<typename Vec>
+Vec AnyVertex(const xpolygon<Vec>& p) { return p[0][0]; }

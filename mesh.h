@@ -85,3 +85,8 @@ private:
 	vector<uint> _offsets;
 	vector<uint> _ring_offsets;
 };
+
+// +1 - disjoint
+//  0 - touching / contact
+// -1 - overlaping / penetrating
+int Classify(const xmesh3& ma, const xmesh3& mb);
