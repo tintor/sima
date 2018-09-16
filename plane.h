@@ -1,6 +1,6 @@
 #pragma once
 #include "format.h"
-
+#include "triangle.h"
 // TODO raw_plane: which stores non-unit normal
 
 class plane {
@@ -20,9 +20,8 @@ public:
 
 	double4 normal() const { double4 e = n; e.w = 0; return e; }
 
-	// Signed distance!
+	// Signed distance! P can be point(w=1) or vector(w=0)
 	double distance(double4 p) const {
-		assert(p.w == 1.0);
 		return dot(n, p);
 	}
 
@@ -55,8 +54,4 @@ inline bool intersects(triangle3 q, plane p, double eps) {
 	double b = p.distance(q.b);
 	double c = p.distance(q.c);
 	return (a <= eps || b <= eps || c <= eps) && (a >= -eps || b >= -eps || c >= -eps);
-}
-
-inline int Classify(plane p, double4 v) {
-	return Classify(p.distance(v));
 }

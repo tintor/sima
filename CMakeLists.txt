@@ -26,6 +26,8 @@ set(prod
 	callstack.cc
 	sphere.cc
 	segment.cc
+	classify.cc
+	project.cc
 	lodepng/lodepng.cc)
 
 set(test
@@ -34,6 +36,7 @@ set(test
 	test_aabb.cc
 	test_util.cc
 	test_aabb.cc
+	test_classify.cc
 	test_is_valid.cc
 	test_transform.cc
 	test_solid_bsp_tree.cc

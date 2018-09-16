@@ -8,6 +8,11 @@
 
 // TODO review entire file after conversion from int -> double
 
+static bool Overlaps(aabb2 a, aabb2 b) {
+	double2 mn = vmin(a.max, b.max), mx = vmax(a.min, b.min);
+	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
+}
+
 // same as relate(), but faster
 bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab) {
 	double pa = signed_double_edge_area(p, a);

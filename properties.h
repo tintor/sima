@@ -22,6 +22,9 @@ bool is_aabb(const mesh3& mesh);
 double4 eigen_vector(span<const point3> points);
 
 inline plane best_fit_plane(span<const point3> points) {
+	if (points.size() == 3) {
+		return plane(points[0], points[1], points[2]);
+	}
 	double4 normal = normalize(eigen_vector(points));
 	double s = 0;
 	for (point3 p : points)

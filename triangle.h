@@ -52,6 +52,10 @@ using polygon3 = aligned_vector<double4>;
 template<typename Vec>
 class xpolygon {
 public:
+	xpolygon() {
+		_offsets.push_back(0);
+	}
+
 	void add(Vec p) {
 		_vertices.push_back(p);
 		_offsets.back() += 1;
@@ -66,7 +70,20 @@ public:
 		return span<const Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
 	}
 
+	span<Vec> operator[](uint idx) {
+		return span<Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
+	}
+
 	uint size() const { return _offsets.size() - 1; }
+
+	void reserve(uint rings, uint vertices) {
+		_vertices.reserve(vertices);
+		_offsets.reserve(rings + 1);
+	}
+
+	span<const Vec> vertices() const { return span<const Vec>(_vertices); }
+
+	span<Vec> vertices() { return span<Vec>(_vertices); }
 
 private:
 	aligned_vector<Vec> _vertices;

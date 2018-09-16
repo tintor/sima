@@ -1,6 +1,7 @@
 #include "segment.h"
 #include "aabb.h"
 #include "exception.h"
+#include "classify.h"
 
 // D - disjoint
 // O - overlap
@@ -9,35 +10,175 @@
 // A - T intersection: A or B is touching interior of PQ
 // B - T intersection: P or Q is touching interior of AB
 
-// TODO(marko) test that result will be stable if params are swapped (or if segments are reversed)
-char relate(segment2 p, segment2 q) {
-	int sp = Classify(p, q.a);
-	int sq = Classify(p, q.b);
+static bool Overlaps(aabb2 a, aabb2 b) {
+	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
+	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
+}
+
+int relate_full(segment2 p, segment2 q, double* pt, double* qt) {
+	THROW(not_implemented);
+/*	int sp = Sign(p, q.a);
+	int sq = Sign(p, q.b);
 	if (sp == 0 && sq == 0) { // colinear
-		if (Overlaps(aabb2(p), aabb2(q)))
+		if (Overlaps(aabb2(p), aabb2(q))) { // TODO overlaps must respect tolerances
+			int result = COLINEAR | OVERLAP;
+			// TODO set pt and qt in case of overlap! (be carefull to return both points)!
+			if (Intersects(aabb2(p), q.a))
+				result |= QA;
+			if (Intersects(aabb2(p), q.b))
+				result |= QB;
+			if (Intersects(aabb2(q), p.a))
+				result |= PA;
+			if (Intersects(aabb2(q), p.b))
+				result |= PB;
+			return result;
+		}
+		if (Equals(p.a, q.a))
+			return COLINEAR | VERTEX_VERTEX | PA | QA;
+		if (Equals(p.a, q.b))
+			return COLINEAR | VERTEX_VERTEX | PA | QB;
+		if (Equals(p.b, q.a))
+			return COLINEAR | VERTEX_VERTEX | PB | QA;
+		if (Equals(p.b, q.b))
+			return COLINEAR | VERTEX_VERTEX | PB | QB;
+		return COLINEAR; // but disjoint
+	}
+
+	if (Equals(p.a, q.a))
+		return VERTEX_VERTEX | PA | QA;
+	if (Equals(p.a, q.b))
+		return VERTEX_VERTEX | PA | QB;
+	if (Equals(p.b, q.a))
+		return VERTEX_VERTEX | PB | QA;
+	if (Equals(p.b, q.b))
+		return VERTEX_VERTEX | PB | QB;
+
+	int sa = Sign(q, p.a);
+	int sb = Sign(q, p.b);
+	int sab = sa * sb;
+	int spq = sp * sq;
+	if (sab < 0 && spq < 0) {
+		if (pt || st) {
+			double2 A = p.a, B = p.b, P = q.a, Q = q.b;
+			double2 AP = A - P, QP = Q - P, BA = B - A;
+			double d = cross(QP, BA);
+			if (pt)
+				*pt = cross(AP, QP) / d;
+			if (qt)
+				*qt = cross(AP, BA) / d;
+		}
+		return CROSS;
+	}
+	if (sa == 0 && spq < 0) {
+		return VERTEX_EDGE | PA;
+	}
+	if (sb == 0 && spq < 0)
+		return VERTEX_EDGE | PB;
+	if (sab < 0 && sp == 0)
+		return EDGE_VERTEX | QA;
+	if (sab < 0 && sq == 0)
+		return EDGE_VERTEX | QB;
+	return 0; // disjoint*/
+}
+
+// TODO(marko) test that result will be stable if params are swapped (or if segments are reversed)
+char relate(segment2 p, segment2 q, double2* pt, double2* qt) {
+	int sp = Sign(p, q.a);
+	int sq = Sign(p, q.b);
+	if (sp == 0 && sq == 0) { // colinear
+		if (Overlaps(aabb2(p), aabb2(q))) {
+			if (pt) {
+				double t = p.param(q.a);
+				double s = p.param(q.b);
+				*pt = (t < s) ? double2{t, s} : double2{s, t};
+			}
+			if (qt) {
+				double t = q.param(p.a);
+				double s = q.param(p.b);
+				*qt = (t < s) ? double2{t, s} : double2{s, t};
+			}
 			return 'O';
-		if (Equals(p.a, q.a) || Equals(p.a, q.b) || Equals(p.b, q.a) || Equals(p.b, q.b))
+		}
+
+		if (Equals(p.a, q.a)) {
+			if (pt) *pt = double2{0, 0};
+			if (qt) *qt = double2{0, 0};
 			return 'V';
+		}
+		if (Equals(p.a, q.b)) {
+			if (pt) *pt = double2{0, 0};
+			if (qt) *qt = double2{1, 1};
+			return 'V';
+		}
+		if (Equals(p.b, q.a)) {
+			if (pt) *pt = double2{1, 1};
+			if (qt) *qt = double2{0, 0};
+			return 'V';
+		}
+		if (Equals(p.b, q.b)) {
+			if (pt) *pt = double2{1, 1};
+			if (qt) *qt = double2{1, 1};
+			return 'V';
+		}
 		return 'D';
 	}
 
-	if (Equals(p.a, q.a) || Equals(p.a, q.b) || Equals(p.b, q.a) || Equals(p.b, q.b))
+	if (Equals(p.a, q.a)) {
+		if (pt) *pt = double2{0, 0};
+		if (qt) *qt = double2{0, 0};
 		return 'V';
+	}
+	if (Equals(p.a, q.b)) {
+		if (pt) *pt = double2{0, 0};
+		if (qt) *qt = double2{1, 1};
+		return 'V';
+	}
+	if (Equals(p.b, q.a)) {
+		if (pt) *pt = double2{1, 1};
+		if (qt) *qt = double2{0, 0};
+		return 'V';
+	}
+	if (Equals(p.b, q.b)) {
+		if (pt) *pt = double2{1, 1};
+		if (qt) *qt = double2{1, 1};
+		return 'V';
+	}
 
-	int sab = Classify(q, p.a) * Classify(q, p.b);
+	int sa = Sign(q, p.a);
+	int sb = Sign(q, p.b);
+	int sab = sa * sb;
 	int spq = sp * sq;
-	if (sab < 0 && spq < 0)
+	if (sab < 0 && spq < 0) {
+		if (pt || qt) {
+			double2 R = p.a - q.a, Q = q.b - q.a, P = p.b - p.a;
+			double d = cross(Q, P);
+			if (pt) *pt = broad2(cross(R, Q) / d);
+			if (qt) *qt = broad2(cross(R, P) / d);
+		}
 		return 'X';
-	if (sab == 0 && spq < 0)
+	}
+	if (sab == 0 && spq < 0) {
+		if (pt) *pt = (sa == 0) ? double2{0, 0} : double2{1, 1};
+		if (qt) {
+			double2 R = p.a - q.a, Q = q.b - q.a, P = p.b - p.a;
+			*qt = broad2(cross(R, P) / cross(Q, P));
+		}
 		return 'A';
-	if (sab < 0 && spq == 0)
+	}
+	if (sab < 0 && spq == 0) {
+		if (pt) {
+			double2 R = p.a - q.a, Q = q.b - q.a, P = p.b - p.a;
+			*pt = broad2(cross(R, Q) / cross(Q, P));
+		}
+		if (qt) *qt = (sp == 0) ? double2{0, 0} : double2{1, 1};
 		return 'B';
+	}
 	return 'D';
 }
 
 bool relate(segment2 p, ray2 q) {
-	int sp = Classify(p, q.origin);
-	int sq = Classify(p, q.origin + q.unit_dir);
+	int sp = Sign(p, q.origin);
+	int sq = Sign(p, q.origin + q.unit_dir);
 	if (sp == 0 && sq == 0) { // colinear
 		if (Overlaps(aabb2(p), aabb2(q.origin, q.infinity())))
 			return 'O';
@@ -49,7 +190,7 @@ bool relate(segment2 p, ray2 q) {
 	if (Equals(p.a, q.origin) || Equals(p.b, q.origin))
 		return 'V';
 
-	int sab = Classify(q, p.a) * Classify(q, p.b);
+	int sab = Sign(q, p.a) * Sign(q, p.b);
 	int spq = sp * sq;
 	if (sab < 0 && spq < 0)
 		return 'X';

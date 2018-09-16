@@ -54,7 +54,7 @@ struct ray {
 	ray(Vec a, Vec b) : unit_dir(normalize(b - a)), origin(a) { }
 
 	// using max() instead of infinity() in order for mult with zero to stay zero
-	Vec infinity() { return linear(std::numeric_limits<double>::max()); }
+	Vec infinity() const { return linear(std::numeric_limits<double>::max()); }
 
 	bool operator==(ray v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
 	bool operator!=(ray v) const { return !(operator==(v)); }
@@ -110,7 +110,6 @@ struct line {
 using line2 = line<double2>;
 using line3 = line<double4>;
 
-char relate(segment<double2> p, segment<double2> q);
 bool relate(segment<double2> p, ray<double2> q);
 
 // Tested and stable!
@@ -156,28 +155,26 @@ inline double signed_double_area(double2 a, double2 b, double2 c) {
 	return signed_double_edge_area(a, b) + signed_double_edge_area(b, c) + signed_double_edge_area(c, a);
 }
 
-inline int Classify(double d) {
-	if (d > Tolerance) return 1;
-	if (d < -Tolerance) return -1;
-	return 0;
-}
-
-inline int Classify(segment2 s, double2 v) {
-	return Classify(signed_double_area(s.a, s.b, v) / length(s.a - s.b));
-}
-
-inline int Classify(ray2 s, double2 v) {
-	return Classify(signed_double_area(s.origin, s.origin + s.unit_dir, v));
-}
-
 inline bool Colinear(line3 s, double4 v) {
 	auto va = v - s.origin;
     return squared(va - s.unit_dir * dot(va, s.unit_dir)) <= squared(Tolerance);
 }
 
-char relate(segment2 p, segment2 q);
+char relate(segment2 p, segment2 q, double2* pt = nullptr, double2* qt = nullptr);
 
 inline bool relate_abxo(segment2 p, segment2 q) {
 	char c = relate(p, q);
 	return c == 'A' || c == 'B' || c == 'X' || c == 'O';
 }
+
+constexpr int COLINEAR = 1;
+constexpr int VERTEX_VERTEX = 2;
+constexpr int VERTEX_EDGE = 4;
+constexpr int EDGE_VERTEX = 8;
+constexpr int CROSS = 16;
+constexpr int OVERLAP = 32;
+constexpr int PA = 64;
+constexpr int PB = 128;
+constexpr int QA = 256;
+constexpr int QB = 512;
+int relate_full(segment2 p, segment2 q, double* pt = nullptr, double* qt = nullptr);

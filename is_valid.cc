@@ -5,6 +5,8 @@
 #include "aabb.h"
 #include "exception.h"
 #include "primitives.h"
+#include "project.h"
+#include "classify.h"
 
 // from tesselate.cc
 bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab);
@@ -277,95 +279,10 @@ Validity IsValid(const mesh3& mesh) {
 	return Validity::OK;
 }
 
-// TODO move this function elsewhere!
-// +1 - outside
-//  0 - edge (distance between P and polygon boundary is less than Tolerance)
-// -1 - inside
-template<typename Polygon2>
-int Classify(const Polygon2& a, double2 p) {
-	int crossings = 0; // 1 - half a crossing, 2 - full crossing
-	ray2 ray(p, p + double2{1, 0});
-	for (auto e : Edges(a)) {
-		int say = Classify(e.a.y - p.y);
-		int sby = Classify(e.b.y - p.y);
-		if (say * sby > 0) // edge is above or below ray
-			continue;
-		if (say == 0 && sby == 0) { // colinear
-			int sax = Classify(e.a.x - p.x);
-			int sbx = Classify(e.b.x - p.x);
-			if (sax * sbx <= 0) // TODO this will make vertices square instead of round
-				return 0;
-		}
-		if (sby == 0) { // in edge
-			crossings += say;
-			continue;
-		}
-		if (say == 0) { // out edge
-			crossings -= sby;
-			continue;
-		}
-		// E is not horizontal
-		int sp = Classify(e, p); // TODO check proper sign!
-		if (sp == 0)
-			return 0;
-		if (sp < 0) // P is on the left side of e
-			crossings += 2;
-	}
-	return ((crossings / 2) & 1) ? -1 : 1;
-}
-
-// +1 disjoint
-//  0 touch
-// -1 overlap
-template<typename Polygon2>
-int Classify(const Polygon2& a, const Polygon2& b) {
-	// check if any pair of segments intersect
-	for (auto ea : Edges(a))
-		for (auto eb : Edges(b))
-			if (relate_abxo(ea, eb))
-				return true;
-	// check for containment
-	return Classify(a, AnyVertex(b)) <= 0 || Classify(b, AnyVertex(a)) <= 0;
-}
-
-// TODO issue this projection will stretch some axis more than others and skew tolerances!
-xpolygon2 project(face f, int axis) {
-	xpolygon2 poly;
-	// TODO reserve
-	if (axis == 0)
-		for (auto ring : f) {
-			poly.add({});
-			for (auto p : ring)
-				poly.add(double2{p.y, p.z});
-		}
-	if (axis == 1)
-		for (auto ring : f) {
-			poly.add({});
-			for (auto p : ring)
-				poly.add(double2{p.x, p.z});
-		}
-	if (axis == 2)
-		for (auto ring : f) {
-			poly.add({});
-			for (auto p : ring)
-				poly.add(double2{p.x, p.y});
-		}
-	return poly;
-}
-
-int ProjectionAxis(face f) {
-	double4 s = aabb4(f.vertices()).size();
-	if (s.x <= s.y && s.x <= s.z)
-		return 0;
-	if (s.y <= s.x && s.y <= s.z)
-		return 1;
-	return 2;
-}
-
 bool AreCoplanarFacesOverlapping(face p, face q) {
 	int axis = ProjectionAxis(p);
-	xpolygon2 p2 = project(p, axis);
-	xpolygon2 q2 = project(q, axis);
+	xpolygon2 p2 = Project(p, axis);
+	xpolygon2 q2 = Project(q, axis);
 	// TODO issue this projection will stretch some axis more than others and skew tolerances!
 	return Classify(p2, q2) == -1;
 }
@@ -379,7 +296,7 @@ bool AreCoplanarFacesOverlapping(face p, face q) {
 int Classify(plane p, face f) {
 	int count[3] = {0, 0, 0};
 	for (point3 v : f.vertices())
-		count[Classify(p, v) + 1] += 1;
+		count[Sign(p, v) + 1] += 1;
 	int neg = count[0];
 	int zero = count[1];
 	int pos = count[2];
@@ -395,7 +312,7 @@ int Classify(plane p, face f) {
 
 bool AreCoplanar(plane p, face f) {
 	for (point3 v : f.vertices())
-		if (Classify(p, v) != 0)
+		if (Sign(p, v) != 0)
 			return false;
 	return true;
 }
@@ -435,7 +352,7 @@ Validity IsValid(const xmesh3& mesh) {
 	for (face f : mesh) {
 		if (!AreCoplanar(best_fit_plane(f.vertices()), f))
 			return Validity::NonPlanarFace;
-		xpolygon2 poly = project(f, ProjectionAxis(f));
+		xpolygon2 poly = Project(f, ProjectionAxis(f));
 		if (!IsValid(poly))
 			return Validity::InvalidFace;
 	}

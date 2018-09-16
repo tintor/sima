@@ -2,6 +2,9 @@
 #include "span.h"
 #include "vector.h"
 #include "align_alloc.h"
+#include "segment.h"
+#include "auto.h"
+#include "each.h"
 
 // TODO should we store plane for every face?
 // store normalized plane or unnormalized plane?
@@ -50,6 +53,29 @@ private:
 	span<const uint> _offsets;
 };
 
+struct face_edge_iter {
+	int ring = 0;
+	int vertex = 0;
+	const face& f;
+
+	face_edge_iter(const face& f) : f(f) { }
+
+	optional<segment3> next() {
+		if (vertex >= f[ring].size()) {
+			vertex = 0;
+			ring += 1;
+		}
+		if (ring >= f.size()) return {};
+		span<const double4> r = f[ring];
+		ON_SCOPE_EXIT(vertex += 1);
+		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
+	}
+};
+
+inline auto Edges(const face& f) {
+	return iterable(face_edge_iter(f));
+}
+
 class xmesh3 {
 public:
 	xmesh3() {
@@ -85,8 +111,3 @@ private:
 	vector<uint> _offsets;
 	vector<uint> _ring_offsets;
 };
-
-// +1 - disjoint
-//  0 - touching / contact
-// -1 - overlaping / penetrating
-int Classify(const xmesh3& ma, const xmesh3& mb);

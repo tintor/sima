@@ -1,6 +1,8 @@
 #pragma once
 #include "triangle.h"
 
+// TODO tessellation of 3d concave polygons with holes
+
 // ear cutting algorithm
 // assumes that P is valid and has not duplicate vertices or overlapping edges
 void tesselate(polygon2 poly, /*out*/mesh2& tess);

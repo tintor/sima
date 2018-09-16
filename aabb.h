@@ -67,6 +67,12 @@ struct aabb {
 		max = vmax(v, max);
 	}
 
+	aabb buffer(double t) const {
+		Vec tt;
+		broadcast(tt, t);
+		return aabb(min - tt, max + tt);
+	}
+
 	bool valid() const {
 		return all(min <= max);
 	}
@@ -89,11 +95,6 @@ struct aabb {
 		return all(min <= e && e <= max);
 	}
 
-	// TODO need to add tolerance
-	bool overlaps(aabb e) const {
-		return all(e.min < max && min < e.max);
-	}
-
 	bool intersects(aabb e) const {
 		return all(e.min <= max && min <= e.max);
 	}
@@ -103,8 +104,6 @@ struct aabb {
 	}
 };
 
-template<typename T>
-bool Overlaps(aabb<T> a, aabb<T> b) { return a.overlaps(b); }
 template<typename T>
 bool Intersects(aabb<T> a, aabb<T> b) { return a.intersects(b); }
 template<typename T>
