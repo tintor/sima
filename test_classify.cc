@@ -127,21 +127,15 @@ long squared(int2 a) {
 	return (long)a.x * a.x + (long) a.y * a.y;
 }
 
-template<typename RNG>
-static vector<int2> random_polygon(int size, RNG& rng) {
-	unordered_set<int2, hash_t<int2>, equal_t<int2>> points;
-	while (points.size() < size) {
-		std::uniform_int_distribution uniform(0, 9);
-		points.insert(int2{uniform(rng), uniform(rng)});
-	}
-
+template<typename T>
+void tsp_sort(vector<T>& poly) {
 	// order points into polygon using traveling salesman heuristic
-	vector<int2> poly(points.begin(), points.end());
 	bool done = false;
+	auto size = poly.size();
 	while (!done) {
 		done = true;
-		for (int j : range(1, size))
-			for (int i : range(j - 1)) {
+		for (size_t j : range<size_t>(1, size))
+			for (size_t i : range(j - 1)) {
 				auto c = poly[j];
 				auto d = poly[(j + 1) % size];
 				auto a = poly[i];
@@ -153,18 +147,44 @@ static vector<int2> random_polygon(int size, RNG& rng) {
 				}
 			}
 	}
+}
+
+template<typename RNG>
+static vector<int2> random_int_polygon(int size, RNG& rng) {
+	unordered_set<int2, hash_t<int2>, equal_t<int2>> points;
+	while (points.size() < size) {
+		std::uniform_int_distribution uniform(0, 9);
+		points.insert(int2{uniform(rng), uniform(rng)});
+	}
+
+	vector<int2> poly(points.begin(), points.end());
+	tsp_sort(poly);
 	return poly;
 }
 
-void transform(double2& p, int t) {
+
+template<typename RNG>
+static polygon2 random_polygon(int size, RNG& rng) {
+	polygon2 poly;
+	while (poly.size() < size) {
+		auto p = uniform2(rng, -10, 10);
+		if (All(poly, [p](double2 a){return !Equals(a, p);}))
+			poly.push_back(p);
+	}
+	tsp_sort(poly);
+	return poly;
+}
+
+double2 transform(double2 p, int t) {
 	if (t & 1) p.x = -p.x;
 	if (t & 2) p.y = -p.y;
 	if (t & 4) p = {p.y, p.x};
+	return p;
 }
 
 void transform(vector<double2>& poly, int t) {
 	for (double2& p : poly)
-		transform(p, t);
+		p = transform(p, t);
 	if (t & 8)
 		for (int i = 0; i < poly.size() / 2; i++)
 			swap(poly[i], poly[poly.size() - 1 - i]);
@@ -175,7 +195,7 @@ TEST_CASE("Classify(polygon2, double2) random small int polygon", "[classify]") 
 	polygon2 poly[16];
 	for (int i = 0; i < 10000; i++) {
 		poly[0].clear();
-		for (int2 p : random_polygon(8, rnd))
+		for (int2 p : random_int_polygon(8, rnd))
 			poly[0].push_back(double2{static_cast<double>(p.x), static_cast<double>(p.y)});
 		for (int i = 1; i < 16; i++) {
 			poly[i] = poly[0];
@@ -186,8 +206,7 @@ TEST_CASE("Classify(polygon2, double2) random small int polygon", "[classify]") 
 				double2 p{static_cast<double>(x), static_cast<double>(y)};
 				int cn[3] = {0, 0, 0};
 				for (int t = 0; t < 16; t++) {
-					double2 tp = p;
-					transform(tp, t);
+					double2 tp = transform(p, t);
 					cn[1 + Classify(poly[t], tp)] += 1;
 				}
 				int m = max(cn[0], cn[1], cn[2]);
@@ -242,18 +261,22 @@ TEST_CASE("relate(segment2, segment2)", "[classify]") {
 
 	auto verify = [](double2 a, double2 b, double2 c, double2 d) {
 		char k = relate(segment2(a, b), segment2(c, d));
-		REQUIRE(k == relate(segment2(b, a), segment2(c, d)));
-		REQUIRE(k == relate(segment2(b, a), segment2(d, c)));
-		REQUIRE(k == relate(segment2(a, b), segment2(d, c)));
-
-		// TODO swap x,y
-		// TODO flip x
-		// TODO flip y
+		for (int t = 0; t < 8; t++) {
+			double2 A = a, B = b, C = c, D = d;
+			transform(A, t);
+			transform(B, t);
+			transform(C, t);
+			transform(D, t);
+			REQUIRE(k == relate(segment2(A, B), segment2(C, D)));
+			REQUIRE(k == relate(segment2(B, A), segment2(C, D)));
+			REQUIRE(k == relate(segment2(B, A), segment2(D, C)));
+			REQUIRE(k == relate(segment2(A, B), segment2(D, C)));
+		}
 		return k;
 	};
 
 	std::default_random_engine rnd;
-	for (int i = 0; i < 1000000; i++) {
+	for (int i = 0; i < 300000; i++) {
 		double2 a = uniform2(rnd, -10, 10);
 		double2 b = uniform2(rnd, -10, 10);
 		while (Equals(a, b))
@@ -314,7 +337,7 @@ TEST_CASE("relate(segment2, segment2)", "[classify]") {
 	}
 }
 
-TEST_CASE("Classify(xpolygon2, segment2)", "[classify]") {
+TEST_CASE("Classify(xpolygon2, segment2) square", "[classify]") {
 	xpolygon2 a;
 	a.add({double2{0, 0}, double2{1, 0}, double2{1, 1}, double2{0, 1}});
 
@@ -333,6 +356,54 @@ TEST_CASE("Classify(xpolygon2, segment2)", "[classify]") {
 	REQUIRE(Classify(a, segment2(double2{0.5, 0.5}, double2{1.5, 0.5})) == -1);
 	REQUIRE(Classify(a, segment2(double2{0.5, 0.5}, double2{1, 0.5})) == -1);
 	REQUIRE(Classify(a, segment2(double2{0.1, 0.5}, double2{0.9, 0.5})) == -1);
+}
+
+TEST_CASE("Classify(xpolygon2, segment2) concave", "[classify]") {
+	xpolygon2 a;
+	a.add({double2{0, 0}, double2{1, 1}, double2{2, 0}, double2{2, 2}, double2{0, 2}});
+
+	REQUIRE(Classify(a, segment2(double2{0, 0}, double2{2, 0})) == 0);
+}
+
+TEST_CASE("Classify(polygon2, segment2) random polyogn", "[classify]") {
+	std::default_random_engine rnd;
+	polygon2 poly[16];
+	for (int i = 0; i < 1000; i++) {
+	   	poly[0]	= random_polygon(8, rnd);
+		for (int t = 1; t < 16; t++) {
+			poly[t] = poly[0];
+			transform(poly[t], t);
+		}
+
+		const auto& p = poly[0];
+		vector<pair<segment2, int>> tests;
+		tests.emplace_back(segment2(p[0], p[1]), 0);
+		for (auto j : range<size_t>(1, p.size() - 1))
+			tests.emplace_back(segment2(p[0], p[j]), 9);
+
+		for (int j = 0; j < 100; j++) {
+			double2 a = uniform2(rnd, -10, 10);
+			double2 b = uniform2(rnd, -10, 10);
+			while (Equals(a, b))
+				b = uniform2(rnd, -10, 10);
+
+			tests.emplace_back(segment2(a, b), 9);
+			tests.emplace_back(segment2(a, p[0]), 9);
+			tests.emplace_back(segment2(a, double2{p[0].y, b.y}), 9);
+			tests.emplace_back(segment2(double2{a.x, p[0].y}, double2{b.x, p[0].y}), 9);
+
+			double2 c = segment2(p[0], p[1]).linear(uniform(rnd, -0.5, 1.5));
+			tests.emplace_back(segment2(a, c), 9);
+		}
+
+		for (const auto& [s, cc] : tests) {
+			int c = (cc == 9) ? Classify(poly[0], s) : cc;
+			for (int t = 0; t < 16; t++) {
+				segment2 ts(transform(s.a, t), transform(s.b, t));
+				REQUIRE(c == Classify(poly[t], ts));
+			}
+		}
+	}
 }
 
 TEST_CASE("Classify(xpolygon2, xpolygon2)", "[classify]") {
