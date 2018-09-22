@@ -137,7 +137,9 @@ int TClassify(const Polygon2& a, const Polygon2& b) {
 	if (!Intersects(va, vb))
 		return +1;
 
-	if (Classify(a, AnyVertex(b), va) < 0 || Classify(b, AnyVertex(a), vb) < 0)
+	if (Contains(va, vb) && Classify(a, AnyVertex(b), va) < 0)
+		return -1;
+	if (Contains(vb, va) && Classify(b, AnyVertex(a), vb) < 0)
 		return -1;
 
 	int result = 1;
@@ -161,12 +163,8 @@ int TClassify(const Polygon2& a, const Polygon2& b) {
 int Classify(const xpolygon2& a, const xpolygon2& b) { return TClassify(a, b); }
 int Classify(const polygon2& a, const polygon2& b) { return TClassify(a, b); }
 
-pair<int, int> ClassifyDoubleSided(const xpolygon2& f, ray2 s) {
-	THROW(not_implemented);
-}
-
-int Classify(const face& f, double4 v) {
-	if (!Intersects(aabb4(f.vertices()), aabb4(v)))
+int Classify(const face& f, double4 v, const aabb4& box) {
+	if (!Intersects(box, aabb4(v)))
 		return +1;
 
 	plane p = best_fit_plane(f.vertices());
@@ -179,8 +177,8 @@ int Classify(const face& f, double4 v) {
 	return (c == 1) ? 1 : 0;
 }
 
-int Classify(const face& f, const ray3& s, double* travel) {
-	if (!Intersects(aabb4(f.vertices()), aabb4(s.origin, s.infinity())))
+int Classify(const face& f, const ray3& s, const aabb4& box, double* travel) {
+	if (!Intersects(box, aabb4(s.origin, s.infinity())))
 		return +1;
 
 	plane p = best_fit_plane(f.vertices());
@@ -192,7 +190,7 @@ int Classify(const face& f, const ray3& s, double* travel) {
 	if (std::isfinite(t)) {
 		if (t < -Tolerance)
 			return +1;
-		return Classify(f, s.linear(t));
+		return Classify(f, s.linear(t), box);
 	}
 
 	if (abs(d) > Tolerance)
@@ -203,18 +201,22 @@ int Classify(const face& f, const ray3& s, double* travel) {
 	return (c == 1) ? 1 : 0;
 }
 
+pair<int, int> ClassifyDoubleSided(const xpolygon2& poly, const ray2& ray) {
+	THROW(not_implemented);
+}
+
 // Computes Classify for both s and -s at once.
-pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s) {
-	// TODO bounding box
-	//if (!Intersects(aabb4(f.vertices()), aabb4(s))
-	//	return +1;
+pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box) {
+	if (!Intersects(box, aabb4(s.origin, s.infinity())) && !Intersects(box, aabb4(s.origin, -s.infinity())))
+		return {1, 1};
 
 	plane p = best_fit_plane(f.vertices());
 
 	double d = p.distance(s.origin);
 	double t = -d / p.distance(s.unit_dir);
 	if (std::isfinite(t)) {
-		int c = Classify(f, s.linear(t));
+		// ray intersects plane in point
+		int c = Classify(f, s.linear(t), box);
 		if (c == 1)
 			return {1, 1};
 		if (t > Tolerance)
@@ -224,9 +226,11 @@ pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s) {
 		return {c, c};
 	}
 
+	// ray is parallel with plane
 	if (d > Tolerance || d < -Tolerance)
 		return {1, 1};
 
+	// ray is coplanar with plane
 	int axis = ProjectionAxis(f);
 	auto c = ClassifyDoubleSided(Project(f, axis), Project(s, axis));
 	if (c.first == -1)
@@ -237,20 +241,12 @@ pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s) {
 }
 
 int Classify(plane p, const segment3& s) {
-	int ca = Sign(p, s.a);
-	int cb = Sign(p, s.b);
-	if (ca == +1 && cb == +1)
-		return +1;
-	if (ca == -1 && cb == -1)
-		return +1;
-	if (ca == 0 || cb == 0)
-		return 0;
-	return -1;
+	return Sign(p, s.a) * Sign(p, s.b);
 }
 
 // [intersections] represent relative travels along segment S
-int Classify(const face& f, const segment3& s, vector<pair<double, double>>* intersections) {
-	if (!Intersects(aabb4(f.vertices()), aabb4(s)))
+int Classify(const face& f, const segment3& s, vector<dpair>* intersections) {
+	if (!Intersects(Box(f.vertices()), aabb4(s)))
 		return +1;
 
 	plane p = best_fit_plane(f.vertices());
@@ -298,17 +294,32 @@ int Classify(const xmesh3& m, double4 p, const aabb4& box) {
 
 	// Check if the point is on the boundary
 	for (const face& f : m)
-		if (Classify(f, p) == 0)
+		if (Classify(f, p, box) == 0)
 			return 0;
 
 	// Shoot a ray (in both directions at once) and count crossings
-	// (if both ray hits any edge or vertex, shoot a new ray and repeat)
+	// (if both rays hits any edge or vertex, shoot a new ray and repeat)
 	std::default_random_engine rnd;
-	while (true) {
-		ray3 ray(p, p + uniform_dir3(rnd));
+	std::uniform_int_distribution dist(0, 2);
+	rnd.seed(0);
+	double4 dirs[3] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+	for (size_t i = 0; ; i += 1) {
+		// ray direction vector will have 1 or 2 components zero to make its bounding box smaller
+		double4 d;
+		if (i < 3) {
+			d = dirs[i];
+		} else {
+			while (true) {
+				d = uniform_dir3(rnd);
+				d[dist(rnd)] = 0;
+				if (squared(d) > squared(0.01))
+					break;
+			}
+		}
+		ray3 ray(p, p + d);
 		pair<int, int> result = {1, 1};
 		for (const face& f : m) {
-			auto c = ClassifyDoubleSided(f, ray);
+			auto c = ClassifyDoubleSided(f, ray, box);
 			result.first *= c.first;
 			result.second *= c.second;
 			if (result.first == 0 && result.second == 0)
@@ -348,12 +359,12 @@ int Classify(const xmesh3& m, const segment3& s, const aabb4& box) {
 
 	Intervals intervals;
 	for (const face& f : m) {
-		vector<pair<double, double>> intersections;
+		vector<dpair> intersections;
 		int c = Classify(f, s, &intersections);
 		if (c == -1)
 			return -1;
 		if (c == 0)
-			for (pair<double, double> p : intersections)
+			for (dpair p : intersections)
 				intervals.add(p.first, p.second);
 	}
 
@@ -375,7 +386,7 @@ int Classify(const xmesh3& m, const segment3& s, const aabb4& box) {
 
 static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4& boxb) {
 	int result = 1;
-	for (const face& f : ma) {
+	for (const face& f : ma)
 		for (const segment3& e : Edges(f)) {
 			int c = Classify(mb, e, boxb);
 			if (c == 0)
@@ -383,23 +394,25 @@ static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4
 			if (c == -1)
 				return -1;
 		}
-	}
 	return result;
 }
 
 // This will be a ground truth function. Slow and accurate.
 // TODO identify all contacts
 int Classify(const xmesh3& ma, const xmesh3& mb) {
-	aabb4 boxa(ma.vertices()), boxb(mb.vertices());
-	if (!Intersects(boxa, boxb))
+	auto va = Box(ma.vertices());
+	auto vb = Box(mb.vertices());
+	if (!Intersects(va, vb))
 		return +1;
 
-	if (Classify(ma, mb.vertices()[0], boxa) == -1 || Classify(mb, ma.vertices()[0], boxb) == -1)
+	if (Contains(va, vb) && Classify(ma, mb.vertices()[0], va) < 0)
+		return -1;
+	if (Contains(vb, va) && Classify(mb, ma.vertices()[0], vb) < 0)
 		return -1;
 
-	int ca = ClassifyFaceEdgePairs(ma, mb, boxb);
+	int ca = ClassifyFaceEdgePairs(ma, mb, vb);
 	if (ca == -1)
 		return -1;
-	int cb = ClassifyFaceEdgePairs(mb, ma, boxa);
+	int cb = ClassifyFaceEdgePairs(mb, ma, va);
 	return min(ca, cb);
 }

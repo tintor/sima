@@ -6,6 +6,7 @@
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }
 inline aabb2 Box(const xpolygon2& p) { return aabb2(p.vertices()).buffer(Tolerance); }
+inline aabb4 Box(span<const double4> s) { return aabb4(s).buffer(Tolerance); }
 
 // All Sign() functions return:
 // +1 above / positive side
@@ -64,9 +65,9 @@ int Classify(const xpolygon2& f, ray2 s);
 // 3D
 // ==
 
-int Classify(const face& f, double4 v);
+int Classify(const face& f, double4 v, const aabb4& box);
 int Classify(const face& f, const ray3& s, double* travel = nullptr);
-pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s);
+pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box);
 int Classify(plane p, const segment3& s);
 int Classify(const face& f, const segment3& s, vector<dpair>* intersections = nullptr);
 int Classify(const xmesh3& m, double4 p, const aabb4& box);

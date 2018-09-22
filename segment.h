@@ -54,7 +54,7 @@ struct ray {
 	ray(Vec a, Vec b) : unit_dir(normalize(b - a)), origin(a) { }
 
 	// using max() instead of infinity() in order for mult with zero to stay zero
-	Vec infinity() const { return linear(std::numeric_limits<double>::max()); }
+	Vec infinity() const { return linear(std::numeric_limits<double>::max()) * std::numeric_limits<double>::max(); }
 
 	bool operator==(ray v) const { return equal(origin, v.origin) && equal(unit_dir, v.unit_dir); }
 	bool operator!=(ray v) const { return !(operator==(v)); }
