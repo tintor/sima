@@ -50,9 +50,18 @@ double2 swap(double2 a) {
 	return double2{a.y, a.x};
 }
 
-// TODO test ray/edge crossing logic
-// TODO test "shape" of Tolerance area around the border, is it round or square? (sample many points and estimate area of Tolerance area)
-TEST_CASE("Classify(xpolygon2, double2)", "[classify]") {
+double distance(segment2 s, double2 p) {
+	return length(s.nearest(p) - p);
+}
+
+double distanceRingPoint(span<const double2> ring, double2 p) {
+	double dist = std::numeric_limits<double>::max();
+	for (const segment2& e : Edges(ring))
+		dist = min(dist, distance(e, p));
+	return dist;
+}
+
+TEST_CASE("Classify(xpolygon2, double2) simple", "[classify]") {
 	xpolygon2 a;
 	a.add({double2{0, 0}, double2{1, 0}, double2{1, 1}, double2{0, 1}});
 
@@ -60,67 +69,142 @@ TEST_CASE("Classify(xpolygon2, double2)", "[classify]") {
 	REQUIRE(Classify(a, double2{1.1, 1.1}) == 1);
 	REQUIRE(Classify(a, double2{0.9, 1}) == 0);
 	REQUIRE(Classify(a, double2{0.9, 0.9}) == -1);
+}
 
+TEST_CASE("Classify(xpolygon2, double2) random triangle", "[classify]") {
 	std::default_random_engine rnd;
 	for (int i = 0; i < 10000; i++) {
-		print("i=%s\n", i);
 		double2 a = uniform2(rnd, -10, 10);
 		double2 b = uniform2(rnd, -10, 10);
+		while (Equals(a, b))
+			b = uniform2(rnd, -10, 10);
 		double2 c = uniform2(rnd, -10, 10);
+		while (Equals(a, c) || Equals(b, c))
+			c = uniform2(rnd, -10, 10);
+
 		xpolygon2 poly;
-		poly.add(a);
-		poly.add(b);
-		poly.add(c);
+		poly.add({a, b, c});
 
 		xpolygon2 poly2;
-		poly2.add(c);
-		poly2.add(b);
-		poly2.add(a);
+		poly2.add({c, b, a});
 
 		xpolygon2 poly3;
-		poly3.add(-a);
-		poly3.add(-b);
-		poly3.add(-c);
+		poly3.add({-a, -b, -c});
 
 		xpolygon2 poly4;
-		poly4.add(swap(a));
-		poly4.add(swap(b));
-		poly4.add(swap(c));
+		poly4.add({swap(a), swap(b), swap(c)});
 
-		for (double2 p : {a, b, c}) {
-			print("[%s %s %s] %s\n", a, b, c, p);
-			REQUIRE(Classify(poly, p) == 0);
-		   	REQUIRE(Classify(poly2, p) == 0);
-			REQUIRE(Classify(poly3, -p) == 0);
-			REQUIRE(Classify(poly4, swap(p)) == 0);
-		}
+		vector<pair<double2, int>> tests;
+		tests.emplace_back(a, 0);
+		tests.emplace_back(b, 0);
+		tests.emplace_back(c, 0);
+
 		for (int j = 0; j < 100; j++) {
-			double t = uniform(rnd, -1, 2);
-			for (double2 p : {
-					segment2(a, b).linear(t),
-					segment2(b, c).linear(t),
-					segment2(c, a).linear(t),
-					uniform2(rnd, -10, 10)}) {
-				int k = Classify(poly, p);
-				REQUIRE(k == Classify(poly2, p));
-				REQUIRE(k == Classify(poly3, -p));
-				REQUIRE(k == Classify(poly4, swap(p)));
-			}
+			tests.emplace_back(uniform2(rnd, -10, 10), 9);
 
-			double s = uniform(rnd, 0, 1);
-			double2 p = segment2(a, b).linear(s);
-			REQUIRE(Classify(poly, p) == 0);
-			REQUIRE(Classify(poly2, p) == 0);
-			REQUIRE(Classify(poly3, -p) == 0);
-			REQUIRE(Classify(poly4, swap(p)) == 0);
+			double e = uniform(rnd, -1, -0.01);
+			tests.emplace_back(segment2(a, b).linear(e), 1);
+			tests.emplace_back(segment2(b, a).linear(e), 1);
 
-			s = uniform(rnd, 0.001, 0.999);
-			p = segment2(p, c).linear(s);
-			REQUIRE(Classify(poly, p) == -1);
-			REQUIRE(Classify(poly2, p) == -1);
-			REQUIRE(Classify(poly3, -p) == -1);
-			REQUIRE(Classify(poly4, swap(p)) == -1);
+			double t = uniform(rnd, 0.01, 0.99);
+			tests.emplace_back(segment2(a, b).linear(t), 0);
+
+			double s = uniform(rnd, 0.01, 0.99);
+			tests.emplace_back(segment2(segment2(a, b).linear(t), c).linear(s), -1);
 		}
+
+		for (const auto& [p, cc] : tests) {
+			const int c = (cc == 9) ? Classify(poly, p) : cc;
+			REQUIRE(Classify(poly, p) == c);
+		   	REQUIRE(Classify(poly2, p) == c);
+			REQUIRE(Classify(poly3, -p) == c);
+			REQUIRE(Classify(poly4, swap(p)) == c);
+		}
+	}
+}
+
+long squared(int2 a) {
+	return (long)a.x * a.x + (long) a.y * a.y;
+}
+
+template<typename RNG>
+static vector<int2> random_polygon(int size, RNG& rng) {
+	unordered_set<int2, hash_t<int2>, equal_t<int2>> points;
+	while (points.size() < size) {
+		std::uniform_int_distribution uniform(0, 9);
+		points.insert(int2{uniform(rng), uniform(rng)});
+	}
+
+	// order points into polygon using traveling salesman heuristic
+	vector<int2> poly(points.begin(), points.end());
+	bool done = false;
+	while (!done) {
+		done = true;
+		for (int j : range(1, size))
+			for (int i : range(j - 1)) {
+				auto c = poly[j];
+				auto d = poly[(j + 1) % size];
+				auto a = poly[i];
+				auto b = poly[(i + 1) % size];
+				if (squared(a - b) + squared(c - d) > squared(a - c) + squared(b - d)) {
+					// TODO faster if we replace polygon with XOR-linked list
+					std::reverse(poly.begin() + i + 1, poly.begin() + j + 1);
+					done = false;
+				}
+			}
+	}
+	return poly;
+}
+
+void transform(double2& p, int t) {
+	if (t & 1) p.x = -p.x;
+	if (t & 2) p.y = -p.y;
+	if (t & 4) p = {p.y, p.x};
+}
+
+void transform(vector<double2>& poly, int t) {
+	for (double2& p : poly)
+		transform(p, t);
+	if (t & 8)
+		for (int i = 0; i < poly.size() / 2; i++)
+			swap(poly[i], poly[poly.size() - 1 - i]);
+}
+
+TEST_CASE("Classify(polygon2, double2) random small int polygon", "[classify]") {
+	std::default_random_engine rnd;
+	polygon2 poly[16];
+	for (int i = 0; i < 10000; i++) {
+		poly[0].clear();
+		for (int2 p : random_polygon(8, rnd))
+			poly[0].push_back(double2{static_cast<double>(p.x), static_cast<double>(p.y)});
+		for (int i = 1; i < 16; i++) {
+			poly[i] = poly[0];
+			transform(poly[i], i);
+		}
+		for (int x = 0; x <= 9; x++)
+			for (int y = 0; y <= 9; y++) {
+				double2 p{static_cast<double>(x), static_cast<double>(y)};
+				int cn[3] = {0, 0, 0};
+				for (int t = 0; t < 16; t++) {
+					double2 tp = p;
+					transform(tp, t);
+					cn[1 + Classify(poly[t], tp)] += 1;
+				}
+				int m = max(cn[0], cn[1], cn[2]);
+				int c;
+				if (cn[0] == m) c = -1;
+				if (cn[1] == m) c = 0;
+				if (cn[2] == m) c = 1;
+				if (m != 16) {
+					print("outside %s, border %s, inside %s\n", cn[0], cn[1], cn[2]);
+					for (int t = 0; t < 16; t++) {
+						double2 tp = p;
+						transform(tp, t);
+						print("[%s] Classify(%s, %s) = %s\n", t, "x"/*poly[t]*/, tp, Classify(poly[t], tp));
+					}
+					REQUIRE(m == 16);
+				}
+			}
 	}
 }
 

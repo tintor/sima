@@ -34,6 +34,7 @@ inline bool all(long4 v) { return _mm256_movemask_pd(v) == 0xF; }
 inline bool any(long2 v) { return _mm_movemask_pd(v) != 0; }
 inline bool any(long4 v) { return _mm256_movemask_pd(v) != 0; }
 
+inline bool equal(int2 a, int2 b) { return all(a == b); }
 inline bool equal(double2 a, double2 b) { return all(a == b); }
 inline bool equal(double4 a, double4 b) { return all(a == b); }
 
@@ -41,6 +42,7 @@ inline bool equal(double4 a, double4 b) { return all(a == b); }
 //inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
 //inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
 
+inline hash operator<<(hash h, int2 a) { return h << a.x << a.y; }
 inline hash operator<<(hash h, double2 a) { return h << a.x << a.y; }
 inline hash operator<<(hash h, double4 a) { return h << a.x << a.y << a.z << a.w; }
 

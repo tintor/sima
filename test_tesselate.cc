@@ -7,10 +7,6 @@
 #include <random>
 #include "is_valid.h"
 
-inline double sq(double2 a, double2 b) {
-	return squared(a - b);
-}
-
 template<typename RNG>
 static polygon2 random_polygon(int size, RNG& rng) {
 	unordered_set<double2, hash_t<double2>, equal_t<double2>> points;
@@ -28,7 +24,7 @@ static polygon2 random_polygon(int size, RNG& rng) {
 				auto d = poly[(j + 1) % size];
 				auto a = poly[i];
 				auto b = poly[(i + 1) % size];
-				if (sq(a, b) + sq(c, d) > sq(a, c) + sq(b, d)) {
+				if (squared(a - b) + squared(c - d) > squared(a - c) + squared(b - d)) {
 					// TODO faster if we replace polygon with XOR-linked list
 					std::reverse(poly.begin() + i + 1, poly.begin() + j + 1);
 					done = false;

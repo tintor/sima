@@ -8,6 +8,159 @@ int Classify(const xpolygon2& f, ray2 s) {
 	THROW(not_implemented);
 }
 
+static int ClassifySegmentRayHelper(double2 ea, double2 eb, double2 p) {
+	if (ea.y > eb.y)
+		swap(ea, eb);
+
+	int sa = Sign(ea.y - p.y);
+	int sb = Sign(eb.y - p.y);
+	if (sa > 0 || sb < 0)
+		return 1;
+
+	if (sa == 0 && sb == 0)
+		return (p.x > max(ea.x, eb.x) + Tolerance) ? 1 : 0;
+	if (sa == 0)
+		return (p.x > ea.x + Tolerance) ? 1 : 0;
+	if (sb == 0)
+		return (p.x > eb.x + Tolerance) ? 1 : 0;
+
+	return (signed_double_area(ea, eb, p) < 0) ? -1 : 1;
+}
+
+static bool PointInPolygon(double2 p, span<const double2> ring) {
+	bool result = false;
+	double entrance = 0;
+	size_t m = IndexOfMax(ring, [p](double2 v) { return abs(v.y - p.y); });
+	for (size_t i = 0; i < ring.size(); i++) {
+		double2 a = ring[(i + m) % ring.size()];
+		double2 b = ring[(i + m + 1) % ring.size()];
+
+		int c = ClassifySegmentRayHelper(a, b, p);
+		if (c == -1)
+			result ^= 1;
+		if (c == 0) {
+			bool za = abs(a.y - p.y) <= Tolerance;
+			bool zb = abs(b.y - p.y) <= Tolerance;
+			if (zb && !za)
+				entrance = a.y - p.y;
+			if (za && !zb) {
+				if (entrance * (b.y - p.y) < 0)
+					result ^= 1;
+				entrance = 0;
+			}
+		}
+	}
+	return result;
+}
+
+template<typename Polygon2>
+int TClassify(const Polygon2& a, double2 p, aabb2 box) {
+	if (!box.intersects(p))
+		return +1;
+
+	for (auto e : Edges(a))
+		if (Classify(e, p) == 0)
+			return 0;
+
+	int result = 1;
+	for (auto ring : Rings(a))
+		if (PointInPolygon(p, ring))
+			result = -result;
+	return result;
+}
+
+int Classify(const polygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
+int Classify(const xpolygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
+
+class Intervals {
+public:
+	void add(double begin, double end) {
+		_points.emplace_back(true, begin);
+		_points.emplace_back(false, end);
+	}
+	void unionAll();
+	size_t size() const { return _points.size() / 2; }
+	pair<double, double> operator[](size_t idx) {
+		return { _points[idx * 2].second, _points[idx * 2 + 1].second };
+	}
+private:
+	vector<pair<bool, double>> _points;
+};
+
+template<typename Polygon2>
+int TClassify(const Polygon2& f, segment2 s, aabb2 box, vector<pair<double, double>>* intersections = nullptr) {
+	if (!Intersects(box, aabb2(s)))
+		return +1;
+
+	if (!intersections)
+		if (Classify(f, s.a, box) == -1 || Classify(f, s.b, box) == -1)
+			return -1;
+
+	Intervals intervals;
+	for (segment2 e : Edges(f)) {
+		double2 t;
+		if (relate(e, s, nullptr, &t) != 'D') {
+			double x = t.x, y = t.y;
+			if (intersections)
+				intersections->emplace_back(x, y);
+			intervals.add(x, y);
+		}
+	}
+
+	if (Classify(f, s.a, box) == -1 || Classify(f, s.b, box) == -1)
+		return -1;
+	if (intervals.size() == 0)
+		return +1;
+
+	// check all mid points between travels if they are inside polygon
+	intervals.unionAll();
+	for (size_t i = 1; i < intervals.size(); i++) {
+		double t = (intervals[i - 1].second + intervals[i].first) / 2;
+		int c = Classify(f, s.linear(t), box);
+		assert(c != 0);
+		if (c == -1)
+			return -1;
+	}
+	return 0;
+}
+
+int Classify(const polygon2& f, segment2 s, aabb2 box, vector<dpair>* intersections) {
+	return TClassify(f, s, box, intersections);
+}
+int Classify(const xpolygon2& f, segment2 s, aabb2 box, vector<dpair>* intersections) {
+	return TClassify(f, s, box, intersections);
+}
+
+template<typename Polygon2>
+int TClassify(const Polygon2& a, const Polygon2& b) {
+	aabb2 va = Box(a), vb = Box(b);
+	if (!Intersects(va, vb))
+		return +1;
+
+	if (Classify(a, AnyVertex(b), va) < 0 || Classify(b, AnyVertex(a), vb) < 0)
+		return -1;
+
+	int result = 1;
+	for (auto ea : Edges(a)) {
+		int c = Classify(b, ea, vb);
+		if (c == -1)
+			return -1;
+		if (c == 0)
+			result = 0;
+	}
+	for (auto eb : Edges(b)) {
+		int c = Classify(a, eb, va);
+		if (c == -1)
+			return -1;
+		if (c == 0)
+			result = 0;
+	}
+	return result;
+}
+
+int Classify(const xpolygon2& a, const xpolygon2& b) { return TClassify(a, b); }
+int Classify(const polygon2& a, const polygon2& b) { return TClassify(a, b); }
+
 pair<int, int> ClassifyDoubleSided(const xpolygon2& f, ray2 s) {
 	THROW(not_implemented);
 }
@@ -117,7 +270,7 @@ int Classify(const face& f, const segment3& s, vector<pair<double, double>>* int
 	if (ca == 0 && cb == 0) {
 		// coplanar case
 		auto s2 = Project(s, axis);
-		return Classify(f2, s2, intersections);
+		return Classify(f2, s2, Box(f2), intersections);
 	}
 
 	if (ca == 0 || cb == 0) {

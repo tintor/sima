@@ -52,7 +52,7 @@ class iterable_t {
 	T _it;
 	decltype(_it.next()) _value;
 public:
-	iterable_t(T it) : _it(std::move(it)), _value(it.next()) { }
+	iterable_t(T it) : _it(std::move(it)), _value(_it.next()) { }
 	auto operator*() { return *_value; }
 	void operator++() { _value = _it.next(); }
 	bool operator!=(std::nullptr_t) { return _value.has_value(); }

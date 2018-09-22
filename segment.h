@@ -50,7 +50,7 @@ struct ray {
 	const Vec unit_dir, origin;
 
 	constexpr ray(const ray& s) : unit_dir(s.unit_dir), origin(s.origin) { }
-	ray(segment<Vec> s) : unit_dir(normalize(s.b - s.a)), origin(s.a) { }
+	explicit ray(segment<Vec> s) : unit_dir(normalize(s.b - s.a)), origin(s.a) { }
 	ray(Vec a, Vec b) : unit_dir(normalize(b - a)), origin(a) { }
 
 	// using max() instead of infinity() in order for mult with zero to stay zero
@@ -89,11 +89,11 @@ struct line {
 	}
 
 	line(const line& s) : unit_dir(s.unit_dir), origin(s.origin) { }
-	line(ray<Vec> s)
+	explicit line(ray<Vec> s)
 		: unit_dir(normalize_dir(s.unit_dir))
 		, origin(s.origin - unit_dir * dot(s.origin, unit_dir)) {
 	}
-	line(segment<Vec> s) : line(ray(s)) { }
+	explicit line(segment<Vec> s) : line(ray(s)) { }
 	line(Vec a, Vec b) : line(segment<Vec>{a, b}) { }
 
 	// TODO(marko) equality condition should check if lines are overlapping

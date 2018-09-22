@@ -75,3 +75,17 @@ void remove_dups(Vector& v, const Func& less, const Func& equal) {
        std::sort(v.begin(), v.end(), less);
        v.erase(std::unique(v.begin(), v.end(), equal), v.end());
 }
+
+template<typename T, typename P>
+size_t IndexOfMax(span<const T> s, P measure) {
+	auto mv = measure(s[0]);
+	int mi = 0;
+	for (size_t i = 1; i < s.size(); i++) {
+		auto v = measure(s[i]);
+		if (v > mv) {
+			mv = v;
+			mi = i;
+		}
+	}
+	return mi;
+}

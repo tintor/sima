@@ -57,6 +57,7 @@ public:
 	}
 
 	void add(Vec p) {
+		assert(size() > 0);
 		_vertices.push_back(p);
 		_offsets.back() += 1;
 	}
@@ -93,6 +94,45 @@ private:
 using xpolygon2 = xpolygon<double2>;
 using xpolygon3 = xpolygon<double4>;
 
+inline void format_e(string& s, string_view spec, const xpolygon2& p) {
+	s += "(";
+	for (size_t i = 0; i < p.size(); i++) {
+		format_e(s, spec, p[i]);
+		if (i != 0)
+			s += " ";
+	}
+	s += ")";
+}
+
+inline void format_e(string& s, string_view spec, const xpolygon3& p) {
+	s += "(";
+	for (size_t i = 0; i < p.size(); i++) {
+		format_e(s, spec, p[i]);
+		if (i != 0)
+			s += " ";
+	}
+	s += ")";
+}
+
+inline array<span<const double2>, 1> Rings(const polygon2& poly) {
+	return { poly };
+}
+
+struct rings_iter {
+	int ring;
+	const xpolygon2& poly;
+
+	optional<span<const double2>> next() {
+		if (ring == poly.size())
+			return nullopt;
+		return poly[ring++];
+	}
+};
+
+inline auto Rings(const xpolygon2& poly) {
+	return iterable(rings_iter{ 0, poly });
+}
+
 template<typename Vec>
 struct xpolygon_edge_iter {
 	int ring = 0;
@@ -106,7 +146,8 @@ struct xpolygon_edge_iter {
 			vertex = 0;
 			ring += 1;
 		}
-		if (ring >= poly.size()) return {};
+		if (ring >= poly.size())
+			return {};
 		span<const Vec> r = poly[ring];
 		ON_SCOPE_EXIT(vertex += 1);
 		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
