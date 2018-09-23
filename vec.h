@@ -38,6 +38,9 @@ inline bool equal(int2 a, int2 b) { return all(a == b); }
 inline bool equal(double2 a, double2 b) { return all(a == b); }
 inline bool equal(double4 a, double4 b) { return all(a == b); }
 
+inline double4 floor(double4 a) { return _mm256_floor_pd(a); }
+inline double4 ceil(double4 a) { return _mm256_ceil_pd(a); }
+
 // requires AVX512
 //inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
 //inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }

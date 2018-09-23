@@ -29,6 +29,7 @@ set(prod
 	classify.cc
 	project.cc
 	distance.cc
+	broadphase.cc
 	lodepng/lodepng.cc)
 
 set(test
@@ -56,6 +57,7 @@ set(test
 	test_range.cc
 	test_map.cc
 	test_sphere.cc
+	test_broadphase.cc
 	test_zip.cc)
 
 add_executable(a.sima main.cc ${prod})
