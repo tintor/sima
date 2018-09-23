@@ -104,6 +104,7 @@ public:
 	auto begin() const { return array_iterator<xmesh3>(0, *this); }
 	auto end() const { return array_iterator<xmesh3>(size(), *this); }
 
+	// contains duplicates!
 	span<const point3> vertices() const { return _vertices; }
 
 private:

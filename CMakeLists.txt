@@ -28,6 +28,7 @@ set(prod
 	segment.cc
 	classify.cc
 	project.cc
+	distance.cc
 	lodepng/lodepng.cc)
 
 set(test

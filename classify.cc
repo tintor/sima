@@ -388,6 +388,10 @@ static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4
 	int result = 1;
 	for (const face& f : ma)
 		for (const segment3& e : Edges(f)) {
+			// Since meshes are assumed to be closed, each edge will appear twice (in opposited directions)
+			if (e.a.x > e.b.x)
+				continue;
+
 			int c = Classify(mb, e, boxb);
 			if (c == 0)
 				result = 0;
