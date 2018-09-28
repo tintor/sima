@@ -5,6 +5,8 @@
 #include "segment.h"
 #include "auto.h"
 #include "each.h"
+#include "plane.h"
+#include "exception.h"
 
 // TODO should we store plane for every face?
 // store normalized plane or unnormalized plane?
@@ -34,10 +36,11 @@ public:
 // face can have arbitrary number of vertices and holes
 // first ring is exterior, other rings are interior and oriented opposite
 struct face {
-	face(const point3* vertices, span<const uint> offsets) : _vertices(vertices), _offsets(offsets) { }
+	face(const point3* vertices, span<const uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) { }
 	span<const point3> operator[](uint idx) const {
 		return span<const point3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
 	}
+	plane plane() const { return _plane; }
 	uint size() const { return _offsets.size() - 1; }
 	uint vertex_size() const { return _offsets.back() - _offsets[0]; }
 
@@ -51,6 +54,7 @@ struct face {
 private:
 	const point3* _vertices;
 	span<const uint> _offsets;
+	class plane _plane;
 };
 
 struct face_edge_iter {
@@ -98,7 +102,7 @@ public:
 
 	face operator[](uint idx) const {
 		span<const uint> offsets(_offsets.data() + _ring_offsets[idx], _offsets.data() + _ring_offsets[idx + 1]);
-		return face(_vertices.data(), offsets);
+		return face(_vertices.data(), offsets, _facePlanes[idx]);
 	}
 
 	auto begin() const { return array_iterator<xmesh3>(0, *this); }
@@ -107,8 +111,16 @@ public:
 	// contains duplicates!
 	span<const point3> vertices() const { return _vertices; }
 
+	span<const point3> uniqueVertices() const { THROW(not_implemented); }
+	vector<pair<segment3, double4>> uniqueEdges() const { THROW(not_implemented); }
+
 private:
 	aligned_vector<point3> _vertices;
 	vector<uint> _offsets;
 	vector<uint> _ring_offsets;
+
+	aligned_vector<plane> _facePlanes;
+	aligned_vector<segment3> _uniqueEdges;
+	aligned_vector<double4> _edgeNormals;
+	aligned_vector<point3> _uniqueVertices;
 };

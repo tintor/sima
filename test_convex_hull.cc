@@ -129,7 +129,7 @@ TEST_CASE("convex_hull simple", "[convex_hull]") {
 	REQUIRE(hull({a, b, c, d, double4{-1, 0, 0, 1}}).size() == 4);
 }
 
-TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
+/*TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 	std::default_random_engine rnd;
 	for (int vertices = 4; vertices <= 200; vertices++) {
 		aligned_vector<double4> V(vertices);
@@ -139,7 +139,7 @@ TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 		REQUIRE(IsValid(m) == Validity::OK);
 		REQUIRE(is_convex(m));
 	}
-}
+}*/
 
 TEST_CASE("convex_hull cube", "[convex_hull]") {
 	auto m = generate_box(1, 1, 1);

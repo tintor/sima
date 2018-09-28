@@ -368,7 +368,7 @@ TEST_CASE("Classify(xpolygon2, segment2) concave", "[classify]") {
 TEST_CASE("Classify(polygon2, segment2) random polyogn", "[classify]") {
 	std::default_random_engine rnd;
 	polygon2 poly[16];
-	for (int i = 0; i < 1000; i++) {
+	for (int i = 0; i < 500; i++) {
 	   	poly[0]	= random_polygon(8, rnd);
 		for (int t = 1; t < 16; t++) {
 			poly[t] = poly[0];

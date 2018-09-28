@@ -30,6 +30,13 @@ inline int Sign(ray2 s, double2 v) {
 
 inline int Sign(plane p, double4 v) { return Sign(p.distance(v)); }
 
+struct Contact {
+	enum class Type { Point, Segment, Polygon };
+
+	Type  type;
+	double4 normal;  // from mb to ma
+	double4 sa, sb;
+};
 
 // All Classify() functions return:
 // +1 disjoint / separate
@@ -69,7 +76,7 @@ int Classify(const face& f, double4 v, const aabb4& box);
 int Classify(const face& f, const ray3& s, double* travel = nullptr);
 pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box);
 int Classify(plane p, const segment3& s);
-int Classify(const face& f, const segment3& s, vector<dpair>* intersections = nullptr);
+int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections = nullptr, vector<Contact>* contacts = nullptr);
 int Classify(const xmesh3& m, double4 p, const aabb4& box);
-int Classify(const xmesh3& m, const segment3& s, const aabb4& box);
-int Classify(const xmesh3& ma, const xmesh3& mb);
+int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<Contact>* contacts = nullptr);
+int Classify(const xmesh3& ma, const xmesh3& mb, vector<Contact>* contacts = nullptr);

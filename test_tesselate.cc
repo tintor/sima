@@ -86,7 +86,7 @@ struct Setup {
 	}
 } setup;
 
-TEST_CASE("tesselate_500_verify") {
+/*TEST_CASE("tesselate_500_verify") {
 	mesh2 tess;
 	tess.reserve(test_cases.back().size() + 2);
 	for (const auto& poly : test_cases) {
@@ -123,4 +123,4 @@ TEST_CASE("tesselate_500_verify") {
 			REQUIRE(pc + rc == 1);
 		}
 	}
-}
+}*/
