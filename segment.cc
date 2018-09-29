@@ -12,7 +12,8 @@
 
 static bool Overlaps(aabb2 a, aabb2 b) {
 	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
-	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
+	double2 t{Tolerance, Tolerance};
+	return all(mn - mx <= t) && squared(mn - mx) > squared(Tolerance);
 }
 
 int relate_full(segment2 p, segment2 q, double* pt, double* qt) {

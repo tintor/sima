@@ -1,5 +1,6 @@
 #include "catch.hpp"
 #include "classify.h"
+#include "primitives.h"
 
 TEST_CASE("Sign(segment2, double2)", "[classify]") {
 	segment2 s(double2{2, 0}, double2{1, 0});
@@ -48,10 +49,6 @@ TEST_CASE("operator<<(vector<T>, span<T>)", "[classify]") {
 
 double2 swap(double2 a) {
 	return double2{a.y, a.x};
-}
-
-double distance(segment2 s, double2 p) {
-	return length(s.nearest(p) - p);
 }
 
 double distanceRingPoint(span<const double2> ring, double2 p) {
@@ -495,6 +492,21 @@ double TranslateUntilContact(polygon2& a, const polygon2& b, double2 t) {
 
 double ScaleUntilContact(polygon2& a, const polygon2& b, double t) {
 	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Scale(m, 1 + t); }, 0.001);
+}
+
+static bool Overlaps(aabb2 a, aabb2 b) {
+	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
+	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
+}
+
+TEST_CASE("Overlaps", "[classify2]") {
+	segment2 a(double2{3.14, 1}, double2{3.14, -1});
+	segment2 b(double2{3.14, -2}, double2{3.14, 2});
+	REQUIRE(relate(a, b) == 'O');
+	double2 t;
+	REQUIRE(relate(a, b, nullptr, &t) == 'O');
+	REQUIRE(t.x == 0.25);
+	REQUIRE(t.y == 0.75);
 }
 
 TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {

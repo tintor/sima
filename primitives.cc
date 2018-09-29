@@ -1,6 +1,14 @@
 #include "primitives.h"
 #include "exception.h"
 
+double distance(segment2 a, double2 b) {
+	return length(a.nearest(b) - b);
+}
+
+double distance(double2 a, segment2 b) {
+	return distance(b, a);
+}
+
 constexpr bool inside_triangle_prism(double4 p, triangle3 m, double4 normal) {
 	for (auto [a, b] : Edges(m))
 		if (plane::sign(a, b, a + normal, p) > 0)

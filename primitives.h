@@ -25,6 +25,9 @@ constexpr double ContactEpsilon = 10 * PlanarEpsilon;
 double squared_distance(segment3 p, segment3 q);
 double squared_distance(line3 m, double4 p);
 
+double distance(segment2 a, double2 b);
+double distance(double2 a, segment2 b);
+
 double distance(double4 a, double4 b);
 double distance(double4 a, segment3 b);
 double distance(segment3 a, double4 b);

@@ -3,6 +3,7 @@
 #include "edges.h"
 #include "project.h"
 #include "properties.h"
+#include "primitives.h"
 
 int Classify(const xpolygon2& f, ray2 s) {
 	THROW(not_implemented);
@@ -99,7 +100,12 @@ int TClassify(const Polygon2& f, segment2 s, aabb2 box, vector<pair<double, doub
 	Intervals intervals;
 	for (segment2 e : Edges(f)) {
 		double2 t;
-		if (relate(e, s, nullptr, &t) != 'D') {
+		char c = relate(e, s, nullptr, &t);
+		if (t.y > 1)
+			t.y = 1;
+		if (t.x < 0)
+			t.x = 0;
+		if (c != 'D') {
 			double x = t.x, y = t.y;
 			if (intersections)
 				intersections->emplace_back(x, y);
