@@ -416,3 +416,55 @@ TEST_CASE("Classify(xpolygon2, xpolygon2)", "[classify]") {
 		REQUIRE(Classify(a, b) == i);
 	}
 }
+
+double2 Rotate(double2 v, double a) {
+	double c = cos(a), s = sin(a);
+	return { v.x * c - v.y * s, v.x * s + v.y * c };
+}
+
+polygon2 Rotate(polygon2 m, double a) {
+	for (double2& v : m)
+		v = Rotate(v, a);
+	return m;
+}
+
+polygon2 Translate(polygon2 m, double2 t) {
+	for (double2& v : m)
+		v += t;
+	return m;
+}
+
+polygon2 Scale(polygon2 m, double2 s) {
+	for (double2& v : m)
+		v *= s;
+	return m;
+}
+
+polygon2 MakeRect(double x, double y) {
+	return polygon2{double2{x, y}, double2{-x, y}, double2{-x, -y}, double2{x, -y}};
+}
+
+polygon2 MakeTriangle(double x, double y) {
+	return polygon2{double2{0, y}, double2{-x/2, 0}, double2{x/2, 0}};
+}
+
+polygon2 MakeU(double x, double y, double a) {
+	return polygon2{double2{-x, -y}, double2{x, -y}, double2{x, y}, double2{x-a, y},
+			        double2{x-a, a-y}, double2{a-x, a-y}, double2{a-x, y}, double2{-x, y}};
+}
+
+polygon2 MakeL(double x, double y, double a) {
+	return polygon2{double2{-x, -y}, double2{x, -y}, double2{x, a-y}, double2{a-x, a-y},
+				    double2{a-x, y}, double2{-x, y}};
+}
+
+// two axis aligned squares
+// square and L shape
+// square and U shape
+// U shape and I shape
+// U shape and triangle
+
+// Auto testing:
+// - mode objects towards each other until penetration happens
+// - if they can't move any further assert there are contacts
+// - once in contact, rotate until they get even closer
