@@ -30,10 +30,14 @@ inline int Sign(ray2 s, double2 v) {
 
 inline int Sign(plane p, double4 v) { return Sign(p.distance(v)); }
 
+struct Contact2 {
+	double2 normal;
+	double2 sa, sb;
+};
+
 struct Contact {
 	enum class Type { Point, Segment, Polygon };
-
-	Type  type;
+	Type type;
 	double4 normal;  // from mb to ma
 	double4 sa, sb;
 };
@@ -63,8 +67,8 @@ inline int Classify(const polygon2& f, segment2 s, vector<dpair>* intersections 
 inline int Classify(const xpolygon2& f, segment2 s, vector<dpair>* intersections = nullptr) { return Classify(f, s, Box(f), intersections); }
 
 // polygon vs polygon
-int Classify(const xpolygon2& a, const xpolygon2& b);
-int Classify(const polygon2& a, const polygon2& b);
+int Classify(const xpolygon2& a, const xpolygon2& b, vector<Contact2>* contacts = nullptr);
+int Classify(const polygon2& a, const polygon2& b, vector<Contact2>* contacts = nullptr);
 
 // polygon vs ray
 int Classify(const xpolygon2& f, ray2 s);

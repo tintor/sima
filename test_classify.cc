@@ -422,22 +422,19 @@ double2 Rotate(double2 v, double a) {
 	return { v.x * c - v.y * s, v.x * s + v.y * c };
 }
 
-polygon2 Rotate(polygon2 m, double a) {
+void Rotate(polygon2& m, double a) {
 	for (double2& v : m)
 		v = Rotate(v, a);
-	return m;
 }
 
-polygon2 Translate(polygon2 m, double2 t) {
+void Translate(polygon2& m, double2 t) {
 	for (double2& v : m)
 		v += t;
-	return m;
 }
 
-polygon2 Scale(polygon2 m, double2 s) {
+void Scale(polygon2& m, double2 s) {
 	for (double2& v : m)
 		v *= s;
-	return m;
 }
 
 polygon2 MakeRect(double x, double y) {
@@ -458,7 +455,97 @@ polygon2 MakeL(double x, double y, double a) {
 				    double2{a-x, y}, double2{-x, y}};
 }
 
-// two axis aligned squares
+double TransformUntilContact(polygon2& a, const polygon2& b, std::function<void(polygon2&, double)> transform, double inc) {
+	double t = 0;
+	polygon2 orig = a;
+	while (true) {
+		a = orig;
+		transform(a, t);
+		int k = Classify(a, b);
+		if (k == 0)
+			return t;
+		if (k == -1)
+			break;
+		t += inc;
+	}
+	// solution is between t-inc and t
+	double lower = t - inc, upper = t;
+	while (true) {
+		REQUIRE(upper - lower > 1e-8);
+		t = (lower + upper) / 2;
+		a = orig;
+		transform(a, t);
+		int k = Classify(a, b);
+		if (k == 0)
+			return t;
+		if (k == -1)
+			upper = t;
+		else
+			lower = t;
+	}
+}
+
+double RotateUntilContact(polygon2& a, const polygon2& b, double t) {
+	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Rotate(m, t); }, M_PI / 72);
+}
+
+double TranslateUntilContact(polygon2& a, const polygon2& b, double2 t) {
+	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Translate(m, t * a); }, 1);
+}
+
+double ScaleUntilContact(polygon2& a, const polygon2& b, double t) {
+	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Scale(m, 1 + t); }, 0.001);
+}
+
+TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {
+	polygon2 a = MakeRect(-1, 1);
+	polygon2 b = MakeRect(-2, 2);
+	Translate(b, double2{5.14, 0});
+	double t = TranslateUntilContact(a, b, double2{1, 0});
+	print("t = %s\n", t);
+	vector<Contact2> contacts;
+	Classify(a, b, &contacts);
+	for (const Contact2& c : contacts)
+		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
+}
+
+TEST_CASE("Classify(polygon2, polygon2) offset boxes", "[classify2]") {
+	polygon2 a = MakeRect(-1, 1);
+	polygon2 b = MakeRect(-1, 1);
+	Translate(b, double2{5.14, 1});
+	double t = TranslateUntilContact(a, b, double2{1, 0});
+	print("t = %s\n", t);
+	vector<Contact2> contacts;
+	Classify(a, b, &contacts);
+	for (const Contact2& c : contacts)
+		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
+}
+
+TEST_CASE("Classify(polygon2, polygon2) rotated box", "[classify2]") {
+	polygon2 a = MakeRect(-1, 1);
+	Translate(a, M_PI / 4);
+	polygon2 b = MakeRect(-1, 1);
+	Translate(b, double2{5.14, 0});
+	double t = TranslateUntilContact(a, b, double2{1, 0});
+	print("t = %s\n", t);
+	vector<Contact2> contacts;
+	Classify(a, b, &contacts);
+	for (const Contact2& c : contacts)
+		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
+}
+
+TEST_CASE("Classify(polygon2, polygon2) same boxes", "[classify2]") {
+	polygon2 a = MakeRect(-1, 1);
+	polygon2 b = MakeRect(-1, 1);
+	Translate(b, double2{5.14, 0});
+	double t = TranslateUntilContact(a, b, double2{1, 0});
+	print("t = %s\n", t);
+	vector<Contact2> contacts;
+	Classify(a, b, &contacts);
+	for (const Contact2& c : contacts)
+		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
+}
+
 // square and L shape
 // square and U shape
 // U shape and I shape
