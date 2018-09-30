@@ -201,9 +201,9 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) 
 	int resultA = TClassifyWithContacts(a, b, vb, *contacts, false);
 	int resultB = TClassifyWithContacts(b, a, va, *contacts, true);
 	if (resultA == 0 || resultB == 0) {
+		// TODO
 		// remove duplicate edge/edge contacts
-		// TODO sort
-		// TODO unique
+		// merge point/edge contacts that are very close to each other (Tolerance)
 		return 0;
 	}
 	return 1;

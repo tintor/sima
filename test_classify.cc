@@ -416,7 +416,7 @@ TEST_CASE("Classify(xpolygon2, xpolygon2)", "[classify]") {
 
 double2 Rotate(double2 v, double a) {
 	double c = cos(a), s = sin(a);
-	return { v.x * c - v.y * s, v.x * s + v.y * c };
+	return { v.x * c + v.y * s, v.y * c - v.x * s };
 }
 
 void Rotate(polygon2& m, double a) {
@@ -514,7 +514,6 @@ TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {
 	polygon2 b = MakeRect(-2, 2);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	print("t = %s\n", t);
 	vector<Contact2> contacts;
 	Classify(a, b, &contacts);
 	for (const Contact2& c : contacts)
@@ -526,7 +525,6 @@ TEST_CASE("Classify(polygon2, polygon2) offset boxes", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 1});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	print("t = %s\n", t);
 	vector<Contact2> contacts;
 	Classify(a, b, &contacts);
 	for (const Contact2& c : contacts)
@@ -539,7 +537,6 @@ TEST_CASE("Classify(polygon2, polygon2) rotated box", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	print("t = %s\n", t);
 	vector<Contact2> contacts;
 	Classify(a, b, &contacts);
 	for (const Contact2& c : contacts)
@@ -551,19 +548,20 @@ TEST_CASE("Classify(polygon2, polygon2) same boxes", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	print("t = %s\n", t);
 	vector<Contact2> contacts;
 	Classify(a, b, &contacts);
 	for (const Contact2& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }
 
-// square and L shape
-// square and U shape
-// U shape and I shape
-// U shape and triangle
-
-// Auto testing:
-// - mode objects towards each other until penetration happens
-// - if they can't move any further assert there are contacts
-// - once in contact, rotate until they get even closer
+TEST_CASE("Classify(polygon2, polygon2) square and L", "[classify2]") {
+	polygon2 a = MakeRect(-1, 1);
+	polygon2 b = MakeL(1, 1, 0.2);
+	Rotate(b, M_PI * 3 / 2);
+	Translate(b, double2{5, 0});
+	double t = TranslateUntilContact(a, b, double2{1, 0});
+	vector<Contact2> contacts;
+	Classify(a, b, &contacts);
+	for (const Contact2& c : contacts)
+		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
+}
