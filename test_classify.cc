@@ -535,7 +535,7 @@ TEST_CASE("Classify(polygon2, polygon2) offset boxes", "[classify2]") {
 
 TEST_CASE("Classify(polygon2, polygon2) rotated box", "[classify2]") {
 	polygon2 a = MakeRect(-1, 1);
-	Translate(a, M_PI / 4);
+	Rotate(a, M_PI / 4);
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});

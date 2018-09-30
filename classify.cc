@@ -200,7 +200,13 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) 
 	// looking for contacts too!
 	int resultA = TClassifyWithContacts(a, b, vb, *contacts, false);
 	int resultB = TClassifyWithContacts(b, a, va, *contacts, true);
-	return min(resultA, resultB);
+	if (resultA == 0 || resultB == 0) {
+		// remove duplicate edge/edge contacts
+		// TODO sort
+		// TODO unique
+		return 0;
+	}
+	return 1;
 }
 
 int Classify(const xpolygon2& a, const xpolygon2& b, vector<Contact2>* contacts) { return TClassify(a, b, contacts); }
