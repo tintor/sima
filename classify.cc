@@ -138,6 +138,36 @@ int Classify(const xpolygon2& f, segment2 s, aabb2 box, vector<dpair>* intersect
 }
 
 template<typename Polygon2>
+int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector<Contact2>& contacts, bool reverse) {
+	int result = 1;
+	vector<dpair> intersections;
+	for (auto ea : Edges(a)) {
+		intersections.clear();
+		int c = Classify(b, ea, vb, &intersections);
+		if (c == -1)
+			return -1;
+		if (c == 0) {
+			result = 0;
+			for (const dpair& p : intersections) {
+				if (p.first == p.second && (p.first <= Tolerance || p.first >= 1 - Tolerance))
+					continue;
+				Contact2 c;
+				c.sa = ea.linear(p.first);
+				Contact2* v = (contacts.size() > 0) ? &contacts.back() : nullptr;
+				if (p.first == p.second && v && any(v->sa != v->sb) && (all(v->sb == c.sa) || all(v->sa == c.sa)))
+					continue;
+				c.sb = ea.linear(p.second);
+				c.normal = normalize(ea.b - ea.a); // TODO direction and reverse
+				if (p.first != p.second && v && all(v->sa == v->sb) && (all(c.sa == v->sb) || all(c.sb == v->sb)))
+					contacts.resize(contacts.size() - 1);
+				contacts.push_back(c);
+			}
+		}
+	}
+	return result;
+}
+
+template<typename Polygon2>
 int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) {
 	aabb2 va = Box(a), vb = Box(b);
 	if (!Intersects(va, vb))
@@ -168,45 +198,9 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) 
 	}
 
 	// looking for contacts too!
-	vector<dpair> intersections;
-	int result = 1;
-	for (auto ea : Edges(a)) {
-		intersections.clear();
-		int c = Classify(b, ea, vb, &intersections);
-		if (c == -1)
-			return -1;
-		if (c == 0) {
-			result = 0;
-			for (const dpair& p : intersections) {
-				if (p.first == p.second && (p.first <= Tolerance || p.first >= 1 - Tolerance))
-					continue;
-				Contact2 c;
-				c.sa = ea.linear(p.first);
-				c.sb = ea.linear(p.second);
-				c.normal = normalize(ea.b - ea.a); // TODO direction
-				contacts->push_back(c);
-			}
-		}
-	}
-	for (auto eb : Edges(b)) {
-		intersections.clear();
-		int c = Classify(a, eb, va, &intersections);
-		if (c == -1)
-			return -1;
-		if (c == 0) {
-			result = 0;
-			for (const dpair& p : intersections) {
-				if (p.first == p.second && (p.first <= Tolerance || p.first >= 1 - Tolerance))
-					continue;
-				Contact2 c;
-				c.sa = eb.linear(p.first);
-				c.sb = eb.linear(p.second);
-				c.normal = normalize(eb.b - eb.a); // TODO direction
-				contacts->push_back(c);
-			}
-		}
-	}
-	return result;
+	int resultA = TClassifyWithContacts(a, b, vb, *contacts, false);
+	int resultB = TClassifyWithContacts(b, a, va, *contacts, true);
+	return min(resultA, resultB);
 }
 
 int Classify(const xpolygon2& a, const xpolygon2& b, vector<Contact2>* contacts) { return TClassify(a, b, contacts); }
