@@ -112,124 +112,6 @@ GLuint load_program(std::string_view name, bool geometry) {
 	return make_program(shaders);
 }
 
-// Render::Text
-
-static GLuint text_texture;
-static GLuint text_program;
-static GLuint text_matrix_loc;
-static GLuint text_sampler_loc;
-static GLuint text_position_loc;
-static GLuint text_uv_loc;
-static GLuint text_fg_color_loc;
-static GLuint text_bg_color_loc;
-
-void make_character(float* vertex, float* texture, float x, float y, float n, float m, char c) {
-	float* v = vertex;
-	*v++ = x - n; *v++ = y - m;
-	*v++ = x + n; *v++ = y - m;
-	*v++ = x + n; *v++ = y + m;
-
-	*v++ = x - n; *v++ = y - m;
-	*v++ = x + n; *v++ = y + m;
-	*v++ = x - n; *v++ = y + m;
-
-	float a = 0.0625;
-	float b = a * 2;
-	int w = c - 32;
-	float du = (w % 16) * a;
-	float dv = 1 - (w / 16) * b - b;
-	float p = 0;
-	float* t = texture;
-
-	*t++ = du + 0; *t++ = dv + p;
-	*t++ = du + a; *t++ = dv + p;
-	*t++ = du + a; *t++ = dv + b - p;
-
-	*t++ = du + 0; *t++ = dv + p;
-	*t++ = du + a; *t++ = dv + b - p;
-	*t++ = du + 0; *t++ = dv + b - p;
-}
-
-void text_gen_buffers(GLuint position_buffer, GLuint uv_buffer, float x, float y, float n, std::string_view text,
-		std::vector<GLfloat>& position_data, std::vector<GLfloat>& uv_data) {
-	position_data.resize(text.size() * 6 * 2);
-	uv_data.resize(text.size() * 6 * 2);
-
-	for (auto i : range(text.size())) {
-		make_character(&position_data[0] + i * 12, &uv_data[0] + i * 12, x, y, n / 2, n, text[i]);
-		x += n;
-	}
-
-	glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * text.size() * 6 * 2, &position_data[0], GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, uv_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * text.size() * 6 * 2, &uv_data[0], GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void text_draw_buffers(GLuint position_buffer, GLuint uv_buffer, GLuint position_loc, GLuint uv_loc, int length) {
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnableVertexAttribArray(text_position_loc);
-	glEnableVertexAttribArray(text_uv_loc);
-
-	glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
-	glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, uv_buffer);
-	glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDrawArrays(GL_TRIANGLES, 0, length * 6);
-
-	glDisableVertexAttribArray(position_loc);
-	glDisableVertexAttribArray(uv_loc);
-	glDisable(GL_BLEND);
-}
-
-Text::Text() {
-	text_program = load_program("text");
-	text_matrix_loc = glGetUniformLocation(text_program, "matrix");
-	text_sampler_loc = glGetUniformLocation(text_program, "sampler");
-	text_fg_color_loc = glGetUniformLocation(text_program, "fg_color");
-	text_bg_color_loc = glGetUniformLocation(text_program, "bg_color");
-	text_position_loc = glGetAttribLocation(text_program, "position");
-	text_uv_loc = glGetAttribLocation(text_program, "uv");
-	glBindFragDataLocation(text_program, 0, "color");
-
-	glGenBuffers(1, &_positionBuffer);
-	glGenBuffers(1, &_uvBuffer);
-
-	glGenTextures(1, &text_texture);
-	glBindTexture(GL_TEXTURE_2D, text_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	load_png_texture("font.png");
-}
-
-#ifdef xxx
-void Text::Reset(int width, int height, glm::mat4& matrix, bool down) {
-	fg_color = vec4{1, 1, 1, 1};
-	bg_color = vec4{0, 0, 0, 0.4};
-	glBindTexture(GL_TEXTURE_2D, text_texture);
-	glUseProgram(text_program);
-	// TODO use glm::value_ptr(matrix)
-	glUniformMatrix4fv(text_matrix_loc, 1, GL_FALSE, &matrix[0][0]);
-	glUniform1i(text_sampler_loc, 0/*text_texture*/);
-	int lines = (height > width) ? 80 : 40;
-	_ts = height / (lines * 2);
-	_tx = _ts / 2;
-	_ty = down ? (height - _ts) : (_ts);
-	_tdy = down ? (-_ts * 2) : (_ts * 2);
-}
-#endif
-
-void Text::PrintAt(float x, float y, float n, std::string_view text) {
-	text_gen_buffers(_positionBuffer, _uvBuffer, x, y, (n == 0) ? _ts : n, text, _position_data, _uv_data);
-	// TODO use glm::value_ptr(matrix)
-	glUniform4fv(text_fg_color_loc, 1, reinterpret_cast<float*>(&fg_color));
-	glUniform4fv(text_bg_color_loc, 1, reinterpret_cast<float*>(&bg_color));
-	text_draw_buffers(_positionBuffer, _uvBuffer, text_position_loc, text_uv_loc, text.size());
-}
-
 Console::Console() {
 	memset(_output, ' ', ConsoleWidth * ConsoleHeight);
 
@@ -336,7 +218,7 @@ bool Console::OnKey(int key, int mods) {
 	return false;
 }
 
-void Console::Render(Text* text, float time) {
+/*void Console::Render(Text* text, float time) {
 	if (!_visible)
 		return;
 
@@ -352,7 +234,7 @@ void Console::Render(Text* text, float time) {
 	if (input.cursor < ConsoleWidth)
 		input.buffer[input.cursor] = (fmod(time, 1.6f) <= 0.8) ? '_' : ' ';
 	text->PrintBuffer(std::string_view(input.buffer.data(), input.buffer.size()));
-}
+}*/
 
 /*json_t* Console::save()
 {
