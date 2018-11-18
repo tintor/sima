@@ -20,7 +20,6 @@ set(prod
 	shape.cc
 	file.cc
 	primitives.cc
-	rendering.cc
 	timestamp.cc
 	mesh_import.cc
 	callstack.cc
@@ -30,8 +29,12 @@ set(prod
 	project.cc
 	distance.cc
 	broadphase.cc
-	glad/src/glad.c
 	lodepng/lodepng.cc)
+
+set(render
+	font.cc
+	rendering.cc
+	glad/src/glad.c)
 
 set(test
 	test.cc
@@ -61,7 +64,7 @@ set(test
 	test_broadphase.cc
 	test_zip.cc)
 
-add_executable(a.sima main.cc ${prod})
+add_executable(a.sima main.cc ${prod} ${render})
 add_executable(a.test ${prod} ${test})
 
 add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
@@ -74,17 +77,26 @@ add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 
-add_subdirectory(glfw)
+add_subdirectory(glm)
+include_directories(glm)
+
+include_directories(freetype-2.9.1/include)
 include_directories(glad/include)
+
+add_subdirectory(glfw)
 include_directories(glfw/include)
+
 include_directories(lodepng)
 include_directories(../libraries)
 
+find_package(Freetype REQUIRED)
 if (APPLE)
-    target_link_libraries(a.sima glfw ${GLFW_LIBRARIES})
-    target_link_libraries(a.test glfw ${GLFW_LIBRARIES})
+	set(RENDER_LIBS glfw ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
+	#target_link_libraries(a.test glfw ${GLFW_LIBRARIES})
 else()
     find_package(GLEW REQUIRED)
-    target_link_libraries(a.sima glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
-    target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
+	set(RENDER_LIBS glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
+	#target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
 endif()
+
+target_link_libraries(a.sima ${RENDER_LIBS})

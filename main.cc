@@ -1,13 +1,10 @@
 #include "callstack.h"
+#include "font.h"
 
 // 3rd party
 #define GL_SILENCE_DEPRECATION
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-// std
-#include <iostream>
-using namespace std;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
@@ -63,7 +60,7 @@ int main(int argc, char** argv) {
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(1000, 1000, "Sima", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(800, 600, "Sima", nullptr, nullptr);
 	if (!window)
 		return -1;
 	glfwMakeContextCurrent(window);
@@ -77,8 +74,17 @@ int main(int argc, char** argv) {
     glfwSetScrollCallback(window, scroll_callback);
 
 	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
-	glViewport(0, 0, 1000, 1000);
+    glViewport(0, 0, 800, 600);
 	glClearColor(0.0, 0.5, 0.0, 1.0);
+
+	glEnable(GL_CULL_FACE);
+
+	Font fontTNR("Times New Roman");
+	Font fontArial("Arial");
+	Font fontMonaco("/System/Library/Fonts/Monaco.dfont");
+	if (!fontTNR.ok() || !fontArial.ok() || !fontMonaco.ok()) {
+		return -1;
+	}
 
 	// Blank screen workaround in OSX Mojave
 	glfwPollEvents();
@@ -90,9 +96,15 @@ int main(int argc, char** argv) {
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glEnable(GL_DEPTH_TEST);
-		glDisable(GL_DEPTH_TEST);
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+    	glEnable(GL_BLEND);
+    	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		fontTNR.render("This is Times New Roman text", 25, 25, 1, "7FE030");
+        fontArial.render("This is Arial text", 540, 570, 0.5, "40B0E0");
+		fontMonaco.render("This is Monaco text", 25, 100, 1, "FFFF00");
+		glDisable(GL_BLEND);
 
 		glfwSwapBuffers(window);
 	}
