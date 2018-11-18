@@ -80,7 +80,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 add_subdirectory(glm)
 include_directories(glm)
 
-include_directories(freetype-2.9.1/include)
+# brew install freetype
+include_directories(/usr/local/Cellar/freetype/2.9.1/include/freetype2)
+
 include_directories(glad/include)
 
 add_subdirectory(glfw)
