@@ -1,303 +1,44 @@
-#include <vector>
-#include <array>
-#include <unordered_map>
-#include <unordered_set>
-#include <cmath>
-#include <random>
-#include <cassert>
-#include <iostream>
-#include <functional>
-#include <stdexcept>
-#include <cstdint>
-#include <atomic>
-#include <unistd.h>
-#include <execinfo.h>
-
-#define GLFW_INCLUDE_GLCOREARB
-#ifndef __APPLE_CC__
-    #include <GL/glew.h>
-#endif
-#include <GLFW/glfw3.h>
-#include "auto.h"
-#include "rendering.h"
-#include "shape.h"
-#include "integration.h"
-#include "timestamp.h"
 #include "callstack.h"
 
-#include "solid_bsp_tree.h"
+// 3rd party
+#define GL_SILENCE_DEPRECATION
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-// Dynamics and simulation
-// =======================
+// std
+#include <iostream>
+using namespace std;
 
-struct Body {
-    // const
-    Shape shape;
-    double mass;
-    //dmat3 inertial_tensor;
-    // mutable
-	double4 position;
-	double4 orientation;
-	double4 velocity;
-	double4 angular_velocity;
-};
-
-class Joint {
-	// ball joint (common point) 3DF
-	// hinge / axel joint (common edge) 1DF
-	// cylindrical joint (common line) 2DF
-	// prismatic joint 1DF (two common parallel lines)
-};
-
-class BallJoint {
-	double4 pa, pb;
-};
-
-class HingeJoint {
-	double4 pa, da, pb, db;
-	double4 ra, rb; // just for computing relative angle (must be unit and normal to da / db)
-};
-
-// Open chain articulated only
-// TODO describe children with relative coordinates, but allow computation of absolute ones
-class ArticulatedBody {
-	Body m_body;
-	vector<pair<ArticulatedBody, Joint>> m_children;
-};
-
-// TODO update to use custom integrator
-void update(Body& body, double dt) {
-    double4 bias_velocity, bias_angular_velocity;
-    body.position += dt * (body.velocity + bias_velocity);
-    // dq/dt = w*q/2  =>  q' = q + (w*q)*(dt/2)
-    //body.angular_velocity * body.orientation;
-    //body.orientation = glm::normalize(body.orientation + (body.angular_velocity + bias_angular_velocity) * body.orientation * (dt / 2));
-
-    double4 torque, force;
-    body.velocity += force * (dt / body.mass);
-    //auto invI = glm::inverse(body.inertial_tensor);
-    //auto I = body.inertial_tensor;
-    // body.angular_velocity += invI * (torque - glm::cross(body.angular_velocity, I * body.angular_velocity)) * dt;
-}
-
-
-// =====================
-
-Text* text = nullptr;
-
-struct FpvCamera {
-    double4 position;
-    double4 orientation;
-};
-FpvCamera camera;
-
-struct mat4 {
-	double4 a, b, c, d;
-
-	mat4() { }
-	mat4(double v) {
-		a = b = c = d = double4{v, v, v, v};
-	}
-};
-
-mat4 Translate(mat4 a, double4 v) {
-	mat4 m = a;
-	m.a.w += v.x;
-	m.b.w += v.y;
-	m.c.w += v.z;
-	return m;
-}
-
-double4 g_position{0, 0, 0, 1};
-float g_yaw = 0, g_pitch = 0;
-mat4 g_orientation; // compute from g_yaw and g_roll
-
-void on_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
 		return;
 	}
-	double4 forward, right;
 	if (action == GLFW_PRESS && key == GLFW_KEY_W && mods == 0) {
-		// g_position += forward;
 	}
 	if (action == GLFW_PRESS && key == GLFW_KEY_S && mods == 0) {
-		// TODO backward
 	}
 	if (action == GLFW_PRESS && key == GLFW_KEY_A && mods == 0) {
-		// TODO shuffle left
 	}
 	if (action == GLFW_PRESS && key == GLFW_KEY_D && mods == 0) {
-		// TODO shuffle right
 	}
-	// TODO:
-	// Q and E, roll
-	// update g_orientation of mouse move
 }
 
-void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
 	if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT) {
 	}
 }
 
-void on_scroll(GLFWwindow* window, double x, double y) {
+void scroll_callback(GLFWwindow* window, double x, double y) {
 }
 
-// =====================
-// OpenGL
-
-int render_width = 0, render_height = 0;
-
-void model_init(GLFWwindow* window) {
-    glfwSetKeyCallback(window, on_key);
-    glfwSetMouseButtonCallback(window, on_mouse_button);
-    glfwSetScrollCallback(window, on_scroll);
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	glViewport(0, 0, width, height);
 }
 
-mat4 perspective, perspective_rotation;
-
-mat4 Perspective(double fovy, double aspect, double zNear, double zFar) {
-	const double tanHalfFovy = tan(fovy / 2);
-	mat4 result(0);
-	result.a.x = 1 / (aspect * tanHalfFovy);
-	result.b.y = 1 / (tanHalfFovy);
-	result.c.z = - (zFar + zNear) / (zFar - zNear);
-	result.c.w = -1;
-	result.d.z = - (2 * zFar * zNear) / (zFar - zNear);
-	return result;
-}
-
-// angle is in radians
-mat4 Rotate(const mat4& m, double angle, const double4& v) {
-	const double c = cos(angle);
-	const double s = sin(angle);
-
-	double4 axis = normalize(v);
-	double4 t = (1 - c) * axis;
-
-	mat4 rotate;
-	rotate.a.x = c + t.x * axis.x;
-	rotate.a.y = t.x * axis.y + s * axis.z;
-	rotate.a.z = t.x * axis.z - s * axis.y;
-
-	rotate.b.x = t.y * axis.x - s * axis.z;
-	rotate.b.y = c + t.y * axis.y;
-	rotate.b.z = t.y * axis.z + s * axis.x;
-
-	rotate.c.x = t.z * axis.x + s * axis.y;
-	rotate.c.y = t.z * axis.y - s * axis.x;
-	rotate.c.z = c + t.z * axis.z;
-
-	mat4 result;
-	result.a = m.a * rotate.a.x + m.b * rotate.a.y + m.c * rotate.a.z;
-	result.b = m.a * rotate.b.x + m.b * rotate.b.y + m.c * rotate.b.z;
-	result.c = m.a * rotate.c.x + m.b * rotate.c.y + m.c * rotate.c.z;
-	result.d = m.d;
-	return result;
-}
-
-void render_init() {
-	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
-	glEnable(GL_CULL_FACE);
-	glClearColor(0.0, 0.5, 0.0, 1.0);
-	glViewport(0, 0, render_width, render_height);
-
-	perspective = Perspective(M_PI / 180 * 90, render_width / (double)render_height, 0.03, 1000);
-	perspective_rotation = Rotate(perspective, 0, double4{1, 0, 0, 0});
-	perspective_rotation = Rotate(perspective_rotation, 0, double4{0, 1, 0, 0});
-	perspective_rotation = Rotate(perspective_rotation, double(M_PI / 2), double4{-1, 0, 0, 0});
-
-	text = new Text;
-	text->fg_color = double4{1, 1, 1, 1};
-	text->bg_color = double4{0, 0, 0, 1};
-}
-
-struct Triangle {
-    double4 vertex[3];
-    double4 color;
-};
-
-struct Line {
-    double4 vectex[2];
-    double4 color;
-};
-
-void render_line(double4 vertex_a, double4 vertex_b, double4 color) {
-
-}
-
-void render_world(const mat4& matrix) {
-	glClear(GL_COLOR_BUFFER_BIT /*| GL_DEPTH_BUFFER_BIT*/);
-	glEnable(GL_DEPTH_TEST);
-
-    // TODO floor checkerbox
-    // TODO two boxes in space
-
-	render_line(double4{0,0,0}, double4{3,0,0}, double4{1,1,1});
-	render_line(double4{0,0,0}, double4{0,2,0}, double4{1,1,1});
-	render_line(double4{0,0,0}, double4{0,0,1}, double4{1,1,1});
-
-	glDisable(GL_DEPTH_TEST);
-}
-
-void render_gui() {
-	/*glm::mat4 matrix = glm::ortho<float>(0, render_width, 0, render_height, -1, 1);
-	text->Reset(render_width, render_height, matrix, true);
-	text->Print("Hello world!");*/
-}
-
-bool last_cursor_init = false;
-double last_cursor_x, last_cursor_y;
-
-void turn(double dx, double dy) {
-	g_yaw += dx;
-	g_pitch += dy;
-	if (g_pitch > M_PI / 2 * 0.999)
-		g_pitch = M_PI / 2 * 0.999;
-	if (g_pitch < -M_PI / 2 * 0.999)
-		g_pitch = -M_PI / 2 * 0.999;
-	g_orientation = Rotate(mat4(), -g_yaw, double4{0, 0, 1, 0});
-	g_orientation = Rotate(g_orientation, -g_pitch, double4{1, 0, 0, 0});
-}
-
-void model_orientation(GLFWwindow* window) {
-	double cursor_x, cursor_y;
-	glfwGetCursorPos(window, &cursor_x, &cursor_y);
-	if (!last_cursor_init) {
-		last_cursor_init = true;
-		last_cursor_x = cursor_x;
-		last_cursor_y = cursor_y;
-	}
-	if (cursor_x != last_cursor_x || cursor_y != last_cursor_y) {
-		turn((cursor_x - last_cursor_x) / 150, (cursor_y - last_cursor_y) / 150);
-		last_cursor_x = cursor_x;
-		last_cursor_y = cursor_y;
-		perspective_rotation = Rotate(perspective, g_pitch, double4{1, 0, 0, 0});
-		perspective_rotation = Rotate(perspective_rotation, g_yaw, double4{0, 1, 0, 0});
-		perspective_rotation = Rotate(perspective_rotation, M_PI / 2, double4{-1, 0, 0});
-	}
-}
-
-void OnError(int error, const char* message) {
+void error_callback(int error, const char* message) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, message);
-}
-
-GLFWwindow* create_window() {
-	glfwSetErrorCallback(OnError);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-	GLFWwindow* window = glfwCreateWindow(mode->width * 2, mode->height * 2, "Sima", glfwGetPrimaryMonitor(), NULL);
-	if (!window)
-		return nullptr;
-	glfwMakeContextCurrent(window);
-	glfwSwapInterval(1/*VSYNC*/);
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	glfwGetFramebufferSize(window, &render_width, &render_height);
-	return window;
+	exit(0);
 }
 
 void sigsegv_handler(int sig) {
@@ -313,32 +54,49 @@ int main(int argc, char** argv) {
 	void sigsegv_handler(int sig);
 	signal(SIGSEGV, sigsegv_handler);
 
-    Timestamp::init();
-
     if (!glfwInit())
         return -1;
 
-	GLFWwindow* window = create_window();
+	glfwSetErrorCallback(error_callback);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	GLFWwindow* window = glfwCreateWindow(1000, 1000, "Sima", nullptr, nullptr);
 	if (!window)
 		return -1;
-	model_init(window);
-	render_init();
+	glfwMakeContextCurrent(window);
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	    return -1;
+	glfwSwapInterval(1); // VSYNC
+
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetKeyCallback(window, key_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
+	glViewport(0, 0, 1000, 1000);
+	glClearColor(0.0, 0.5, 0.0, 1.0);
+
+	// Blank screen workaround in OSX Mojave
+	glfwPollEvents();
+	int x, y;
+	glfwGetWindowPos(window, &x, &y);
+	glfwSetWindowPos(window, x+1, y);
+	glfwSetWindowPos(window, x, y);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		model_orientation(window);
-		mat4 matrix = Translate(perspective_rotation, g_position);
-		//Frustum frustum(matrix);
-		//g_player.cpos = glm::idouble4(glm::floor(g_player.position)) >> ChunkSizeBits;*/
-
-        render_world(matrix);
-		render_gui();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_DEPTH_TEST);
 
 		glfwSwapBuffers(window);
 	}
 
 	glfwTerminate();
-	_exit(0); // exit(0) is not enough
 	return 0;
 }

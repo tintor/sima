@@ -8,6 +8,7 @@
 #ifndef __APPLE_CC__
 	#include <GL/glew.h>
 #endif
+#define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h>
 
 #include "format.h"

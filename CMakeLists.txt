@@ -30,6 +30,7 @@ set(prod
 	project.cc
 	distance.cc
 	broadphase.cc
+	glad/src/glad.c
 	lodepng/lodepng.cc)
 
 set(test
@@ -74,6 +75,7 @@ add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
 
 add_subdirectory(glfw)
+include_directories(glad/include)
 include_directories(glfw/include)
 include_directories(lodepng)
 include_directories(../libraries)
