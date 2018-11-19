@@ -32,6 +32,7 @@ set(prod
 	lodepng/lodepng.cc)
 
 set(render
+	window.cc
 	font.cc
 	rendering.cc
 	glad/src/glad.c)

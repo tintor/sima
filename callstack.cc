@@ -16,7 +16,7 @@ std::unique_ptr<char, void(*)(char*)> Callstack::demangle(const char* symbol) {
 	return {(status == 0) ? e : nullptr, [](char* p) { free(p); }};
 }
 
-bool matches(const std::initializer_list<std::string_view>& prefixes, std::string_view s) {
+static bool matches(const std::initializer_list<std::string_view>& prefixes, std::string_view s) {
 	for (std::string_view m : prefixes)
 		if (s.size() >= m.size() && s.substr(0, m.size()) == m)
 			return true;
@@ -47,4 +47,17 @@ void Callstack::write(std::string& out, const std::initializer_list<std::string_
 			out += '\n';
 		}
 	}
+}
+
+static void sigsegv_handler(int sig) {
+	fprintf(stderr, "Error: signal %d:\n", sig);
+	Callstack stack;
+	string s;
+	stack.write(s, {"sigsegv_handler(int)", "_sigtramp"});
+	fputs(s.c_str(), stderr);
+	exit(1);
+}
+
+void InitSegvHandler() {
+	signal(SIGSEGV, sigsegv_handler);
 }

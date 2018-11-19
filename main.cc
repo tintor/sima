@@ -1,10 +1,6 @@
 #include "callstack.h"
 #include "font.h"
-
-// 3rd party
-#define GL_SILENCE_DEPRECATION
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include "window.h"
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
@@ -33,40 +29,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-void error_callback(int error, const char* message) {
-	fprintf(stderr, "GLFW error %d: %s\n", error, message);
-	exit(0);
-}
-
-void sigsegv_handler(int sig) {
-	fprintf(stderr, "Error: signal %d:\n", sig);
-	Callstack stack;
-	string s;
-	stack.write(s, {"sigsegv_handler(int)", "_sigtramp"});
-	fputs(s.c_str(), stderr);
-	exit(1);
-}
-
 int main(int argc, char** argv) {
-	void sigsegv_handler(int sig);
-	signal(SIGSEGV, sigsegv_handler);
+	InitSegvHandler();
 
-    if (!glfwInit())
-        return -1;
-
-	glfwSetErrorCallback(error_callback);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	GLFWwindow* window = glfwCreateWindow(800, 600, "Sima", nullptr, nullptr);
+	auto window = CreateWindow({.width=800, .height=600, .title="Sima"});
 	if (!window)
 		return -1;
-	glfwMakeContextCurrent(window);
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	    return -1;
-	glfwSwapInterval(1); // VSYNC
 
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
@@ -86,29 +54,18 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	// Blank screen workaround in OSX Mojave
-	glfwPollEvents();
-	int x, y;
-	glfwGetWindowPos(window, &x, &y);
-	glfwSetWindowPos(window, x+1, y);
-	glfwSetWindowPos(window, x, y);
-
-	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
-
+	double x = 0;
+	RunEventLoop(window, [&]() {
+		x += 0.03;
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
     	glEnable(GL_BLEND);
     	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		fontTNR.render("This is Times New Roman text", 25, 25, 1, "7FE030");
+		fontTNR.render("This is Times New Roman text", x, 25, 1, "7FE030");
         fontArial.render("This is Arial text", 540, 570, 0.5, "40B0E0");
-		fontMonaco.render("This is Monaco text", 25, 100, 1, "FFFF00");
+		fontMonaco.render("This is Monaco text", x, 100, 1, "FFFF00");
 		glDisable(GL_BLEND);
-
-		glfwSwapBuffers(window);
-	}
-
-	glfwTerminate();
+	});
 	return 0;
 }

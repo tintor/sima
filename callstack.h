@@ -13,3 +13,5 @@ private:
 	std::array<void*, 20> _stack;
 	int _size;
 };
+
+void InitSegvHandler();
