@@ -1,5 +1,6 @@
-// balls bouncing off each other
 // draw polygons with mouse
+// render velocity and ang_velocity vectors
+// move and rotate objects with mouse
 // tangental friction
 // notification messages that disappear
 // convex shapes instead of balls
@@ -16,6 +17,7 @@
 #include "font.h"
 #include "window.h"
 #include "shader.h"
+#include "format.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
@@ -23,13 +25,14 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+using glm::dvec2;
 using glm::vec2;
 using glm::mat3;
 
 bool gSimulate = false;
 bool gGravity = true;
-bool gAirDrag = true;
-bool gFriction = true;
+bool gAirDrag = false;
+bool gFriction = false;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
@@ -94,13 +97,24 @@ private:
 };
 
 struct Body {
-	float radius;
-	float mass;
-	vec2 pos;
-	vec2 velocity = vec2(0, 0);
-	float angle = 0;
-	float ang_velocity = 0;
+	double radius;
+	double mass;
+	dvec2 pos;
+	dvec2 velocity = vec2(0, 0);
+	double angle = 0;
+	double ang_velocity = 0;
 };
+
+void ResolveCollision(Body& a, Body& b, dvec2 d) {
+	double ua = glm::dot(d, a.velocity);
+	double ub = glm::dot(d, b.velocity);
+	auto ma = a.mass;
+	auto mb = b.mass;
+	double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
+	double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
+	a.velocity += d * (va - ua);
+	b.velocity += d * (vb - ub);
+}
 
 int main(int argc, char** argv) {
 	InitSegvHandler();
@@ -181,19 +195,32 @@ void main() {
 	ortho[2][0] = -1.0f;
 	ortho[2][1] = -1.0f;
 
-	vec2 gravity(0, -10); // mm/s^2
+	dvec2 gravity(0, -10); // mm/s^2
 
-	float x = 0, e = 0;
+	double time = 0;
+	double energy = 0;
+	for (Body& body : bodies) {
+		energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.velocity, body.velocity) * body.mass / 2;
+	}
+	double energyMin = energy, energyMax = energy;
+
+	// 250s -> 527 float vs 524 double
 	RunEventLoop(window, [&]() {
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		fontTNR.render("This is Times New Roman text", x, 25, 1, "7FE030");
-		glDisable(GL_BLEND);
-
-		constexpr float dt = 0.05;
+		constexpr double dt = 0.01;
 		if (gSimulate) {
+			for (uint i = 0; i < bodies.size(); i++) {
+				for (uint j = i + 1; j < bodies.size(); j++) {
+					Body& a = bodies[i];
+					Body& b = bodies[j];
+					dvec2 d = a.pos - b.pos;
+					float r = a.radius + b.radius;
+					if (glm::dot(d, d) <= r * r) {
+						ResolveCollision(a, b, glm::normalize(d));
+					}
+				}
+			}
 			for (Body& body : bodies) {
 				if (gGravity && body.pos.y > body.radius) {
 					body.velocity += gravity * dt;
@@ -203,28 +230,41 @@ void main() {
 				}
 				body.pos += body.velocity * dt;
 
-				float k = gFriction ? 0.95f : 1.0f;
+				//double k = gFriction ? 0.95f : 1.0f;
 				if (body.pos.x < body.radius && body.velocity.x < 0) {
-					body.velocity.x = -body.velocity.x * k;
+					body.velocity.x = -body.velocity.x;// * k;
 				}
 				if (body.pos.x > Width - body.radius && body.velocity.x > 0) {
-					body.velocity.x = -body.velocity.x * k;
+					body.velocity.x = -body.velocity.x;// * k;
 				}
 				if (body.pos.y < body.radius && body.velocity.y < 0) {
-					body.velocity.y = -body.velocity.y * k;
+					body.velocity.y = -body.velocity.y;// * k;
 				}
 				if (body.pos.y > Height - body.radius && body.velocity.y > 0) {
-					body.velocity.y = -body.velocity.y * k;
+					body.velocity.y = -body.velocity.y;// * k;
 				}
 			}
+			time += dt;
 		}
+
+		double energy = 0;
+		for (Body& body : bodies) {
+			energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.velocity, body.velocity) * body.mass / 2;
+		}
+		if (energy < energyMin) energyMin = energy;
+		if (energy > energyMax) energyMax = energy;
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		fontMonaco.render(format("Energy %.0f, spread %.0f, time %.2f, %.4f", energy, energyMax - energyMin, time, (energyMax - energyMin) / time), 25, 25, 0.3, "7FE030");
+		glDisable(GL_BLEND);
 
 		glUseProgram(shader);
 		buffer.bind();
 		for (const Body& body : bodies) {
 			mat3 transform(ortho);
-			transform = glm::translate(transform, body.pos);
-			transform = glm::rotate(transform, body.angle);
+			transform = glm::translate(transform, vec2(body.pos));
+			transform = glm::rotate(transform, float(body.angle));
 			transform = glm::scale(transform, vec2(body.radius, body.radius));
 			glUniformMatrix3fv(transformLoc, 1, false, glm::value_ptr(transform));
 			glDrawArrays(GL_LINE_LOOP, 0, v.size());
