@@ -143,6 +143,11 @@ Font::Font(string_view name, int resolution) {
         };
     }
 
+	m_max_size_y = 0;
+	for (const Character& ch : m_characters) {
+		m_max_size_y = std::max(m_max_size_y, ch.size_y);
+	}
+
 	m_loaded = true;
 }
 
@@ -155,12 +160,19 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 		return;
 	}
 
+	const auto orig_x = x;
     s_renderer.shader.use();
     glUniform3f(s_renderer.textColorLocation, color.r, color.g, color.b);
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(s_renderer.VAO);
 
     for (char c : text) {
+		if (c == '\n') {
+			x = orig_x;
+			y -= m_max_size_y * scale * 1.2;
+			continue;
+		}
+
         Character ch = m_characters[c];
         GLfloat xpos = x + ch.bearing_x * scale;
         GLfloat ypos = y - (ch.size_y - ch.bearing_y) * scale;

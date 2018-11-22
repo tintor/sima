@@ -23,6 +23,7 @@ public:
 private:
 	bool m_loaded = false;
 
+	uint m_max_size_y = 0;
 	struct Character {
 	   	uint texture;   // ID handle of the glyph texture
 		uint size_x, size_y; // Size of glyph
