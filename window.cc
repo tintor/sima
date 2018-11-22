@@ -14,6 +14,7 @@ GLFWwindow* CreateWindow(WindowDef wd) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_RESIZABLE, wd.resizeable);
 
 	// TODO fullscreen
 	auto window = glfwCreateWindow(wd.width, wd.height, wd.title, nullptr, nullptr);
@@ -35,9 +36,9 @@ void RunEventLoop(GLFWwindow* window, const std::function<void()>& callback) {
 	glfwSetWindowPos(window, x+1, y);
 
 	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
 		callback();
 		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
 	glfwTerminate();
 }

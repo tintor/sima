@@ -66,6 +66,7 @@ void main() {
 	// Configure VAO/VBO for texture quads
 	glGenVertexArrays(1, &s_renderer.VAO);
 	glGenBuffers(1, &s_renderer.VBO);
+
 	glBindVertexArray(s_renderer.VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, s_renderer.VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);

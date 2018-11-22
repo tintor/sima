@@ -14,6 +14,7 @@ struct WindowDef {
 	const char* title = "";
 	bool fullscreen = false;
 	bool vsync = true;
+	bool resizeable = true;
 };
 
 GLFWwindow* CreateWindow(WindowDef wd);
