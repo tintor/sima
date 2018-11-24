@@ -3,13 +3,6 @@
 // move and rotate objects with mouse
 // tangental friction
 // notification messages that disappear
-// simple PID controller with test cases:
-// - [F=0]
-// - [F=C]
-// - [F=k*v]
-// - [F=k*v^2]
-// - [F=k*(x-x0)]
-// - [F=k*sin(w*t)]
 // convex shapes instead of balls (no rotation)
 // 2d + rotation
 // concave shapes instead of convex
@@ -128,7 +121,7 @@ int main(int argc, char** argv) {
 		}
 	)END");
 
-	const unsigned int transformLoc = glGetUniformLocation(shader, "transform");
+	UNIFORM(mat3, transform);
 
 	VertexBuffer_vec2 buffer(25);
 
@@ -250,7 +243,7 @@ int main(int argc, char** argv) {
 			transform = glm::translate(transform, vec2(body.pos));
 			transform = glm::rotate(transform, float(body.angle));
 			transform = glm::scale(transform, vec2(body.radius, body.radius));
-			glUniformMatrix3fv(transformLoc, 1, false, glm::value_ptr(transform));
+			transformUniform = transform;
 			glDrawArrays(GL_LINE_LOOP, 0, v.size());
 		}
 	});

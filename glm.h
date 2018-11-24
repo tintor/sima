@@ -6,11 +6,19 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-using glm::dvec4;
-using glm::dvec3;
+#include "format.h"
+
 using glm::dvec2;
+using glm::dvec3;
+using glm::dvec4;
+
 using glm::vec2;
+using glm::vec3;
+using glm::vec4;
+
+using glm::mat2;
 using glm::mat3;
+using glm::mat4;
 
 namespace glm {
 inline void format_e(string& s, string_view spec, dvec2 v) {

@@ -1,78 +1,79 @@
 #pragma once
-
-#include "auto.h"
-#include "format.h"
+#include "std.h"
+#include "glm.h"
 
 #define GL_SILENCE_DEPRECATION
 #include <glad/glad.h>
 
-class Shader
-{
+class Shader {
 public:
-	Shader(string_view source) {
-		size_t n = source.rfind("#version ");
-		string_view vert = source.substr(0, n);
-		string_view frag = source.substr(n);
-
-        uint vertex = compile(GL_VERTEX_SHADER, vert);
-        uint fragment = compile(GL_FRAGMENT_SHADER, frag);
-        ON_SCOPE_EXIT(glDeleteShader(vertex));
-        ON_SCOPE_EXIT(glDeleteShader(fragment));
-
-        m_id = glCreateProgram();
-        glAttachShader(m_id, vertex);
-        glAttachShader(m_id, fragment);
-        glLinkProgram(m_id);
-
-        int success;
-        glGetProgramiv(m_id, GL_LINK_STATUS, &success);
-        if (!success) {
-        	array<char, 1024> infoLog;
-            glGetProgramInfoLog(m_id, infoLog.size(), nullptr, infoLog.data());
-			print("PROGRAM LINKING ERROR:\n");
-			print("%s\n", infoLog);
-			exit(0);
-        }
-	}
-
+	Shader(string_view source);
 	operator uint() const { return m_id; }
 
 	void use() {
-        glUseProgram(m_id);
-    }
-
-	void setBool(const char* name, bool value) const {
-        glUniform1i(glGetUniformLocation(m_id, name), (int)value);
-    }
-
-    void setInt(const char* name, int value) const {
-        glUniform1i(glGetUniformLocation(m_id, name), value);
-    }
-
-    void setFloat(const char* name, float value) const {
-        glUniform1f(glGetUniformLocation(m_id, name), value);
-    }
-
-private:
-	uint compile(int type, string_view source) {
-        const char* ptr = source.data();
-		int length = source.size();
-
-        uint shader = glCreateShader(type);
-        glShaderSource(shader, 1, &ptr, &length);
-        glCompileShader(shader);
-        int success;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success) {
-        	array<char, 1024> infoLog;
-            glGetShaderInfoLog(shader, infoLog.size(), nullptr, infoLog.data());
-			print("%s SHADER COMPILATION ERROR:\n", (type == GL_VERTEX_SHADER) ? "VERTEX" : "FRAGMENT");
-			print("%s\n", infoLog);
-			exit(0);
-        }
-		return shader;
+		glUseProgram(m_id);
 	}
 
 private:
+	uint compile(int type, string_view source);
+
+private:
 	uint m_id = 0;
+};
+
+class Uniform {
+public:
+	Uniform(string_view name, int expectedType);
+protected:
+	int m_location = -1;
+};
+
+#define UNIFORM(TYPE, NAME) Uniform_##TYPE NAME##Uniform(#NAME)
+
+class Uniform_vec2 : public Uniform {
+public:
+	Uniform_vec2(string_view name) : Uniform(name, GL_FLOAT_VEC2) { }
+	void operator=(const vec2& value) {
+		glUniform2fv(m_location, 1, glm::value_ptr(value));
+	}
+};
+
+class Uniform_vec3 : public Uniform {
+public:
+	Uniform_vec3(string_view name) : Uniform(name, GL_FLOAT_VEC3) { }
+	void operator=(const vec3& value) {
+		glUniform3fv(m_location, 1, glm::value_ptr(value));
+	}
+};
+
+class Uniform_vec4 : public Uniform {
+public:
+	Uniform_vec4(string_view name) : Uniform(name, GL_FLOAT_VEC4) { }
+	void operator=(const vec4& value) {
+		glUniform4fv(m_location, 1, glm::value_ptr(value));
+	}
+};
+
+class Uniform_mat2 : public Uniform {
+public:
+	Uniform_mat2(string_view name) : Uniform(name, GL_FLOAT_MAT2) { }
+	void operator=(const mat2& value) {
+		glUniformMatrix2fv(m_location, 1, false, glm::value_ptr(value));
+	}
+};
+
+class Uniform_mat3 : public Uniform {
+public:
+	Uniform_mat3(string_view name) : Uniform(name, GL_FLOAT_MAT3) { }
+	void operator=(const mat3& value) {
+		glUniformMatrix3fv(m_location, 1, false, glm::value_ptr(value));
+	}
+};
+
+class Uniform_mat4 : public Uniform {
+public:
+	Uniform_mat4(string_view name) : Uniform(name, GL_FLOAT_MAT4) { }
+	void operator=(const mat4& value) {
+		glUniformMatrix4fv(m_location, 1, false, glm::value_ptr(value));
+	}
 };
