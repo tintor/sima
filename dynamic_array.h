@@ -15,14 +15,14 @@ public:
 		if (_data == nullptr)
 			throw std::bad_alloc();
 	}
-	
+
 	~raw_array() { free(_data); }
 
 	raw_array(raw_array&& e) {
 		_data = e._data;
 		e._data = nullptr;
 	}
-	
+
 	raw_array& operator=(raw_array&& e) {
 		if (this != &e) {
 			free(_data);
@@ -39,7 +39,7 @@ public:
 	T& operator[](uint idx) {
 		return _data[idx];
 	}
-	
+
 	const T& operator[](uint idx) const {
 		return _data[idx];
 	}
@@ -110,7 +110,7 @@ public:
 		assert(idx < _size);
 		return _data[idx];
 	}
-	
+
 	T operator[](uint idx) const {
 		assert(idx < _size);
 		return _data[idx];
@@ -132,10 +132,14 @@ public:
 		_size = size;
 	}
 
+	void swap(dynamic_array& o) {
+		std::swap(_data, o._data);
+		std::swap(_size, o._size);
+	}
+
 	uint size() const { return _size; }
 	T* begin() { return _data; }
 	T* end() { return _data + _size; }
-
 private:
     T *_data;
     uint _size;
