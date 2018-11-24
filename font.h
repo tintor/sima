@@ -16,13 +16,10 @@ class Font {
 public:
 	Font(string_view name, int resolution = 48);
 	~Font();
-	bool ok() { return m_loaded; }
 	// range for (x, y) is always (800, 600)
 	void render(string_view text, double x, double y, double scale, Color color);
 
 private:
-	bool m_loaded = false;
-
 	uint m_max_size_y = 0;
 	struct Character {
 	   	uint texture;   // ID handle of the glyph texture

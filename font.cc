@@ -18,79 +18,66 @@ struct Renderer {
 	uint VAO, VBO;
 	Shader shader;
 	int textColorLocation;
+
+	Renderer();
 };
 
-static Renderer s_renderer;
+Renderer::Renderer() : shader(R"END(
+		#version 330 core
+		layout (location = 0) in vec4 vertex; // <vec2 pos, vec2 tex>
+		out vec2 TexCoords;
 
-static bool initRenderer() {
-	constexpr string_view FONT_VERT = R"END(
-#version 330 core
-layout (location = 0) in vec4 vertex; // <vec2 pos, vec2 tex>
-out vec2 TexCoords;
+		uniform mat4 projection;
 
-uniform mat4 projection;
+		void main() {
+		    gl_Position = projection * vec4(vertex.xy, 0.0, 1.0);
+		    TexCoords = vertex.zw;
+		}
 
-void main() {
-    gl_Position = projection * vec4(vertex.xy, 0.0, 1.0);
-    TexCoords = vertex.zw;
-}
-)END";
+		#version 330 core
+		in vec2 TexCoords;
+		out vec4 color;
 
-	constexpr string_view FONT_FRAG = R"END(
-#version 330 core
-in vec2 TexCoords;
-out vec4 color;
+		uniform sampler2D text;
+		uniform vec3 textColor;
 
-uniform sampler2D text;
-uniform vec3 textColor;
-
-void main() {
-    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);
-    color = vec4(textColor, 1.0) * sampled;
-}
-)END";
-
-	// Compile and setup the shader
-	if (!s_renderer.shader.load(FONT_VERT, FONT_FRAG)) {
-		printf("init rendeder: shader load failed\n");
-		return false;
-	}
+		void main() {
+		    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);
+		    color = vec4(textColor, 1.0) * sampled;
+		}
+	)END") {
 	glm::mat4 projection = glm::ortho(0.0, 800.0, 0.0, 600.0);
-	s_renderer.shader.use();
-	glUniformMatrix4fv(glGetUniformLocation(s_renderer.shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-	s_renderer.textColorLocation = glGetUniformLocation(s_renderer.shader, "textColor");
+	shader.use();
+	glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+	textColorLocation = glGetUniformLocation(shader, "textColor");
 
 	// Disable byte-alignment restriction
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	// Configure VAO/VBO for texture quads
-	glGenVertexArrays(1, &s_renderer.VAO);
-	glGenBuffers(1, &s_renderer.VBO);
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
 
-	glBindVertexArray(s_renderer.VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, s_renderer.VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, nullptr, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
-	return true;
 }
 
+static Renderer* s_renderer = nullptr;
+
 Font::Font(string_view name, int resolution) {
-	static bool initialized = false;
-	if (!initialized) {
-		if (!initRenderer()) {
-        	std::cout << "ERROR Font: renderer unable to initialize" << std::endl;
-			return;
-		}
-		initialized = true;
+	if (s_renderer == nullptr) {
+		s_renderer = new Renderer();
 	}
 
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) {
         std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
-		return;
+		exit(0);
 	}
 	ON_SCOPE_EXIT(FT_Done_FreeType(ft));
 
@@ -100,7 +87,7 @@ Font::Font(string_view name, int resolution) {
     FT_Face face;
     if (FT_New_Face(ft, format(fmt, name).c_str(), 0, &face)) {
         std::cout << "ERROR::FREETYPE: Failed to load font: " << format(fmt, name) << std::endl;
-		return;
+		exit(0);
 	}
 	ON_SCOPE_EXIT(FT_Done_Face(face));
 
@@ -112,7 +99,7 @@ Font::Font(string_view name, int resolution) {
         // Load character glyph
         if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
 			printf("ERROR::FREETYTPE: Failed to load Glyph '%c' (%d)\n", c, c);
-            return;
+			exit(0);
         }
 
 		GLuint texture;
@@ -147,8 +134,6 @@ Font::Font(string_view name, int resolution) {
 	for (const Character& ch : m_characters) {
 		m_max_size_y = std::max(m_max_size_y, ch.size_y);
 	}
-
-	m_loaded = true;
 }
 
 Font::~Font() {
@@ -156,15 +141,11 @@ Font::~Font() {
 }
 
 void Font::render(string_view text, double x, double y, double scale, Color color) {
-    if (!m_loaded) {
-		return;
-	}
-
 	const auto orig_x = x;
-    s_renderer.shader.use();
-    glUniform3f(s_renderer.textColorLocation, color.r, color.g, color.b);
+    s_renderer->shader.use();
+    glUniform3f(s_renderer->textColorLocation, color.r, color.g, color.b);
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(s_renderer.VAO);
+    glBindVertexArray(s_renderer->VAO);
 
     for (char c : text) {
 		if (c == '\n') {
@@ -192,7 +173,7 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
         // Render glyph texture over quad
         glBindTexture(GL_TEXTURE_2D, ch.texture);
         // Update content of VBO memory
-        glBindBuffer(GL_ARRAY_BUFFER, s_renderer.VBO);
+        glBindBuffer(GL_ARRAY_BUFFER, s_renderer->VBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);

@@ -1,40 +1,39 @@
 #pragma once
 
-#include <glad/glad.h>
-#include "std.h"
 #include "auto.h"
+#include "format.h"
+
+#define GL_SILENCE_DEPRECATION
+#include <glad/glad.h>
 
 class Shader
 {
 public:
-    bool load(string_view vertexCode, string_view fragmentCode) {
-        const char* vShaderCode = vertexCode.data();
-        const char* fShaderCode = fragmentCode.data();
-		int vertexLength = vertexCode.size();
-		int fragmentLength = fragmentCode.size();
+	Shader(string_view source) {
+		size_t n = source.rfind("#version ");
+		string_view vert = source.substr(0, n);
+		string_view frag = source.substr(n);
 
-        // vertex shader
-        uint vertex = glCreateShader(GL_VERTEX_SHADER);
+        uint vertex = compile(GL_VERTEX_SHADER, vert);
+        uint fragment = compile(GL_FRAGMENT_SHADER, frag);
         ON_SCOPE_EXIT(glDeleteShader(vertex));
-        glShaderSource(vertex, 1, &vShaderCode, &vertexLength);
-        glCompileShader(vertex);
-        if (!checkCompileErrors(vertex, "VERTEX"))
-			return false;
-        // fragment Shader
-        uint fragment = glCreateShader(GL_FRAGMENT_SHADER);
         ON_SCOPE_EXIT(glDeleteShader(fragment));
-        glShaderSource(fragment, 1, &fShaderCode, &fragmentLength);
-        glCompileShader(fragment);
-        if (!checkCompileErrors(fragment, "FRAGMENT"))
-			return false;
-        // shader Program
+
         m_id = glCreateProgram();
         glAttachShader(m_id, vertex);
         glAttachShader(m_id, fragment);
         glLinkProgram(m_id);
-        checkCompileErrors(m_id, "PROGRAM");
-		return true;
-    }
+
+        int success;
+        glGetProgramiv(m_id, GL_LINK_STATUS, &success);
+        if (!success) {
+        	array<char, 1024> infoLog;
+            glGetProgramInfoLog(m_id, infoLog.size(), nullptr, infoLog.data());
+			print("PROGRAM LINKING ERROR:\n");
+			print("%s\n", infoLog);
+			exit(0);
+        }
+	}
 
 	operator uint() const { return m_id; }
 
@@ -55,26 +54,25 @@ public:
     }
 
 private:
-    bool checkCompileErrors(uint shader, string_view type) {
-        int success;
-        char infoLog[1024];
-        if (type != "PROGRAM") {
-            glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-            if (!success) {
-                glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << std::endl;
-				return false;
-            }
-        } else {
-            glGetProgramiv(shader, GL_LINK_STATUS, &success);
-            if (!success) {
-                glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << std::endl;
-				return false;
-            }
-        }
-		return true;
-    }
+	uint compile(int type, string_view source) {
+        const char* ptr = source.data();
+		int length = source.size();
 
+        uint shader = glCreateShader(type);
+        glShaderSource(shader, 1, &ptr, &length);
+        glCompileShader(shader);
+        int success;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+        	array<char, 1024> infoLog;
+            glGetShaderInfoLog(shader, infoLog.size(), nullptr, infoLog.data());
+			print("%s SHADER COMPILATION ERROR:\n", (type == GL_VERTEX_SHADER) ? "VERTEX" : "FRAGMENT");
+			print("%s\n", infoLog);
+			exit(0);
+        }
+		return shader;
+	}
+
+private:
 	uint m_id = 0;
 };
