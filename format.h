@@ -36,6 +36,11 @@ void format_e(string& s, string_view spec, const vector<T, A>& m) {
 	format_span(s, spec, m);
 }
 
+template<size_t S>
+void format_e(string& s, string_view spec, const array<char, S>& m) {
+	s.append(m.data(), strnlen(m.data(), m.size()));
+}
+
 template<typename T, size_t S>
 void format_e(string& s, string_view spec, const array<T, S>& m) {
 	format_span(s, spec, m);
