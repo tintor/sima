@@ -27,22 +27,22 @@ T RungeKutta4(T x0, S t0, S dt, std::function<T(T x, S d)> derivative) {
 }
 
 // For solving systems of variable size, without memory allocation.
-void BigRungeKutta4(const double* x0, double t0, double dt, double* k1, double* k2, double* k3, double* k4, double* out, uint count,
-		std::function<void(const double* x, double d, double* d, int count)> derivative) {
-	derivative(x0, t0, k1);
+void BigRungeKutta4(const double* x0, double t0, double dt, double* k1, double* k2, double* k3, double* k4, double* out, int count,
+		std::function<void(const double* x, double t, double* d, int count)> derivative) {
+	derivative(x0, t0, k1, count);
 
-	for (uint i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 		out[i] = x0[i] + k1[i] * (dt / 2);
-	derivative(out, t0 + dt / 2, k2);
+	derivative(out, t0 + dt / 2, k2, count);
 
-	for (uint i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 		out[i] = x0[i] + k2[i] * (dt / 2);
-	derivative(out, t0 + dt / 2, k3);
+	derivative(out, t0 + dt / 2, k3, count);
 
-	for (uint i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 		out[i] = x0[i] + k3[i] * dt;
-	derivative(out, t0 + dt, k4);
+	derivative(out, t0 + dt, k4, count);
 
-	for (uint i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 		out[i] = x0[i] + (k1[i] + k4[i]) * (dt / 6) + (k2[i] + k3[i]) * (dt / 3);
 }
