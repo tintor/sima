@@ -65,8 +65,9 @@ set(test
 	test_broadphase.cc
 	test_zip.cc)
 
-add_executable(a.sima main.cc ${prod} ${render})
-add_executable(a.test ${prod} ${test})
+add_executable(main main.cc ${prod} ${render})
+add_executable(run_gravity run_gravity.cc ${prod} ${render})
+add_executable(test ${prod} ${test})
 
 add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
@@ -102,4 +103,5 @@ else()
 	#target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
 endif()
 
-target_link_libraries(a.sima ${RENDER_LIBS})
+target_link_libraries(main ${RENDER_LIBS})
+target_link_libraries(run_gravity ${RENDER_LIBS})
