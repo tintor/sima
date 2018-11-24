@@ -7,7 +7,7 @@ static void error_callback(int error, const char* message) {
 
 GLFWwindow* CreateWindow(WindowDef wd) {
     if (!glfwInit())
-        return nullptr;
+		exit(1);
 
 	glfwSetErrorCallback(error_callback);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -19,10 +19,11 @@ GLFWwindow* CreateWindow(WindowDef wd) {
 	// TODO fullscreen
 	auto window = glfwCreateWindow(wd.width, wd.height, wd.title, nullptr, nullptr);
 	if (!window)
-		return nullptr;
+		exit(1);
+
 	glfwMakeContextCurrent(window);
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	    return nullptr;
+		exit(1);
 	glfwSwapInterval(wd.vsync ? 1 : 0);
 
 	return window;

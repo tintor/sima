@@ -92,15 +92,11 @@ int main(int argc, char** argv) {
 
 	constexpr int Width = 1200, Height = 900;
 	auto window = CreateWindow({.width=Width, .height=Height, .resizeable=false});
-	if (!window)
-		return -1;
-
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 
-	fprintf(stderr, "OpenGL version: [%s]\n", glGetString(GL_VERSION));
 	glClearColor(0.0, 0.5, 0.0, 1.0);
 
 	Shader shader(R"END(
@@ -120,7 +116,6 @@ int main(int argc, char** argv) {
 		    color = vec4(1.0, 0.5, 0.2, 1.0);
 		}
 	)END");
-
 	UNIFORM(mat3, transform);
 
 	VertexBuffer_vec2 buffer(25);
