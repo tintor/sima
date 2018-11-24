@@ -18,6 +18,20 @@ inline bool ordered(T a, T b, T c) {
 }
 
 template<typename T>
+void minimize(T& a, T b) {
+	if (b < a) {
+		a = b;
+	}
+}
+
+template<typename T>
+void maximize(T& a, T b) {
+	if (b > a) {
+		a = b;
+	}
+}
+
+template<typename T>
 T min(T a, T b) {
 	return (a < b) ? a : b;
 }
