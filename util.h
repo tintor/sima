@@ -7,6 +7,13 @@ inline int sign(T a) {
 	return (0 < a) - (a < 0);
 }
 
+template<typename T>
+T clamp(T a, T min, T max) {
+	if (a > max) return max;
+	if (a < min) return min;
+	return a;
+}
+
 template<size_t S>
 bool aligned(const void* ptr) {
 	return (reinterpret_cast<size_t>(ptr) % S) == 0;
