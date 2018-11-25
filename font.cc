@@ -190,8 +190,7 @@ Font::~Font() {
 	// TODO delete textures
 }
 
-void Font::render(string_view text, double x, double y, double scale, Color color) {
-	const auto orig_x = x;
+void Font::render(string_view text, double scale, Color color) {
 	s_renderer->shader.use();
 	glUniform3f(s_renderer->textColorLocation, color.r, color.g, color.b);
 	glActiveTexture(GL_TEXTURE0);
@@ -203,19 +202,19 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 	int offset = 0;
 	for (char c : text) {
 		if (c == '\n') {
-			x = orig_x;
-			y -= m_max_size_y * scale * 1.2;
+			m_x = m_left;
+			m_y -= m_max_size_y * scale * 1.2;
 			continue;
 		}
 
 		Character ch = m_characters[c];
 		if (ch.size_x == 0 || ch.size_y == 0) {
-			x += m_characters[c].advance * scale;
+			m_x += ch.advance * scale;
 			continue;
 		}
 
-		GLfloat xpos = x + ch.bearing_x * scale;
-		GLfloat ypos = y - (int(ch.size_y) - int(ch.bearing_y)) * scale;
+		GLfloat xpos = m_x + ch.bearing_x * scale;
+		GLfloat ypos = m_y - (int(ch.size_y) - int(ch.bearing_y)) * scale;
 
 		GLfloat w = ch.size_x * scale;
 		GLfloat h = ch.size_y * scale;
@@ -231,7 +230,7 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 			xpos + w, ypos + h,	ch.u1, ch.v0,
 		};
 
-		x += ch.advance * scale;
+		m_x += ch.advance * scale;
 
 		memcpy(s_renderer->vertices + offset * 6 * 4, vertices, 6 * 4 * sizeof(float));
 		offset += 1;

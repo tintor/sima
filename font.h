@@ -18,11 +18,22 @@ class Font {
 public:
 	Font(string_view name, int resolution = 48);
 	~Font();
+	void render(string_view text, double scale, Color color);
+
 	// range for (x, y) is always (800, 600)
-	void render(string_view text, double x, double y, double scale, Color color);
+	void moveTo(double x, double y) { m_left = x; m_x = x; m_y = y; }
+
+	void render(string_view text, double x, double y, double scale, Color color) {
+		moveTo(x, y);
+		render(text, scale, color);
+	}
 
 private:
 	int m_max_size_y = 0;
+
+	float m_left = 0;
+	float m_x = 0;
+	float m_y = 0;
 
 	uint m_texture = 0;
 
