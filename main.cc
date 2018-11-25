@@ -1,5 +1,4 @@
 // collision between concave shapes
-// collision between concave shape and ground
 // rotation!
 // hinges and 3 dof arm (turn off collision detection between objects that have hinge)
 // draw polygons with mouse
@@ -74,7 +73,9 @@ struct Body {
 	polygon2 shape;
 	std::vector<vec2> shapef;
 
+	aabb2 box;
 	double radius;
+
 	double mass;
 	dvec2 pos;
 	dvec2 velocity = vec2(0, 0);
@@ -118,6 +119,8 @@ void SetShape(Body& body, const polygon2& poly) {
 	for (double2 v : body.shape)
 		maximize(r2, dot(v, v));
 	body.radius = sqrt(r2);
+
+	body.box = aabb2(body.shape);
 }
 
 int main(int argc, char** argv) {
@@ -234,20 +237,21 @@ int main(int argc, char** argv) {
 				body.velocity = dvec2(s1.z, s1.w);
 
 				constexpr double elasticity = 0.5;
-				if (body.pos.y < body.radius) {
+				if (body.pos.y + body.box.min.y < 0) {
+					double dip = -(body.pos.y + body.box.min.y);
 					// remove penetration, but preserve total energy (if possible when d >= 0)
-					double d = gravity.y * 2 * (body.radius - body.pos.y) + body.velocity.y * body.velocity.y;
+					double d = gravity.y * 2 * dip + body.velocity.y * body.velocity.y;
 					body.velocity.y = (d > 0) ? elasticity * sqrt(d) : 0;
-					body.pos.y = body.radius;
+					body.pos.y = -body.box.min.y;
 				}
 
-				if (body.pos.x <= body.radius && body.velocity.x < 0) {
+				if (body.pos.x + body.box.min.x <= 0 && body.velocity.x < 0) {
 					body.velocity.x = -body.velocity.x * elasticity;
 				}
-				if (body.pos.x >= Width - body.radius && body.velocity.x > 0) {
+				if (body.pos.x + body.box.max.x >= Width && body.velocity.x > 0) {
 					body.velocity.x = -body.velocity.x * elasticity;
 				}
-				if (body.pos.y >= Height - body.radius && body.velocity.y > 0) {
+				if (body.pos.y + body.box.max.y >= Height && body.velocity.y > 0) {
 					body.velocity.y = -body.velocity.y * elasticity;
 				}
 
