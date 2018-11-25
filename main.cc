@@ -106,18 +106,31 @@ void RestoreStates(vector<Body>& bodies) {
 	}
 }
 
+// TODO avoid reallocating memory for BT and Contacts
 void Interact(Body& a, Body& b) {
 	dvec2 d = a.pos - b.pos;
 	float r = a.radius + b.radius;
 	if (glm::dot(d, d) > r * r)
 		return;
-	d = glm::normalize(d);
+	// translate B to A's frame
+	polygon2 bt(b.shape.size());
+	for (uint i = 0; i < b.shape.size(); i++)
+		bt[i] = b.shape[i] + double2{d.x, d.y};
 
 	vector<Contact2> contacts;
-	int c = Classify(a.shape, b.shape, &contacts);
+	int c = Classify(a.shape, bt, &contacts);
 	if (c > 0)
 		return;
+	if (c < 0) {
+		print("penetrating objects in Interact()\n");
+		exit(1);
+	}
 
+	// TODO translate contacts from A frame to world frame
+
+	// TODO resolve collision's such that there are no delta_vs across any contact
+
+	d = glm::normalize(d);
 	double ua = glm::dot(d, a.vel);
 	double ub = glm::dot(d, b.vel);
 	auto ma = a.mass;
@@ -146,6 +159,99 @@ void SetShape(Body& body, const polygon2& poly) {
 	body.box = aabb2(body.shape);
 }
 
+// TODO avoid reallocating memory for BT
+int Classify(const Body& a, const Body& b) {
+	dvec2 d = a.pos - b.pos;
+	float r = a.radius + b.radius;
+	if (glm::dot(d, d) > r * r)
+		return 1;
+
+	// translate B to A's frame
+	polygon2 bt(b.shape.size());
+	for (uint i = 0; i < b.shape.size(); i++)
+		bt[i] = b.shape[i] + double2{d.x, d.y};
+	return Classify(a.shape, bt);
+}
+
+// +1 - all bodies are separate
+//  0 - at least two bodies in contact (and no penetration)
+// -1 - at least two bodies in penetration
+int Classify(const vector<Body>& bodies) {
+	int result = 1;
+	for (auto i : range(bodies.size()))
+		for (auto j : range(i + 1, bodies.size())) {
+			int c = Classify(bodies[i], bodies[j]);
+			if (c > 0)
+				continue;
+			if (c < 0)
+				return -1;
+			result = 0;
+		}
+	return result;
+}
+
+constexpr int Width = 1200, Height = 900;
+const dvec2 gravity(0, -100); // mVm/s^2
+
+void Advance(vector<Body>& bodies, double dt) {
+	for (Body& body : bodies) {
+		// TODO if objects end up penetrating each other, what then?
+		// - ignore penetration (classify needs to be able to compute contacts from penetration)
+		// - simulate up to contact time (resolve contacts), continue simulating
+		// 	 - remaining_time = dt
+		// 	 - start: resolve collisions
+		// 	 - save states of all objects
+		// 	 - advance all objects for remaining_time
+		// 	 - if any collision detected (during remaining_time):
+		// 	   - find collision_time TODO how?
+		// 	   - restore states
+		// 	   - advance all objects to collision_time
+		// 	   - remaining_time -= collision_time
+		// 	   - goto start
+		// - alternate:
+		// 	 - remaining_time = dt
+		// 	 - start: resolve collisions
+		// 	 - save states of all objects
+		// 	 - advance all objects for remaining_time
+		// 	 - if pedetration detected (at end time):
+		// 	   - find first collision_time using binary search
+		// 	   - restore states
+		// 	   - advance all objects to collision_time
+		// 	   - remaining_time -= collision_time
+		// 	   - goto start
+		dvec2 acc = gGravity ? gravity : dvec2(0, 0);
+		dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
+		auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) {
+			return dvec4(dvec2(s.z, s.w), acc);
+		});
+		body.pos = dvec2(s1.x, s1.y);
+		body.vel = dvec2(s1.z, s1.w);
+
+		constexpr double elasticity = 0.5;
+		if (body.pos.y + body.box.min.y < 0) {
+			double dip = -(body.pos.y + body.box.min.y);
+			// remove penetration, but preserve total energy (if possible when d >= 0)
+			double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
+			body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
+			body.pos.y = -body.box.min.y;
+		}
+
+		if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
+			body.vel.x = -body.vel.x * elasticity;
+		}
+		if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
+			body.vel.x = -body.vel.x * elasticity;
+		}
+		if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
+			body.vel.y = -body.vel.y * elasticity;
+		}
+
+		if (gAirDrag) {
+			body.vel *= 0.999;
+		}
+	}
+}
+
 double CollisionTime(const polygon2& a, const polygon2& b, vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
 	// TODO
 	return 0;
@@ -154,7 +260,6 @@ double CollisionTime(const polygon2& a, const polygon2& b, vec2 a0, vec2 a1, vec
 int main(int argc, char** argv) {
 	InitSegvHandler();
 
-	constexpr int Width = 1200, Height = 900;
 	auto window = CreateWindow({.width=Width, .height=Height, .resizeable=false});
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
@@ -237,8 +342,6 @@ int main(int argc, char** argv) {
 	ortho[2][0] = -1.0f;
 	ortho[2][1] = -1.0f;
 
-	const dvec2 gravity(0, -100); // mVm/s^2
-
 	double time = 0;
 	double energy = 0;
 	for (Body& body : bodies) {
@@ -251,66 +354,46 @@ int main(int argc, char** argv) {
 
 		constexpr double dt = 0.01;
 		if (gSimulate) {
-			for (auto i : range(bodies.size()))
-				for (auto j : range(i + 1, bodies.size()))
-					Interact(bodies[i], bodies[j]);
+			double remaining_dt = dt;
+			while (true) {
+				// resolve collisions
+				// TODO Classify() call from prev iteration can tell us pairs and their contacts
+				for (auto i : range(bodies.size()))
+					for (auto j : range(i + 1, bodies.size()))
+						Interact(bodies[i], bodies[j]);
 
-			for (Body& body : bodies) {
-				// TODO if objects end up penetrating each other, what then?
-				// - ignore penetration (classify needs to be able to compute contacts from penetration)
-				// - simulate up to contact time (resolve contacts), continue simulating
-				// 	 - remaining_time = dt
-				// 	 - start: resolve collisions
-				// 	 - save states of all objects
-				// 	 - advance all objects for remaining_time
-				// 	 - if any collision detected (during remaining_time):
-				// 	   - find collision_time TODO how?
-				// 	   - restore states
-				// 	   - advance all objects to collision_time
-				// 	   - remaining_time -= collision_time
-				// 	   - goto start
-				// - alternate:
-				// 	 - remaining_time = dt
-				// 	 - start: resolve collisions
-				// 	 - save states of all objects
-				// 	 - advance all objects for remaining_time
-				// 	 - if pedetration detected (at end time):
-				// 	   - find first collision_time using binary search
-				// 	   - restore states
-				// 	   - advance all objects to collision_time
-				// 	   - remaining_time -= collision_time
-				// 	   - goto start
-				dvec2 acc = gGravity ? gravity : dvec2(0, 0);
-				dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
-				auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) {
-					return dvec4(dvec2(s.z, s.w), acc);
-				});
-				body.pos = dvec2(s1.x, s1.y);
-				body.vel = dvec2(s1.z, s1.w);
+				SaveStates(bodies);
+				Advance(bodies, remaining_dt);
+				if (Classify(bodies) >= 0)
+					break;
 
-				constexpr double elasticity = 0.5;
-				if (body.pos.y + body.box.min.y < 0) {
-					double dip = -(body.pos.y + body.box.min.y);
-					// remove penetration, but preserve total energy (if possible when d >= 0)
-					double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
-					body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
-					body.pos.y = -body.box.min.y;
+				// find collision time
+				double min_dt = 0;
+				double max_dt = remaining_dt;
+				int i = 0;
+				while (true) {
+					if (i >= 20) {
+						gSimulate = false;
+						print("binary search is broken (%s %s) %s\n", min_dt, max_dt, remaining_dt);
+						goto exit;
+					}
+					RestoreStates(bodies);
+					double mid_dt = (min_dt + max_dt) / 2;
+					Advance(bodies, mid_dt);
+					int c = Classify(bodies);
+					if (c == 0)
+						break;
+					if (c < 0)
+						max_dt = mid_dt;
+					else
+						min_dt = mid_dt;
+					i += 1;
 				}
-
-				if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
-					body.vel.x = -body.vel.x * elasticity;
-				}
-				if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
-					body.vel.x = -body.vel.x * elasticity;
-				}
-				if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
-					body.vel.y = -body.vel.y * elasticity;
-				}
-
-				if (gAirDrag) {
-					body.vel *= 0.999;
-				}
+				double mid_dt = (min_dt + max_dt) / 2;
+				remaining_dt -= mid_dt;
 			}
+			exit:
+
 			time += dt;
 		}
 
