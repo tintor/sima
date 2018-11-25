@@ -156,7 +156,7 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 
         Character ch = m_characters[c];
         GLfloat xpos = x + ch.bearing_x * scale;
-        GLfloat ypos = y - (ch.size_y - ch.bearing_y) * scale;
+        GLfloat ypos = y - (int(ch.size_y) - int(ch.bearing_y)) * scale;
 
         GLfloat w = ch.size_x * scale;
         GLfloat h = ch.size_y * scale;
