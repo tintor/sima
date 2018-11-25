@@ -8,7 +8,6 @@
 // TODO: unicode characters
 // TODO: x and y positioning: left, center, right
 // TODO: 3d text positioning
-// TODO: use hex format for color
 // TODO: text rotation
 // TODO: compute text size
 
@@ -23,17 +22,19 @@ public:
 	void render(string_view text, double x, double y, double scale, Color color);
 
 private:
-	uint m_max_size_y = 0;
+	int m_max_size_y = 0;
 
 	uint m_texture = 0;
-	int m_texture_width = 0;
-	int m_texture_height = 0;
 
 	struct Character {
-		int texture_offset;
-		uint size_x, size_y; // Size of glyph
+		float u0;
+		float u1;
+		float v0;
+		float v1;
+
+		int size_x, size_y; // Size of glyph
 		int bearing_x, bearing_y; // Offset from baseline to left/top of glyph
-	    uint advance;    // Horizontal offset to advance to next glyph
+	    int advance;    // Horizontal offset to advance to next glyph
 	};
 
 	array<Character, 128> m_characters;

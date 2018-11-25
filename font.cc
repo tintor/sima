@@ -14,10 +14,13 @@
 #include "auto.h"
 #include "format.h"
 
+constexpr int CharsPerBuffer = 100;
+
 struct Renderer {
 	uint VAO, VBO;
 	Shader shader;
 	int textColorLocation;
+	float vertices[6 * 4 * CharsPerBuffer];
 
 	Renderer();
 };
@@ -60,7 +63,7 @@ Renderer::Renderer() : shader(R"END(
 
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, nullptr, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * CharsPerBuffer, nullptr, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -97,8 +100,8 @@ Font::Font(string_view name, int resolution) {
 	ON_SCOPE_EXIT(glBindTexture(GL_TEXTURE_2D, 0));
 	glGenTextures(1, &m_texture);
 	glBindTexture(GL_TEXTURE_2D, m_texture);
-	m_texture_width = 1;
-	m_texture_height = 0;
+	int texture_width = 1;
+	int texture_height = 0;
 
 	for (int c = 0; c < m_characters.size(); c++) {
 		// Load character glyph
@@ -112,15 +115,17 @@ Font::Font(string_view name, int resolution) {
 		int w = face->glyph->bitmap.width;
 		int h = face->glyph->bitmap.rows;
 		if (w > 0 && h > 0) {
-			m_texture_height = std::max(m_texture_height, 2 + h);
-			m_texture_width += w + 1;
+			texture_height = std::max(texture_height, 2 + h);
+			texture_width += w + 1;
 		}
 	}
 
-	uint8_t* data = new uint8_t[m_texture_width * m_texture_height];
-	memset(data, 0, m_texture_width * m_texture_height);
+	uint8_t* data = new uint8_t[texture_width * texture_height];
+	memset(data, 0, texture_width * texture_height);
 	ON_SCOPE_EXIT(delete[] data);
 	int texture_offset = 1;
+	float tw = texture_width;
+	float th = texture_height;
 
 	for (int c = 0; c < m_characters.size(); c++) {
 		// Load character glyph
@@ -129,11 +134,20 @@ Font::Font(string_view name, int resolution) {
 			exit(0);
 		}
 
+		int size_x = face->glyph->bitmap.width;
+		int size_y = face->glyph->bitmap.rows;
+
 		m_characters[c] = {
-			texture_offset,
-			face->glyph->bitmap.width, face->glyph->bitmap.rows,
+			texture_offset / tw,
+			(texture_offset + size_x) / tw,
+			1 / th,
+			(1 + size_y) / th,
+
+			size_x, size_y,
 			face->glyph->bitmap_left, face->glyph->bitmap_top,
-			uint(face->glyph->advance.x)
+			// Advance is number of 1/64 pixels.
+			// Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+			int(face->glyph->advance.x >> 6)
 		};
 
 		int w = face->glyph->bitmap.width;
@@ -142,7 +156,7 @@ Font::Font(string_view name, int resolution) {
 		if (w > 0 && h > 0) {
 			for (int y = 0; y < h; y++) {
 				for (int x = 0; x < w; x++) {
-					data[(y + 1) * m_texture_width + texture_offset + x] = buffer[y * w + x];
+					data[(y + 1) * texture_width + texture_offset + x] = buffer[y * w + x];
 				}
 			}
 			texture_offset += w + 1;
@@ -153,8 +167,8 @@ Font::Font(string_view name, int resolution) {
 			GL_TEXTURE_2D,
 			0,
 			GL_RED,
-			m_texture_width,
-			m_texture_height,
+			texture_width,
+			texture_height,
 			0,
 			GL_RED,
 			GL_UNSIGNED_BYTE,
@@ -182,8 +196,11 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 	glUniform3f(s_renderer->textColorLocation, color.r, color.g, color.b);
 	glActiveTexture(GL_TEXTURE0);
 	glBindVertexArray(s_renderer->VAO);
-	glBindTexture(GL_TEXTURE_2D, m_texture);
 
+	glBindTexture(GL_TEXTURE_2D, m_texture);
+	glBindBuffer(GL_ARRAY_BUFFER, s_renderer->VBO);
+
+	int offset = 0;
 	for (char c : text) {
 		if (c == '\n') {
 			x = orig_x;
@@ -192,42 +209,45 @@ void Font::render(string_view text, double x, double y, double scale, Color colo
 		}
 
 		Character ch = m_characters[c];
+		if (ch.size_x == 0 || ch.size_y == 0) {
+			x += m_characters[c].advance * scale;
+			continue;
+		}
+
 		GLfloat xpos = x + ch.bearing_x * scale;
 		GLfloat ypos = y - (int(ch.size_y) - int(ch.bearing_y)) * scale;
 
 		GLfloat w = ch.size_x * scale;
 		GLfloat h = ch.size_y * scale;
 
-		float tw = m_texture_width;
-		float th = m_texture_height;
-
-		float u0 = ch.texture_offset / tw;
-		float u1 = (ch.texture_offset + ch.size_x) / tw;
-		float v0 = 1 / th;
-		float v1 = (1 + ch.size_y) / th;
-
 		// Update VBO for each character
-		GLfloat vertices[6][4] = {
-			{ xpos,		ypos + h,	u0, v0 },
-			{ xpos,		ypos,		u0, v1 },
-			{ xpos + w, ypos,		u1, v1 },
+		float vertices[6 * 4] = {
+			xpos, ypos + h,	ch.u0, ch.v0,
+			xpos, ypos, ch.u0, ch.v1,
+			xpos + w, ypos, ch.u1, ch.v1,
 
-			{ xpos,		ypos + h,	u0, v0 },
-			{ xpos + w, ypos,		u1, v1 },
-			{ xpos + w, ypos + h,	u1, v0 }
+			xpos, ypos + h, ch.u0, ch.v0,
+			xpos + w, ypos, ch.u1, ch.v1,
+			xpos + w, ypos + h,	ch.u1, ch.v0,
 		};
-		// Render glyph texture over quad
-		// Update content of VBO memory
-		glBindBuffer(GL_ARRAY_BUFFER, s_renderer->VBO); // TODO combine all letters into a single buffer
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
 
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		// Render quad
-		glDrawArrays(GL_TRIANGLES, 0, 6); // TODO use GL_QUADS
-		// Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-		// Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
-		x += (ch.advance >> 6) * scale;
+		x += ch.advance * scale;
+
+		memcpy(s_renderer->vertices + offset * 6 * 4, vertices, 6 * 4 * sizeof(float));
+		offset += 1;
+
+		if (offset == CharsPerBuffer) {
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, s_renderer->vertices);
+			glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
+			offset = 0;
+		}
 	}
+	if (offset > 0) {
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, s_renderer->vertices);
+		glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
+		offset = 0;
+	}
+
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
