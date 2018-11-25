@@ -35,6 +35,7 @@ set(render
 	window.cc
 	font.cc
 	rendering.cc
+	shader.cc
 	glad/src/glad.c)
 
 set(test
@@ -55,6 +56,7 @@ set(test
 	test_tesselate.cc
 	test_integration.cc
  	test_auto.cc
+	test_array_deque.cc
 	#test_array_set.cc
 	test_bits.cc
 	test_dynamic_array.cc
@@ -68,6 +70,7 @@ set(test
 add_executable(main main.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})
 add_executable(test ${prod} ${test})
+add_executable(pid pid.cc ${prod} ${render})
 
 add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
@@ -105,3 +108,4 @@ endif()
 
 target_link_libraries(main ${RENDER_LIBS})
 target_link_libraries(run_gravity ${RENDER_LIBS})
+target_link_libraries(pid ${RENDER_LIBS})
