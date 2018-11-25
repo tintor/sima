@@ -54,6 +54,17 @@ double4 CenterOfMass(const mesh3& mesh) {
 	return P / (V * 4);
 }
 
+double2 CenterOfMass(const polygon2& poly) {
+	double2 P = {0, 0};
+	double2 V = 0;
+	for (auto [a, b] : Edges(poly)) {
+		double v = a.x * b.y - a.y * b.x;
+		P += (a + b) * v;
+		V += v;
+	}
+	return P / (V * 3);
+}
+
 /*inline dmat3 full_mat3(double a) {
     const double m[] = { a, a, a, a, a, a, a, a, a};
     return glm::make_mat3(m);

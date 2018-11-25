@@ -14,6 +14,8 @@ inline double Volume(const xmesh3& mesh) { return std::abs(SignedVolume(mesh)); 
 double4 CenterOfMass(const mesh3& mesh);
 double4 CenterOfMass(const xmesh3& mesh);
 
+double2 CenterOfMass(const polygon2& poly);
+
 // Moment of inertia of a valid polyhedron with Center of Mass = 0 and Density = 1
 //dmat3 moment_of_inertia(const imesh3& mesh);
 
