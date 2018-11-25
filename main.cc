@@ -1,12 +1,12 @@
+// collision between concave shapes
+// collision between concave shape and ground
+// rotation!
+// hinges and 3 dof arm (turn off collision detection between objects that have hinge)
 // draw polygons with mouse
 // render velocity and ang_velocity vectors
 // move and rotate objects with mouse
 // tangental friction
 // notification messages that disappear
-// convex shapes instead of balls (no rotation)
-// 2d + rotation
-// concave shapes instead of convex
-// hinges and 3 dof arm (turn off collision detection between objects that have hinge)
 // joint friction
 // PID controller for the arm
 // click on stop to move tip of end-effector there
@@ -27,6 +27,9 @@
 #include "integration.h"
 #include "util.h"
 #include "glm.h"
+#include "classify.h"
+#include "triangle.h"
+#include "properties.h"
 
 // rendering
 #include "font.h"
@@ -68,6 +71,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 struct Body {
+	polygon2 shape;
+	std::vector<vec2> shapef;
+
 	double radius;
 	double mass;
 	dvec2 pos;
@@ -76,7 +82,18 @@ struct Body {
 	double ang_velocity = 0;
 };
 
-void ResolveCollision(Body& a, Body& b, dvec2 d) {
+void Interact(Body& a, Body& b) {
+	dvec2 d = a.pos - b.pos;
+	float r = a.radius + b.radius;
+	if (glm::dot(d, d) > r * r)
+		return;
+	d = glm::normalize(d);
+
+	vector<Contact2> contacts;
+	int c = Classify(a.shape, b.shape, &contacts);
+	if (c > 0)
+		return;
+
 	double ua = glm::dot(d, a.velocity);
 	double ub = glm::dot(d, b.velocity);
 	auto ma = a.mass;
@@ -85,6 +102,22 @@ void ResolveCollision(Body& a, Body& b, dvec2 d) {
 	double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
 	a.velocity += d * (va - ua);
 	b.velocity += d * (vb - ub);
+}
+
+void SetShape(Body& body, const polygon2& poly) {
+	double2 com = CenterOfMass(poly);
+	body.shape = poly;
+	for (double2& v : body.shape)
+		v -= com;
+
+	body.shapef.resize(body.shape.size());
+	for (uint i = 0; i < body.shape.size(); i++)
+		body.shapef[i] = vec2(body.shape[i].x, body.shape[i].y);
+
+	double r2 = 0;
+	for (double2 v : body.shape)
+		maximize(r2, dot(v, v));
+	body.radius = sqrt(r2);
 }
 
 int main(int argc, char** argv) {
@@ -131,6 +164,7 @@ int main(int argc, char** argv) {
 		v[i].y = sin(a);
 	}
 	v[24] = vec2(0, 0);
+	std::array<vec2, 25> w;
 	buffer.write(v);
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -139,6 +173,31 @@ int main(int argc, char** argv) {
 	bodies.push_back({.mass=130*130, .radius=130, .pos=vec2(200, 200)});
 	bodies.push_back({.mass=80*80, .radius=80, .pos=vec2(400, 400)});
 	bodies.push_back({.mass=50*50, .radius=50, .pos=vec2(600, 600)});
+
+	polygon2 shape;
+	shape.push_back(double2{0, 0});
+	shape.push_back(double2{200, 0});
+	shape.push_back(double2{200, -100});
+	shape.push_back(double2{100, -100});
+	shape.push_back(double2{100, -200});
+	shape.push_back(double2{0, -200});
+	SetShape(bodies[0], shape);
+
+	shape.clear();
+	for (int i = 0; i < 24; i++) {
+		auto a = 2 * M_PI / 24 * i;
+		shape.push_back(double2{cos(a), sin(a)} * 80);
+	}
+	shape.push_back(double2{0, 0});
+	SetShape(bodies[1], shape);
+
+	shape.clear();
+	for (int i = 0; i < 24; i++) {
+		auto a = 2 * M_PI / 24 * i;
+		shape.push_back(double2{cos(a), sin(a)} * 50);
+	}
+	shape.push_back(double2{0, 0});
+	SetShape(bodies[2], shape);
 
 	mat3 ortho;
 	ortho[0][0] = 2.0f / Width;
@@ -161,17 +220,10 @@ int main(int argc, char** argv) {
 
 		constexpr double dt = 0.01;
 		if (gSimulate) {
-			for (uint i = 0; i < bodies.size(); i++) {
-				for (uint j = i + 1; j < bodies.size(); j++) {
-					Body& a = bodies[i];
-					Body& b = bodies[j];
-					dvec2 d = a.pos - b.pos;
-					float r = a.radius + b.radius;
-					if (glm::dot(d, d) <= r * r) {
-						ResolveCollision(a, b, glm::normalize(d));
-					}
-				}
-			}
+			for (auto i : range(bodies.size()))
+				for (auto j : range(i + 1, bodies.size()))
+					Interact(bodies[i], bodies[j]);
+
 			for (Body& body : bodies) {
 				dvec2 acc = gGravity ? gravity : dvec2(0, 0);
 				dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.velocity.x, body.velocity.y);
@@ -237,9 +289,9 @@ int main(int argc, char** argv) {
 			mat3 transform(ortho);
 			transform = glm::translate(transform, vec2(body.pos));
 			transform = glm::rotate(transform, float(body.angle));
-			transform = glm::scale(transform, vec2(body.radius, body.radius));
 			transformUniform = transform;
-			glDrawArrays(GL_LINE_LOOP, 0, v.size());
+			buffer.write(span<const vec2>(body.shapef.data(), body.shapef.size()));
+			glDrawArrays(GL_LINE_LOOP, 0, body.shapef.size());
 		}
 	});
 	return 0;
