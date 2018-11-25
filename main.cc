@@ -75,13 +75,36 @@ struct Body {
 
 	aabb2 box;
 	double radius;
-
 	double mass;
+
 	dvec2 pos;
-	dvec2 velocity = vec2(0, 0);
-	double angle = 0;
-	double ang_velocity = 0;
+	dvec2 vel = vec2(0, 0);
+	double ang_pos = 0;
+	double ang_vel = 0;
+
+	dvec2 saved_pos;
+	dvec2 saved_vel;
+	double saved_ang_pos;
+	double saved_ang_vel;
 };
+
+void SaveStates(vector<Body>& bodies) {
+	for (Body& body : bodies) {
+		body.saved_pos = body.pos;
+		body.saved_vel = body.vel;
+		body.saved_ang_pos = body.ang_pos;
+		body.saved_ang_vel = body.ang_vel;
+	}
+}
+
+void RestoreStates(vector<Body>& bodies) {
+	for (Body& body : bodies) {
+		body.pos = body.saved_pos;
+		body.vel = body.saved_vel;
+		body.ang_pos = body.saved_ang_pos;
+		body.ang_vel = body.saved_ang_vel;
+	}
+}
 
 void Interact(Body& a, Body& b) {
 	dvec2 d = a.pos - b.pos;
@@ -95,14 +118,14 @@ void Interact(Body& a, Body& b) {
 	if (c > 0)
 		return;
 
-	double ua = glm::dot(d, a.velocity);
-	double ub = glm::dot(d, b.velocity);
+	double ua = glm::dot(d, a.vel);
+	double ub = glm::dot(d, b.vel);
 	auto ma = a.mass;
 	auto mb = b.mass;
 	double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
 	double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
-	a.velocity += d * (va - ua);
-	b.velocity += d * (vb - ub);
+	a.vel += d * (va - ua);
+	b.vel += d * (vb - ub);
 }
 
 void SetShape(Body& body, const polygon2& poly) {
@@ -121,6 +144,11 @@ void SetShape(Body& body, const polygon2& poly) {
 	body.radius = sqrt(r2);
 
 	body.box = aabb2(body.shape);
+}
+
+double CollisionTime(const polygon2& a, const polygon2& b, vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
+	// TODO
+	return 0;
 }
 
 int main(int argc, char** argv) {
@@ -214,7 +242,7 @@ int main(int argc, char** argv) {
 	double time = 0;
 	double energy = 0;
 	for (Body& body : bodies) {
-		energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.velocity, body.velocity) * body.mass / 2;
+		energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
 	}
 	double energyMin = energy, energyMax = energy;
 
@@ -228,35 +256,59 @@ int main(int argc, char** argv) {
 					Interact(bodies[i], bodies[j]);
 
 			for (Body& body : bodies) {
+				// TODO if objects end up penetrating each other, what then?
+				// - ignore penetration (classify needs to be able to compute contacts from penetration)
+				// - simulate up to contact time (resolve contacts), continue simulating
+				// 	 - remaining_time = dt
+				// 	 - start: resolve collisions
+				// 	 - save states of all objects
+				// 	 - advance all objects for remaining_time
+				// 	 - if any collision detected (during remaining_time):
+				// 	   - find collision_time TODO how?
+				// 	   - restore states
+				// 	   - advance all objects to collision_time
+				// 	   - remaining_time -= collision_time
+				// 	   - goto start
+				// - alternate:
+				// 	 - remaining_time = dt
+				// 	 - start: resolve collisions
+				// 	 - save states of all objects
+				// 	 - advance all objects for remaining_time
+				// 	 - if pedetration detected (at end time):
+				// 	   - find first collision_time using binary search
+				// 	   - restore states
+				// 	   - advance all objects to collision_time
+				// 	   - remaining_time -= collision_time
+				// 	   - goto start
 				dvec2 acc = gGravity ? gravity : dvec2(0, 0);
-				dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.velocity.x, body.velocity.y);
+				dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
 				auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) {
 					return dvec4(dvec2(s.z, s.w), acc);
 				});
 				body.pos = dvec2(s1.x, s1.y);
-				body.velocity = dvec2(s1.z, s1.w);
+				body.vel = dvec2(s1.z, s1.w);
 
 				constexpr double elasticity = 0.5;
 				if (body.pos.y + body.box.min.y < 0) {
 					double dip = -(body.pos.y + body.box.min.y);
 					// remove penetration, but preserve total energy (if possible when d >= 0)
-					double d = gravity.y * 2 * dip + body.velocity.y * body.velocity.y;
-					body.velocity.y = (d > 0) ? elasticity * sqrt(d) : 0;
+					double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
+					body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
 					body.pos.y = -body.box.min.y;
 				}
 
-				if (body.pos.x + body.box.min.x <= 0 && body.velocity.x < 0) {
-					body.velocity.x = -body.velocity.x * elasticity;
+				if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
+					body.vel.x = -body.vel.x * elasticity;
 				}
-				if (body.pos.x + body.box.max.x >= Width && body.velocity.x > 0) {
-					body.velocity.x = -body.velocity.x * elasticity;
+				if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
+					body.vel.x = -body.vel.x * elasticity;
 				}
-				if (body.pos.y + body.box.max.y >= Height && body.velocity.y > 0) {
-					body.velocity.y = -body.velocity.y * elasticity;
+				if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
+					body.vel.y = -body.vel.y * elasticity;
 				}
 
 				if (gAirDrag) {
-					body.velocity *= 0.999;
+					body.vel *= 0.999;
 				}
 			}
 			time += dt;
@@ -264,7 +316,7 @@ int main(int argc, char** argv) {
 
 		double energy = 0;
 		for (Body& body : bodies) {
-			energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.velocity, body.velocity) * body.mass / 2;
+			energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
 		}
 		minimize(energyMin, energy);
 		maximize(energyMax, energy);
@@ -276,7 +328,7 @@ int main(int argc, char** argv) {
 			p.x = p.x / Width * 800;
 			p.y = p.y / Height * 600;
 			monaco.render(
-				format("pos (%f)\nvec (%f)", body.pos, body.velocity),
+				format("pos (%f)\nvec (%f)", body.pos, body.vel),
 				p.x, p.y, 0.3, "7FE030");
 		}
 		monaco.render(
@@ -292,7 +344,7 @@ int main(int argc, char** argv) {
 		for (const Body& body : bodies) {
 			mat3 transform(ortho);
 			transform = glm::translate(transform, vec2(body.pos));
-			transform = glm::rotate(transform, float(body.angle));
+			transform = glm::rotate(transform, float(body.ang_pos));
 			transformUniform = transform;
 			buffer.write(span<const vec2>(body.shapef.data(), body.shapef.size()));
 			glDrawArrays(GL_LINE_LOOP, 0, body.shapef.size());
