@@ -106,19 +106,19 @@ void RestoreStates(vector<Body>& bodies) {
 	}
 }
 
-// TODO avoid reallocating memory for BT and Contacts
-void Interact(Body& a, Body& b) {
+// TODO avoid reallocating memory for Contacts
+void Interact(Body& a, Body& b, polygon2& temp) {
 	dvec2 d = a.pos - b.pos;
 	float r = a.radius + b.radius;
 	if (glm::dot(d, d) > r * r)
 		return;
 	// translate B to A's frame
-	polygon2 bt(b.shape.size());
+	temp.resize(b.shape.size());
 	for (uint i = 0; i < b.shape.size(); i++)
-		bt[i] = b.shape[i] + double2{d.x, d.y};
+		temp[i] = b.shape[i] + double2{d.x, d.y};
 
 	vector<Contact2> contacts;
-	int c = Classify(a.shape, bt, &contacts);
+	int c = Classify(a.shape, temp, &contacts);
 	if (c > 0)
 		return;
 	if (c < 0) {
@@ -159,38 +159,66 @@ void SetShape(Body& body, const polygon2& poly) {
 	body.box = aabb2(body.shape);
 }
 
-// TODO avoid reallocating memory for BT
-int Classify(const Body& a, const Body& b) {
+int Classify(const Body& a, const Body& b, polygon2& temp) {
 	dvec2 d = a.pos - b.pos;
 	float r = a.radius + b.radius;
 	if (glm::dot(d, d) > r * r)
 		return 1;
 
 	// translate B to A's frame
-	polygon2 bt(b.shape.size());
+	temp.resize(b.shape.size());
 	for (uint i = 0; i < b.shape.size(); i++)
-		bt[i] = b.shape[i] + double2{d.x, d.y};
-	return Classify(a.shape, bt);
+		temp[i] = b.shape[i] + double2{d.x, d.y};
+	return Classify(a.shape, temp);
 }
+
+constexpr int Width = 1200, Height = 900;
 
 // +1 - all bodies are separate
 //  0 - at least two bodies in contact (and no penetration)
 // -1 - at least two bodies in penetration
-int Classify(const vector<Body>& bodies) {
+int Classify(const vector<Body>& bodies, polygon2& temp) {
 	int result = 1;
-	for (auto i : range(bodies.size()))
+	for (auto i : range(bodies.size())) {
+		const Body& b = bodies[i];
+
+		// Check against walls
+		int c = Sign(b.pos.y + b.box.min.y, Tolerance);
+		if (c < 0)
+			return -1;
+		if (c == 0)
+			result = 0;
+
+		c = Sign(b.pos.x + b.box.min.x, Tolerance);
+		if (c < 0)
+			return -1;
+		if (c == 0)
+			result = 0;
+
+		c = Sign(Width - (b.pos.x + b.box.max.x), Tolerance);
+		if (c < 0)
+			return -1;
+		if (c == 0)
+			result = 0;
+
+		c = Sign(Height - (b.pos.y + b.box.max.y), Tolerance);
+		if (c < 0)
+			return -1;
+		if (c == 0)
+			result = 0;
+
+		// Check against other bodies
 		for (auto j : range(i + 1, bodies.size())) {
-			int c = Classify(bodies[i], bodies[j]);
-			if (c > 0)
-				continue;
+			c = Classify(b, bodies[j], temp);
 			if (c < 0)
 				return -1;
-			result = 0;
+			if (c == 0)
+				result = 0;
 		}
+	}
 	return result;
 }
 
-constexpr int Width = 1200, Height = 900;
 const dvec2 gravity(0, -100); // mVm/s^2
 
 void Advance(vector<Body>& bodies, double dt) {
@@ -349,6 +377,7 @@ int main(int argc, char** argv) {
 	}
 	double energyMin = energy, energyMax = energy;
 
+	polygon2 temp;
 	RunEventLoop(window, [&]() {
 		glClear(GL_COLOR_BUFFER_BIT);
 
@@ -360,11 +389,11 @@ int main(int argc, char** argv) {
 				// TODO Classify() call from prev iteration can tell us pairs and their contacts
 				for (auto i : range(bodies.size()))
 					for (auto j : range(i + 1, bodies.size()))
-						Interact(bodies[i], bodies[j]);
+						Interact(bodies[i], bodies[j], temp);
 
 				SaveStates(bodies);
 				Advance(bodies, remaining_dt);
-				if (Classify(bodies) >= 0)
+				if (Classify(bodies, temp) >= 0)
 					break;
 
 				// find collision time
@@ -380,7 +409,7 @@ int main(int argc, char** argv) {
 					RestoreStates(bodies);
 					double mid_dt = (min_dt + max_dt) / 2;
 					Advance(bodies, mid_dt);
-					int c = Classify(bodies);
+					int c = Classify(bodies, temp);
 					if (c == 0)
 						break;
 					if (c < 0)
