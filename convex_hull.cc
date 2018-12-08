@@ -6,7 +6,7 @@
 #include "primitives.h"
 #include "exception.h"
 
-bool is_convex(const mesh3& mesh) {
+bool is_convex(span<const triangle3> mesh) {
 	// Extract all unique vertices
 	aligned_vector<point3> vertices;
 	vertices.reserve(mesh.size() * 3);
