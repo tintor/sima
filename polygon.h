@@ -150,10 +150,6 @@ inline bool operator!=(const polygon3& a, const polygon3& b) {
 	return !operator==(a, b);
 }
 
-// Triangle meshes
-using mesh2 = vector<triangle2>;
-using mesh3 = aligned_vector<triangle3>;
-
 inline string wkt(const polygon2& poly) {
 	string s;
 	s += "POLYGON (";
@@ -165,27 +161,6 @@ inline string wkt(const polygon2& poly) {
 		format_e(s, "", poly.front());
 	}
 	s += ')';
-	return s;
-}
-
-inline string wkt(const mesh2& mesh) {
-	string s;
-	s += "MULTIPOLYGON ((";
-	for (auto i : range(mesh.size())) {
-		if (i != 0)
-			s += ", ";
-		const triangle2& m = mesh[i];
-		s += '(';
-		format_e(s, "", m.a);
-		s += ", ";
-		format_e(s, "", m.b);
-		s += ", ";
-		format_e(s, "", m.c);
-		s += ", ";
-		format_e(s, "", m.a);
-		s += ')';
-	}
-	s += "))";
 	return s;
 }
 

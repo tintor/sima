@@ -1,5 +1,5 @@
 #pragma once
-#include "polygon.h"
+#include "mesh.h"
 
 mesh3 load_stl(string_view filename);
 mesh3 load_ply(string_view filename);

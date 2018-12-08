@@ -1,6 +1,7 @@
 #pragma once
 
-#include "triangle.h"
+#include "mesh.h"
+#include "polygon.h"
 #include "convex_hull.h"
 #include "primitives.h"
 

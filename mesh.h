@@ -8,6 +8,30 @@
 #include "plane.h"
 #include "exception.h"
 
+using mesh2 = vector<triangle2>;
+using mesh3 = aligned_vector<triangle3>;
+
+inline string wkt(const mesh2& mesh) {
+	string s;
+	s += "MULTIPOLYGON ((";
+	for (auto i : range(mesh.size())) {
+		if (i != 0)
+			s += ", ";
+		const triangle2& m = mesh[i];
+		s += '(';
+		format_e(s, "", m.a);
+		s += ", ";
+		format_e(s, "", m.b);
+		s += ", ";
+		format_e(s, "", m.c);
+		s += ", ";
+		format_e(s, "", m.a);
+		s += ')';
+	}
+	s += "))";
+	return s;
+}
+
 // TODO should we store plane for every face?
 // store normalized plane or unnormalized plane?
 // pros:

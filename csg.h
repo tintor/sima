@@ -1,5 +1,5 @@
 #pragma once
-#include "polygon.h"
+#include "mesh.h"
 
 mesh3 csg_and(const mesh3& a, const mesh3& b);
 mesh3 csg_or(const mesh3& a, const mesh3& b);

@@ -1,5 +1,6 @@
 #pragma once
-#include "polygon.h"
+#include "mesh.h"
+#include "triangle.h"
 #include "plane.h"
 #include <random>
 
