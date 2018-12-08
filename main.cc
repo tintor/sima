@@ -1,3 +1,8 @@
+// load human 3d model
+// render human 3d model / with phong shading
+// articulate human 3d model
+
+// render contacts
 // collision between concave shapes
 // rotation!
 // hinges and 3 dof arm (turn off collision detection between objects that have hinge)
@@ -37,17 +42,34 @@
 #include "vertex_buffer.h"
 
 bool gSimulate = false;
+bool gSimulateTick = false;
 bool gGravity = true;
 bool gAirDrag = false;
 bool gFriction = false;
 
+bool gSpaceKey = false;
+bool gShiftKey = false;
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	const char* key_name = glfwGetKeyName(key, 0);
+	print("key_callback [%s] key:%s scancode:%s action:%s mods:%s\n", key_name, key, scancode, action, mods);
+
+	if (action == GLFW_PRESS && key == GLFW_KEY_SPACE) {
+		gSpaceKey = true;
+	}
+	if (action == GLFW_RELEASE && key == GLFW_KEY_SPACE) {
+		gSpaceKey = false;
+	}
+
 	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
 		return;
 	}
 	if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == 0) {
 		gSimulate ^= 1;
+	}
+	if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
+		gSimulateTick ^= 1;
 	}
 	if (action == GLFW_PRESS && key == GLFW_KEY_G && mods == 0) {
 		gGravity ^= 1;
@@ -106,8 +128,7 @@ void RestoreStates(vector<Body>& bodies) {
 	}
 }
 
-// TODO avoid reallocating memory for Contacts
-void Interact(Body& a, Body& b, polygon2& temp) {
+void Interact(Body& a, Body& b, polygon2& temp, vector<Contact2>& contacts) {
 	dvec2 d = a.pos - b.pos;
 	float r = a.radius + b.radius;
 	if (glm::dot(d, d) > r * r)
@@ -117,28 +138,57 @@ void Interact(Body& a, Body& b, polygon2& temp) {
 	for (uint i = 0; i < b.shape.size(); i++)
 		temp[i] = b.shape[i] + double2{d.x, d.y};
 
-	vector<Contact2> contacts;
+	contacts.clear();
 	int c = Classify(a.shape, temp, &contacts);
 	if (c > 0)
 		return;
 	if (c < 0) {
 		print("penetrating objects in Interact()\n");
 		exit(1);
+		// TODO classify will not return contacts when there is penetration! :(
+		// TODO there could be multiple contacts with different levels (or none) of penetration
+		// TODO move objects slightly away to prevent penetration (while keeping total kinetic + potential energy constant)
+		// (just moving objects will not work when rotations are added)
 	}
 
-	// TODO translate contacts from A frame to world frame
+	// Translate contacts from A frame to world frame
+	for (Contact2& c : contacts) {
+		c.sa -= double2{d.x, d.y};
+		c.sb -= double2{d.x, d.y};
+	}
 
-	// TODO resolve collision's such that there are no delta_vs across any contact
+	// Resolve all contacts with dv at once!
+	double w = 0;
+	for (const Contact2& contact : contacts) {
+		d.x = -contact.normal.x; // TODO check direction
+		d.y = -contact.normal.y; // TODO check direction
+		double u = glm::dot(d, a.vel - b.vel);
+		if (u < 0)
+			w += -u;
+	}
+	if (w == 0)
+		return;
 
-	d = glm::normalize(d);
-	double ua = glm::dot(d, a.vel);
-	double ub = glm::dot(d, b.vel);
-	auto ma = a.mass;
-	auto mb = b.mass;
-	double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
-	double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
-	a.vel += d * (va - ua);
-	b.vel += d * (vb - ub);
+	dvec2 wa(0, 0);
+	dvec2 wb(0, 0);
+	for (const Contact2& contact : contacts) {
+		d.x = -contact.normal.x; // TODO check direction
+		d.y = -contact.normal.y; // TODO check direction
+		double ua = glm::dot(d, a.vel);
+		double ub = glm::dot(d, b.vel);
+		double u = ua - ub;
+		if (u < 0) {
+			auto ma = a.mass;
+			auto mb = b.mass;
+			double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
+			double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
+			wa += d * (va - ua) * -u;
+			wb += d * (vb - ub) * -u;
+		}
+	}
+
+	a.vel += wa / w;
+	b.vel += wb / w;
 }
 
 void SetShape(Body& body, const polygon2& poly) {
@@ -221,32 +271,58 @@ int Classify(const vector<Body>& bodies, polygon2& temp) {
 
 const dvec2 gravity(0, -100); // mVm/s^2
 
+void InteractWithWalls(Body& body) {
+	constexpr double elasticity = 0.5;
+	if (body.pos.y + body.box.min.y < 0) {
+		double dip = -(body.pos.y + body.box.min.y);
+		// remove penetration, but preserve total energy (if possible when d >= 0)
+		double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
+		body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
+		body.pos.y = -body.box.min.y;
+	}
+	if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
+		body.vel.x = -body.vel.x * elasticity;
+	}
+	if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
+		body.vel.x = -body.vel.x * elasticity;
+	}
+	if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
+		body.vel.y = -body.vel.y * elasticity;
+	}
+}
+
+// TODO if objects end up penetrating each other, what then?
+// - ignore penetration (classify needs to be able to compute contacts from penetration)
+// - simulate up to contact time (resolve contacts), continue simulating
+// 	 - remaining_time = dt
+// 	 - start: resolve collisions
+// 	 - save states of all objects
+// 	 - advance all objects for remaining_time
+// 	 - if any collision detected (during remaining_time):
+// 	   - find collision_time TODO how?
+// 	   - restore states
+// 	   - advance all objects to collision_time
+// 	   - remaining_time -= collision_time
+// 	   - goto start
+// - alternate:
+// 	 - remaining_time = dt
+// 	 - start: resolve collisions
+// 	 - save states of all objects
+// 	 - advance all objects for remaining_time
+// 	 - if pedetration detected (at end time):
+// 	   - find first collision_time using binary search
+// 	   - restore states
+// 	   - advance all objects to collision_time
+// 	   - remaining_time -= collision_time
+// 	   - goto start
+// - alternate:
+//   - simulate full dt (optionally advance until collistion time for high dv collisions)
+//   - iteratively fix all penetrations (both shape v shape, and shape v wall)
+//     - fix penetrations one-by-one in random order (note that fix-up may cause more penetrations)
+//     - classify() will have to compute contacts for penetrations too. (complicated!)
+
 void Advance(vector<Body>& bodies, double dt) {
 	for (Body& body : bodies) {
-		// TODO if objects end up penetrating each other, what then?
-		// - ignore penetration (classify needs to be able to compute contacts from penetration)
-		// - simulate up to contact time (resolve contacts), continue simulating
-		// 	 - remaining_time = dt
-		// 	 - start: resolve collisions
-		// 	 - save states of all objects
-		// 	 - advance all objects for remaining_time
-		// 	 - if any collision detected (during remaining_time):
-		// 	   - find collision_time TODO how?
-		// 	   - restore states
-		// 	   - advance all objects to collision_time
-		// 	   - remaining_time -= collision_time
-		// 	   - goto start
-		// - alternate:
-		// 	 - remaining_time = dt
-		// 	 - start: resolve collisions
-		// 	 - save states of all objects
-		// 	 - advance all objects for remaining_time
-		// 	 - if pedetration detected (at end time):
-		// 	   - find first collision_time using binary search
-		// 	   - restore states
-		// 	   - advance all objects to collision_time
-		// 	   - remaining_time -= collision_time
-		// 	   - goto start
 		dvec2 acc = gGravity ? gravity : dvec2(0, 0);
 		dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
 		auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) {
@@ -255,24 +331,7 @@ void Advance(vector<Body>& bodies, double dt) {
 		body.pos = dvec2(s1.x, s1.y);
 		body.vel = dvec2(s1.z, s1.w);
 
-		constexpr double elasticity = 0.5;
-		if (body.pos.y + body.box.min.y < 0) {
-			double dip = -(body.pos.y + body.box.min.y);
-			// remove penetration, but preserve total energy (if possible when d >= 0)
-			double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
-			body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
-			body.pos.y = -body.box.min.y;
-		}
-
-		if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
-			body.vel.x = -body.vel.x * elasticity;
-		}
-		if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
-			body.vel.x = -body.vel.x * elasticity;
-		}
-		if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
-			body.vel.y = -body.vel.y * elasticity;
-		}
+		InteractWithWalls(body);
 
 		if (gAirDrag) {
 			body.vel *= 0.999;
@@ -335,7 +394,7 @@ int main(int argc, char** argv) {
 
 	std::vector<Body> bodies;
 	bodies.push_back({.mass=130*130, .radius=130, .pos=vec2(200, 200)});
-	bodies.push_back({.mass=80*80, .radius=80, .pos=vec2(400, 400)});
+	bodies.push_back({.mass=90*90, .radius=90, .pos=vec2(400, 400)});
 	bodies.push_back({.mass=50*50, .radius=50, .pos=vec2(600, 600)});
 
 	polygon2 shape;
@@ -350,7 +409,7 @@ int main(int argc, char** argv) {
 	shape.clear();
 	for (int i = 0; i < 24; i++) {
 		auto a = 2 * M_PI / 24 * i;
-		shape.push_back(double2{cos(a), sin(a)} * 80);
+		shape.push_back(double2{cos(a), sin(a)} * 100);
 	}
 	shape.push_back(double2{0, 0});
 	SetShape(bodies[1], shape);
@@ -378,18 +437,20 @@ int main(int argc, char** argv) {
 	double energyMin = energy, energyMax = energy;
 
 	polygon2 temp;
+	vector<Contact2> contacts;
+
 	RunEventLoop(window, [&]() {
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		constexpr double dt = 0.01;
-		if (gSimulate) {
+		if (gSimulate || gSimulateTick) {
 			double remaining_dt = dt;
 			while (true) {
 				// resolve collisions
 				// TODO Classify() call from prev iteration can tell us pairs and their contacts
 				for (auto i : range(bodies.size()))
 					for (auto j : range(i + 1, bodies.size()))
-						Interact(bodies[i], bodies[j], temp);
+						Interact(bodies[i], bodies[j], temp, contacts);
 
 				SaveStates(bodies);
 				Advance(bodies, remaining_dt);
@@ -424,6 +485,7 @@ int main(int argc, char** argv) {
 			exit:
 
 			time += dt;
+			gSimulateTick = false;
 		}
 
 		double energy = 0;
