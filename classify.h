@@ -55,10 +55,10 @@ inline int Classify(segment2 s, double2 v) {
 }
 
 // TESTED polygon vs point
-int Classify(const polygon2& a, double2 p, aabb2 box);
-int Classify(const xpolygon2& a, double2 p, aabb2 box);
-inline int Classify(const polygon2& a, double2 p) { return Classify(a, p, Box(a)); }
-inline int Classify(const xpolygon2& a, double2 p) { return Classify(a, p, Box(a)); }
+int Classify(const polygon2& a, double2 p, aabb2 box, bool check_edges = true);
+int Classify(const xpolygon2& a, double2 p, aabb2 box, bool check_edges = true);
+inline int Classify(const polygon2& a, double2 p, bool check_edges = true) { return Classify(a, p, Box(a), check_edges); }
+inline int Classify(const xpolygon2& a, double2 p, bool check_edges = true) { return Classify(a, p, Box(a), check_edges); }
 
 // polygon vs segment
 using dpair = pair<double, double>;

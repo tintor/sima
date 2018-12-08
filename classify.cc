@@ -55,13 +55,14 @@ static bool PointInPolygon(double2 p, span<const double2> ring) {
 }
 
 template<typename Polygon2>
-int TClassify(const Polygon2& a, double2 p, aabb2 box) {
+int TClassify(const Polygon2& a, double2 p, aabb2 box, bool check_edges) {
 	if (!box.intersects(p))
 		return +1;
 
-	for (auto e : Edges(a))
-		if (Classify(e, p) == 0)
-			return 0;
+	if (check_edges)
+		for (auto e : Edges(a))
+			if (Classify(e, p) == 0)
+				return 0;
 
 	int result = 1;
 	for (auto ring : Rings(a))
@@ -70,8 +71,8 @@ int TClassify(const Polygon2& a, double2 p, aabb2 box) {
 	return result;
 }
 
-int Classify(const polygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
-int Classify(const xpolygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
+int Classify(const polygon2& a, double2 p, aabb2 box, bool check_edges) { return TClassify(a, p, box, check_edges); }
+int Classify(const xpolygon2& a, double2 p, aabb2 box, bool check_edges) { return TClassify(a, p, box, check_edges); }
 
 class Intervals {
 public:

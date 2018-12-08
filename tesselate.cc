@@ -5,6 +5,50 @@
 #include "aabb.h"
 #include "is_valid.h"
 #include "segment.h"
+#include "classify.h"
+
+static bool relate_abxo(const xpolygon2& polygon, segment2 e) {
+	for (segment2 s : Edges(polygon))
+		if (relate_abxo(e, s))
+			return true;
+	return false;
+}
+
+// slow and simple
+void tesselate(const xpolygon2& in, mesh2& mesh) {
+	std::default_random_engine rnd;
+	rnd.seed(0);
+
+	xpolygon2 polygon = in;
+	while (polygon.vertices().size() > 3) {
+		std::uniform_int_distribution<size_t> dist(0, polygon.vertices().size() - 1);
+		size_t b = dist(rnd);
+		uint r = polygon.ring_of_vertex(b);
+
+		uint rel = b - polygon.offset(r);
+		uint size = polygon[r].size();
+		uint a = (rel > 0) ? b - 1 : (polygon.offset(r) + size - 1);
+		uint c = (rel < size - 1) ? b + 1 : polygon.offset(r);
+
+		segment2 e(polygon.vertices()[a], polygon.vertices()[c]);
+
+		// O(N)
+		if (relate_abxo(polygon, e))
+			continue;
+		// O(N)
+		if (Classify(polygon, (e.a + e.b) / 2, /*check_edges*/false) >= 0)
+			continue;
+
+		mesh.emplace_back(e.a, polygon.vertices()[b], e.b);
+		// O(N)
+		polygon.remove_vertex(b);
+	}
+
+	const auto& v = polygon.vertices();
+	assert(polygon.size() == 1);
+	assert(v.size() == 3);
+	mesh.emplace_back(v[0], v[1], v[2]);
+}
 
 // TODO review entire file after conversion from int -> double
 

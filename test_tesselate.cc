@@ -35,6 +35,8 @@ static polygon2 random_polygon(int size, RNG& rng) {
 }
 
 vector<polygon2> test_cases;
+vector<xpolygon2> test_cases2;
+mesh2 tess;
 
 #include <fstream>
 #include "file.h"
@@ -65,8 +67,13 @@ struct Setup {
 				double y = parse<int>(a[i * 2 + 1]);
 				poly.push_back(double2{x, y});
 			}
+			xpolygon2 xp;
+			xp.add(poly);
 			test_cases.push_back(std::move(poly));
+			test_cases2.push_back(std::move(xp));
 		}
+
+		tess.reserve(test_cases.back().size() + 2);
 	}
 
 	void write() {
@@ -78,29 +85,33 @@ struct Setup {
 			polygon2 poly;
 			while (!IsValid(poly))
 				poly = random_polygon(i, rng);
+			xpolygon2 xp;
+			xp.add(poly);
 			test_cases.push_back(poly);
+			test_cases2.push_back(std::move(xp));
 			for (double2 e : poly)
 				os << e.x << ' ' << e.y << ' ';
 			os << '\n';
 		}
+
+		tess.reserve(test_cases.back().size() + 2);
 	}
 } setup;
 
-/*TEST_CASE("tesselate_500_verify") {
-	mesh2 tess;
-	tess.reserve(test_cases.back().size() + 2);
-	for (const auto& poly : test_cases) {
+TEST_CASE("tesselate2_500_verify", "[tesselate]") {
+	for (const auto& poly : test_cases2) {
 		tess.clear();
 		tesselate(poly, tess);
 
-		REQUIRE(tess.size() == poly.size() - 2);
+		REQUIRE(tess.size() == poly.vertices().size() - 2);
 
 		// verify that sum of areas of all triangles equals polygon area
 		double tess_area = 0;
 		for (auto m : tess)
-			tess_area += abs(area(m));
+			tess_area += area(m);
 		double poly_area = area(poly);
-		REQUIRE(std::abs(poly_area) == tess_area);
+		//print("case %d\n", poly.vertices().size());
+		REQUIRE(poly_area == tess_area);
 
 		// verify that all edges are unique
 		unordered_set<segment2, hash_t<segment2>> edges;
@@ -112,15 +123,63 @@ struct Setup {
 
 		// all edges should have their opposite except for edges on polygon boundary
 		unordered_set<segment2, hash_t<segment2>> poly_edges;
-		auto a = poly.back();
-		for (auto b : poly) {
-			poly_edges.insert({a, b});
-			a = b;
-		}
+		for (auto e : Edges(poly))
+			poly_edges.insert(e);
+
 		for (auto e : edges) {
 			auto pc = poly_edges.count(e);
 			auto rc = edges.count(e.reversed());
 			REQUIRE(pc + rc == 1);
 		}
 	}
-}*/
+}
+
+TEST_CASE("tesselate_500_verify", "[tesselate]") {
+	for (const auto& poly : test_cases) {
+		tess.clear();
+		tesselate(poly, tess);
+
+		REQUIRE(tess.size() == poly.size() - 2);
+
+		// verify that sum of areas of all triangles equals polygon area
+		double tess_area = 0;
+		for (auto m : tess)
+			tess_area += area(m);
+		double poly_area = area(poly);
+		//print("case %d\n", poly.size());
+		REQUIRE(poly_area == tess_area);
+
+		// verify that all edges are unique
+		unordered_set<segment2, hash_t<segment2>> edges;
+		for (triangle2 triangle : tess)
+			for (auto e : Edges(triangle)) {
+				REQUIRE(edges.count(e) == 0);
+				edges.insert(e);
+			}
+
+		// all edges should have their opposite except for edges on polygon boundary
+		unordered_set<segment2, hash_t<segment2>> poly_edges;
+		for (auto e : Edges(poly))
+			poly_edges.insert(e);
+
+		for (auto e : edges) {
+			auto pc = poly_edges.count(e);
+			auto rc = edges.count(e.reversed());
+			REQUIRE(pc + rc == 1);
+		}
+	}
+}
+
+TEST_CASE("tesselate2_500_perf", "[!hide][tesselate]") {
+	for (const auto& poly : test_cases2) {
+		tess.clear();
+		tesselate(poly, tess);
+	}
+}
+
+TEST_CASE("tesselate_500_perf", "[!hide][tesselate]") {
+	for (const auto& poly : test_cases) {
+		tess.clear();
+		tesselate(poly, tess);
+	}
+}

@@ -1,5 +1,6 @@
 #pragma once
 #include "triangle.h"
+#include "exception.h"
 
 // TODO move polygon and mesh stuff outside
 
@@ -43,6 +44,26 @@ public:
 	span<const Vec> vertices() const { return span<const Vec>(_vertices); }
 
 	span<Vec> vertices() { return span<Vec>(_vertices); }
+
+	uint ring_of_vertex(uint v) const {
+		assert(v < _vertices.size());
+		for (uint r : range(size()))
+			if (_offsets[r] <= v && v < _offsets[r + 1])
+				return r;
+		THROW(runtime_error);
+	}
+
+	uint offset(uint ring) const {
+		assert(ring < size());
+		return _offsets[ring];
+	}
+
+	void remove_vertex(uint v) {
+		assert(v < _vertices.size());
+		for (uint r : range(ring_of_vertex(v), size()))
+			_offsets[r + 1] -= 1;
+		_vertices.erase(_vertices.begin() + v);
+	}
 
 private:
 	aligned_vector<Vec> _vertices;
@@ -164,16 +185,26 @@ inline string wkt(const polygon2& poly) {
 	return s;
 }
 
-inline double signed_double_area(const polygon2& poly) {
+inline double signed_double_area(span<const double2> poly) {
 	double area = 0;
-	if (poly.size() > 0)
-		for (auto [a, b] : Edges(poly))
-			area += signed_double_edge_area(a, b);
+	if (poly.size() >= 3) {
+		area += signed_double_edge_area(poly.back(), poly[0]);
+		for (uint i = 1; i < poly.size(); i++)
+			area += signed_double_edge_area(poly[i - 1], poly[i]);
+	}
 	return area;
 }
 
 inline double area(const polygon2& poly) {
-	return abs(signed_double_area(poly));
+	return abs(signed_double_area(poly) / 2);
+}
+
+// assumes that holes are oriented opposite from non-holes
+inline double area(const xpolygon2& poly) {
+	double sda = 0;
+	for (auto ring : Rings(poly))
+		sda += signed_double_area(ring);
+	return abs(sda / 2);
 }
 
 template<typename Vec>
