@@ -6,59 +6,152 @@
 #include "is_valid.h"
 #include "segment.h"
 #include "classify.h"
+#include "exception.h"
+#include "timestamp.h"
 
-static bool relate_abxo(const xpolygon2& polygon, segment2 e) {
+static bool Overlaps(aabb2 a, aabb2 b) {
+	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
+	double2 t{Tolerance, Tolerance};
+	return all(mn - mx <= t) && squared(mn - mx) > squared(Tolerance);
+}
+
+/*
+inline double signed_double_edge_area(double2 a, double2 b) {
+	return (a.x + b.x) * (a.y - b.y);
+}
+
+inline double signed_double_area(double2 a, double2 b, double2 c) {
+	return signed_double_edge_area(a, b) + signed_double_edge_area(b, c) + signed_double_edge_area(c, a);
+}
+
+inline int Sign(segment2 s, double2 v) {
+	return Sign(signed_double_area(s.a, s.b, v) / length(s.a - s.b));
+}
+*/
+
+bool fast_relate_abxo(segment2 p, segment2 q) {
+	int sp = Sign(p, q.a);
+	int sq = Sign(p, q.b);
+	if (sp * sq > 0)
+		return false;
+	if (sp == 0 && sq == 0) // colinear
+		return Overlaps(aabb2(p), aabb2(q));
+	int sab = Sign(q, p.a) * Sign(q, p.b);
+	if (sab > 0)
+		return false;
+	return sp * sq < 0 || sab < 0;
+}
+
+static bool relate_abxo(const polygon2& polygon, segment2 e) {
 	for (segment2 s : Edges(polygon))
-		if (relate_abxo(e, s))
+		if (fast_relate_abxo(e, s))
 			return true;
 	return false;
 }
 
-// slow and simple
-void tesselate(const xpolygon2& in, mesh2& mesh) {
+// 0.253s
+
+template<typename T, typename RND>
+T random_int(T lo, T hi, RND& engine) {
+	std::uniform_int_distribution<T> dist(lo, hi);
+	return dist(engine);
+}
+
+vector<uint> make_deck(uint size) {
 	std::default_random_engine rnd;
 	rnd.seed(0);
+	vector<uint> deck(size);
+	for (uint i : range(deck.size())) {
+		uint j = random_int<uint>(0, i, rnd);
+		deck[i] = deck[j];
+		deck[j] = i;
+	}
+	return deck;
+}
 
-	xpolygon2 polygon = in;
-	while (polygon.vertices().size() > 3) {
-		std::uniform_int_distribution<size_t> dist(0, polygon.vertices().size() - 1);
-		size_t b = dist(rnd);
-		uint r = polygon.ring_of_vertex(b);
+void compress_deck(vector<uint>& deck, uint cards) {
+	uint r = 0;
+	uint w = 0;
+	while (r < deck.size()) {
+		if (deck[r] < cards)
+			deck[w++] = deck[r];
+		r += 1;
+	}
+	deck.resize(w);
+}
 
-		uint rel = b - polygon.offset(r);
-		uint size = polygon[r].size();
-		uint a = (rel > 0) ? b - 1 : (polygon.offset(r) + size - 1);
-		uint c = (rel < size - 1) ? b + 1 : polygon.offset(r);
+long t_deck = 0;
+long t_pip = 0;
+long t_relate = 0;
+long t_erase = 0;
 
-		segment2 e(polygon.vertices()[a], polygon.vertices()[c]);
+// slow and simple
+void tesselateSimple(const polygon2& in, mesh2& mesh) {
+	auto deck = make_deck(in.size());
+	uint g = 0;
+	uint fails = 0;
+
+	polygon2 polygon = in;
+	double a1 = signed_double_area(polygon);
+	while (polygon.size() > 3) {
+		if (fails == polygon.size()) {
+			print("polygon = %s\n", polygon);
+			THROW(runtime_error, "no solution found");
+		}
+
+		Timestamp ta;
+		while (deck[g] >= polygon.size())
+			if (++g == deck.size()) {
+				compress_deck(deck, polygon.size());
+				g = 0;
+			}
+		uint b = deck[g];
+		if (++g == deck.size()) {
+			compress_deck(deck, polygon.size());
+			g = 0;
+		}
+		t_deck += ta.elapsed();
+
+		uint a = (b > 0) ? b - 1 : (polygon.size() - 1);
+		uint c = (b < polygon.size() - 1) ? b + 1 : 0;
+		segment2 e(polygon[a], polygon[c]);
 
 		// O(N)
-		if (relate_abxo(polygon, e))
+		Timestamp tb;
+		double a2 = signed_double_area(triangle2{e.a, polygon[b], e.b});
+		bool pip = (abs(a2) + abs(a1 - a2) - abs(a1)) < 1e-9;
+		//bool pip = PointInPolygon((e.a + e.b) / 2, polygon);
+		t_pip += tb.elapsed();
+		if (!pip) {
+			fails += 1;
 			continue;
+		}
 		// O(N)
-		if (Classify(polygon, (e.a + e.b) / 2, /*check_edges*/false) >= 0)
+		Timestamp tc;
+		bool rel = relate_abxo(polygon, e);
+		t_relate += tc.elapsed();
+		if (rel) {
+			fails += 1;
 			continue;
+		}
 
-		mesh.emplace_back(e.a, polygon.vertices()[b], e.b);
+		fails = 0;
+		mesh.emplace_back(e.a, polygon[b], e.b);
 		// O(N)
-		polygon.remove_vertex(b);
+		a1 -= a2;
+		Timestamp td;
+		polygon.erase(polygon.begin() + b);
+		t_erase += td.elapsed();
 	}
 
-	const auto& v = polygon.vertices();
-	assert(polygon.size() == 1);
-	assert(v.size() == 3);
-	mesh.emplace_back(v[0], v[1], v[2]);
+	assert(polygon.size() == 3);
+	mesh.emplace_back(polygon[0], polygon[1], polygon[2]);
 }
 
 // TODO review entire file after conversion from int -> double
 
-static bool Overlaps(aabb2 a, aabb2 b) {
-	double2 mn = vmin(a.max, b.max), mx = vmax(a.min, b.min);
-	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
-}
-
 // same as relate(), but faster
-bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab) {
+bool relate_abxo(double2 a, double2 b, double2 p, double2 q, double ab) {
 	double pa = signed_double_edge_area(p, a);
 	double bp = signed_double_edge_area(b, p);
 	double sp = pa + ab + bp;
@@ -67,6 +160,7 @@ bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab) {
 	double bq = signed_double_edge_area(b, q);
 	double sq = qa + ab + bq;
 
+	// TODO with doubles this will never happen!
 	if (sp == 0) {
 		if (sq == 0) // colinear
 			return Overlaps(aabb2(a, b), aabb2(p, q));
@@ -91,7 +185,7 @@ bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab) {
 
 const int EMPTY = std::numeric_limits<int>::min();
 
-bool intersects_polyline(segment2 s, long ab, polygon2::iterator begin, polygon2::iterator last) {
+bool intersects_polyline(segment2 s, double ab, polygon2::iterator begin, polygon2::iterator last) {
 	double2 p = *last++;
 	for (auto it = begin; it != last; it++) {
 		double2 q = *it;

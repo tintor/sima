@@ -17,6 +17,10 @@ public:
 	using iterator = T*;
 	using const_iterator = const T*;
 
+	operator span<const T>() {
+		return span<const T>(data(), size());
+	}
+
 	constexpr span(T* data, size_t size, ssize_t stride = 1)
 			: _data(data), _size(size), _stride(stride) {
 		assert(stride != 0);

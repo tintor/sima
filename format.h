@@ -33,7 +33,7 @@ void format_e(string& s, string_view spec, span<T> m) {
 
 template<typename T, typename A>
 void format_e(string& s, string_view spec, const vector<T, A>& m) {
-	format_span(s, spec, m);
+	format_span(s, spec, span<const T>(m.data(), m.size()));
 }
 
 template<size_t S>

@@ -8,10 +8,7 @@
 #include "project.h"
 #include "classify.h"
 
-// from tesselate.cc
-bool relate_abxo(double2 a, double2 b, double2 p, double2 q, long ab);
-
-bool IsValid(const polygon2& poly) {
+bool IsValidPolygon(span<const double2> poly) {
 	auto n = poly.size();
 	if (n < 3)
 		return false;
@@ -25,14 +22,17 @@ bool IsValid(const polygon2& poly) {
 	// no self intersection
 	for (auto i : range(n)) {
 		double2 a = poly[i], b = poly[(i + 1) % n];
-		double ab = signed_double_edge_area(a, b);
 		for (auto j : range(i)) {
 			double2 p = poly[j], q = poly[(j + 1) % n];
-			if (relate_abxo(a, b, p, q, ab))
+			if (relate_abxo(segment2(a, b), segment2(p, q)))
 				return false;
 		}
 	}
 	return true;
+}
+
+bool IsValid(const polygon2& poly) {
+	return IsValidPolygon(poly);
 }
 
 bool IsValid(const xpolygon2& poly) {

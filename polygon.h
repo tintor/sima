@@ -45,26 +45,6 @@ public:
 
 	span<Vec> vertices() { return span<Vec>(_vertices); }
 
-	uint ring_of_vertex(uint v) const {
-		assert(v < _vertices.size());
-		for (uint r : range(size()))
-			if (_offsets[r] <= v && v < _offsets[r + 1])
-				return r;
-		THROW(runtime_error);
-	}
-
-	uint offset(uint ring) const {
-		assert(ring < size());
-		return _offsets[ring];
-	}
-
-	void remove_vertex(uint v) {
-		assert(v < _vertices.size());
-		for (uint r : range(ring_of_vertex(v), size()))
-			_offsets[r + 1] -= 1;
-		_vertices.erase(_vertices.begin() + v);
-	}
-
 private:
 	aligned_vector<Vec> _vertices;
 	vector<uint> _offsets;

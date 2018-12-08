@@ -28,7 +28,7 @@ static int ClassifySegmentRayHelper(double2 ea, double2 eb, double2 p) {
 	return (signed_double_area(ea, eb, p) < 0) ? -1 : 1;
 }
 
-static bool PointInPolygon(double2 p, span<const double2> ring) {
+bool PointInPolygon(double2 p, span<const double2> ring) {
 	bool result = false;
 	double entrance = 0;
 	size_t m = IndexOfMax(ring, [p](double2 v) { return abs(v.y - p.y); });
@@ -55,14 +55,13 @@ static bool PointInPolygon(double2 p, span<const double2> ring) {
 }
 
 template<typename Polygon2>
-int TClassify(const Polygon2& a, double2 p, aabb2 box, bool check_edges) {
+int TClassify(const Polygon2& a, double2 p, aabb2 box) {
 	if (!box.intersects(p))
 		return +1;
 
-	if (check_edges)
-		for (auto e : Edges(a))
-			if (Classify(e, p) == 0)
-				return 0;
+	for (auto e : Edges(a))
+		if (Classify(e, p) == 0)
+			return 0;
 
 	int result = 1;
 	for (auto ring : Rings(a))
@@ -71,8 +70,8 @@ int TClassify(const Polygon2& a, double2 p, aabb2 box, bool check_edges) {
 	return result;
 }
 
-int Classify(const polygon2& a, double2 p, aabb2 box, bool check_edges) { return TClassify(a, p, box, check_edges); }
-int Classify(const xpolygon2& a, double2 p, aabb2 box, bool check_edges) { return TClassify(a, p, box, check_edges); }
+int Classify(const polygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
+int Classify(const xpolygon2& a, double2 p, aabb2 box) { return TClassify(a, p, box); }
 
 class Intervals {
 public:

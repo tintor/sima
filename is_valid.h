@@ -3,6 +3,7 @@
 #include "polygon.h"
 #include "format.h"
 
+bool IsValidPolygon(span<const double2> poly);
 bool IsValid(const polygon2& poly);
 bool IsValid(const xpolygon2& poly);
 
