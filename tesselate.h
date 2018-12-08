@@ -1,5 +1,5 @@
 #pragma once
-#include "triangle.h"
+#include "polygon.h"
 
 // TODO tessellation of 3d concave polygons with holes
 

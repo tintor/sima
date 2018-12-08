@@ -1,7 +1,7 @@
 #pragma once
 #include "segment.h"
 #include "mesh.h"
-#include "triangle.h"
+#include "polygon.h"
 
 // TODO project should preserve distances!!!
 double2 Project(double4 v, int axis);

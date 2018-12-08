@@ -1,5 +1,5 @@
 #pragma once
-#include "triangle.h"
+#include "polygon.h"
 #include "span.h"
 
 // Is this valid mesh a convex polyhedron?

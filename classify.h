@@ -3,6 +3,7 @@
 #include "segment.h"
 #include "plane.h"
 #include "aabb.h"
+#include "polygon.h"
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }
 inline aabb2 Box(const xpolygon2& p) { return aabb2(p.vertices()).buffer(Tolerance); }

@@ -1,6 +1,6 @@
 #pragma once
 #include "mesh.h"
-#include "triangle.h" // for polygon2
+#include "polygon.h"
 #include "format.h"
 
 bool IsValid(const polygon2& poly);
