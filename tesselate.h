@@ -2,8 +2,6 @@
 #include "polygon.h"
 #include "mesh.h"
 
-void tesselateSimple(const polygon2& polygon, mesh2& mesh);
-
 // TODO tessellation of 3d concave polygons with holes
 
 // ear cutting algorithm

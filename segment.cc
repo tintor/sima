@@ -10,10 +10,39 @@
 // A - T intersection: A or B is touching interior of PQ
 // B - T intersection: P or Q is touching interior of AB
 
-static bool Overlaps(aabb2 a, aabb2 b) {
-	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
-	double2 t{Tolerance, Tolerance};
-	return all(mn - mx <= t) && squared(mn - mx) > squared(Tolerance);
+bool relate_abxo(segment2 p, segment2 q, double inv_p_len) {
+	int sp = Sign(signed_double_area(p.a, p.b, q.a) * inv_p_len);
+	int sq = Sign(signed_double_area(p.a, p.b, q.b) * inv_p_len);
+	if (sp * sq > 0)
+		return false;
+
+	if (sp == 0 && sq == 0) // colinear
+		return Overlaps(aabb2(p), aabb2(q));
+
+	double q_len = length(q.a - q.b);
+	int sa = Sign(signed_double_area(q.a, q.b, p.a) / q_len);
+	int sb = Sign(signed_double_area(q.a, q.b, p.b) / q_len);
+	if (sa * sb == 0)
+		return sp * sq < 0;
+	return sa * sb < 0;
+}
+
+bool relate_abxo(segment2 p, segment2 q) {
+	double p_len = length(p.a - p.b);
+	int sp = Sign(signed_double_area(p.a, p.b, q.a) / p_len);
+	int sq = Sign(signed_double_area(p.a, p.b, q.b) / p_len);
+	if (sp * sq > 0)
+		return false;
+
+	if (sp == 0 && sq == 0) // colinear
+		return Overlaps(aabb2(p), aabb2(q));
+
+	double q_len = length(q.a - q.b);
+	int sa = Sign(signed_double_area(q.a, q.b, p.a) / q_len);
+	int sb = Sign(signed_double_area(q.a, q.b, p.b) / q_len);
+	if (sa * sb == 0)
+		return sp * sq < 0;
+	return sa * sb < 0;
 }
 
 int relate_full(segment2 p, segment2 q, double* pt, double* qt) {

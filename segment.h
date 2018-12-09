@@ -160,12 +160,10 @@ inline bool Colinear(line3 s, double4 v) {
     return squared(va - s.unit_dir * dot(va, s.unit_dir)) <= squared(Tolerance);
 }
 
-char relate(segment2 p, segment2 q, double2* pt = nullptr, double2* qt = nullptr);
+bool relate_abxo(segment2 p, segment2 q);
+bool relate_abxo(segment2 p, segment2 q, double inv_p_len);
 
-inline bool relate_abxo(segment2 p, segment2 q) {
-	char c = relate(p, q);
-	return c == 'A' || c == 'B' || c == 'X' || c == 'O';
-}
+char relate(segment2 p, segment2 q, double2* pt = nullptr, double2* qt = nullptr);
 
 constexpr int COLINEAR = 1;
 constexpr int VERTEX_VERTEX = 2;

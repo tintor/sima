@@ -22,9 +22,10 @@ bool IsValidPolygon(span<const double2> poly) {
 	// no self intersection
 	for (auto i : range(n)) {
 		double2 a = poly[i], b = poly[(i + 1) % n];
+		double inv_ab_len = 1 / length(a - b);
 		for (auto j : range(i)) {
 			double2 p = poly[j], q = poly[(j + 1) % n];
-			if (relate_abxo(segment2(a, b), segment2(p, q)))
+			if (relate_abxo(segment2(a, b), segment2(p, q), inv_ab_len))
 				return false;
 		}
 	}

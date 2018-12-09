@@ -145,3 +145,9 @@ double4 uniform3(RND& rnd, aabb4 box) {
 			return v;
 	}
 }
+
+inline bool Overlaps(aabb2 a, aabb2 b) {
+	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
+	double2 t{Tolerance, Tolerance};
+	return all(mn - mx <= t) && squared(mn - mx) > squared(Tolerance);
+}

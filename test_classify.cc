@@ -494,11 +494,6 @@ double ScaleUntilContact(polygon2& a, const polygon2& b, double t) {
 	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Scale(m, 1 + t); }, 0.001);
 }
 
-static bool Overlaps(aabb2 a, aabb2 b) {
-	double2 mn = vmax(a.min, b.min), mx = vmin(a.max, b.max);
-	return all(mn <= mx) && squared(mx - mn) > squared(Tolerance);
-}
-
 TEST_CASE("Overlaps", "[classify2]") {
 	segment2 a(double2{3.14, 1}, double2{3.14, -1});
 	segment2 b(double2{3.14, -2}, double2{3.14, 2});

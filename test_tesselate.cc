@@ -1,11 +1,11 @@
 #include "tesselate.h"
-#include "format.h"
 #include "catch.hpp"
 #include "range.h"
-#include "aabb.h"
 #include "string_util.h"
-#include <random>
 #include "is_valid.h"
+#include "file.h"
+#include <random>
+#include <fstream>
 
 template<typename RNG>
 static polygon2 random_polygon(int size, RNG& rng) {
@@ -36,10 +36,6 @@ static polygon2 random_polygon(int size, RNG& rng) {
 
 vector<polygon2> test_cases;
 mesh2 tess;
-
-#include <fstream>
-#include "file.h"
-#include "util.h"
 
 string poly_to_str(span<const double2> p) {
 	string s;
@@ -107,10 +103,10 @@ struct Setup {
 	}
 } setup;
 
-TEST_CASE("tesselateSimple_verify", "[tesselate]") {
+TEST_CASE("tesselate_verify", "[tesselate]") {
 	for (const auto& poly : test_cases) {
 		tess.clear();
-		tesselateSimple(poly, tess);
+		tesselate(poly, tess);
 
 		REQUIRE(tess.size() == poly.size() - 2);
 
@@ -119,7 +115,6 @@ TEST_CASE("tesselateSimple_verify", "[tesselate]") {
 		for (auto m : tess)
 			tess_area += area(m);
 		double poly_area = area(poly);
-		print("case %d\n", poly.size());
 		REQUIRE(poly_area == Approx(tess_area).margin(1e-6));
 
 		// verify that all edges are unique
@@ -143,62 +138,9 @@ TEST_CASE("tesselateSimple_verify", "[tesselate]") {
 	}
 }
 
-/*TEST_CASE("tesselate_500_verify", "[tesselate]") {
+TEST_CASE("tesselate_perf", "[!hide][tesselate]") {
 	for (const auto& poly : test_cases) {
 		tess.clear();
 		tesselate(poly, tess);
-
-		REQUIRE(tess.size() == poly.size() - 2);
-
-		// verify that sum of areas of all triangles equals polygon area
-		double tess_area = 0;
-		for (auto m : tess)
-			tess_area += area(m);
-		double poly_area = area(poly);
-		print("case %d\n", poly.size());
-		REQUIRE(poly_area == Approx(tess_area).margin(1e-6));
-
-		// verify that all edges are unique
-		unordered_set<segment2, hash_t<segment2>> edges;
-		for (triangle2 triangle : tess)
-			for (auto e : Edges(triangle)) {
-				REQUIRE(edges.count(e) == 0);
-				edges.insert(e);
-			}
-
-		// all edges should have their opposite except for edges on polygon boundary
-		unordered_set<segment2, hash_t<segment2>> poly_edges;
-		for (auto e : Edges(poly))
-			poly_edges.insert(e);
-
-		for (auto e : edges) {
-			auto pc = poly_edges.count(e);
-			auto rc = edges.count(e.reversed());
-			REQUIRE(pc + rc == 1);
-		}
 	}
-}*/
-
-extern long t_deck;
-extern long t_pip;
-extern long t_relate;
-extern long t_erase;
-
-TEST_CASE("tesselateSimple_perf", "[!hide][tesselate]") {
-	t_deck = t_pip = t_relate = t_erase = 0;
-	for (const auto& poly : test_cases) {
-		tess.clear();
-		tesselateSimple(poly, tess);
-	}
-	print("t_deck %d\n", t_deck / 1000000);
-	print("t_pip %d\n", t_pip / 1000000);
-	print("t_relate %d\n", t_relate / 1000000);
-	print("t_erase %d\n", t_erase / 1000000);
 }
-
-/*TEST_CASE("tesselate_500_perf", "[!hide][tesselate]") {
-	for (const auto& poly : test_cases) {
-		tess.clear();
-		tesselate(poly, tess);
-	}
-}*/
