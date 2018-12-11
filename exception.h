@@ -16,7 +16,7 @@ public:
 
 	// note: doesn't copy string!
 	explicit exception(ThrowLoc loc, const char* what) : _loc(loc), _what_view(what) { }
-	
+
 	// note: doesn't copy string!
 	explicit exception(ThrowLoc loc, std::string_view what) : _loc(loc), _what_view(what) { }
 

@@ -33,6 +33,13 @@ inline double2 sqrt(double2 a) { return _mm_sqrt_pd(a); }
 inline double4 sqrt(double4 a) { return _mm256_sqrt_pd(a); }
 inline __m128d bit_and(__m128d a, __m128d b) { return _mm_and_pd(a, b); }
 inline __m256d bit_and(__m256d a, __m256d b) { return _mm256_and_pd(a, b); }
+inline __m128d bit_or(__m128d a, __m128d b) { return _mm_or_pd(a, b); }
+inline __m256d bit_or(__m256d a, __m256d b) { return _mm256_or_pd(a, b); }
+
+// returns 1.0 or -1.0 for each component (depending if >= +0, or <= -0)
+inline double4 sign_no_zero(double4 d) {
+	return bit_and(bit_or(d, broad4(1.0)), broad4(-1.0));
+}
 
 inline float4 vdot(float4 a, float4 b) { return _mm_dp_ps(a, b, 0b11111111); }
 

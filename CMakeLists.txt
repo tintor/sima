@@ -29,6 +29,7 @@ set(prod
 	project.cc
 	distance.cc
 	broadphase.cc
+	gjk.cc
 	lodepng/lodepng.cc)
 
 set(render
@@ -40,6 +41,7 @@ set(render
 
 set(test
 	test.cc
+	test_vector.cc
 	test_span.cc
 	test_aabb.cc
 	test_util.cc
