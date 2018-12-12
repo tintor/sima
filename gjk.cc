@@ -102,7 +102,14 @@ static double2 NearestSimplex2(double2 b, double2 a) {
 
 // returns true if contains origin
 static bool NearestSimplex3(double2 c, double2 b, double2 a) {
-	THROW(not_implemented);
+	double sz = signed_double_area(a, b, 0);
+	double sc = signed_double_area(a, b, c);
+	if (sz * sc < 0)
+		return false;
+
+	sz = signed_double_area(a, c, 0);
+	double sb = signed_double_area(a, c, b);
+	return sz * sb >= 0;
 }
 
 // TODO if no axis then difference of centers is better guess!
@@ -112,7 +119,17 @@ bool AreConvexHullsIntersecting(span<const double2> p, span<const double2> q, do
 	double2 initial_axis = axis ? *axis : (q[0] - p[0]);
 	double2 A = Support(p, initial_axis) - Support(q, -initial_axis);
 	double2 D = -A;
-	array<double2, 3> simplex = {A};
+
+	double2 S1 = A;
+	A = Support(p, D) - Support(q, -D);
+	if (dot(A, D) < 0) {
+		if (axis)
+			*axis = D;
+		return false;
+	}
+
+	double2 S2 = A;
+	D = NearestSimplex2(S1, S2);
 
 	A = Support(p, D) - Support(q, -D);
 	if (dot(A, D) < 0) {
@@ -121,18 +138,7 @@ bool AreConvexHullsIntersecting(span<const double2> p, span<const double2> q, do
 		return false;
 	}
 
-	simplex[1] = A;
-	D = NearestSimplex2(simplex[0], simplex[1]);
-
-	A = Support(p, D) - Support(q, -D);
-	if (dot(A, D) < 0) {
-		if (axis)
-			*axis = D;
-		return false;
-	}
-
-	simplex[2] = A;
-	return NearestSimplex3(simplex[0], simplex[1], simplex[2]);
+	return NearestSimplex3(S1, S2, A);
 }
 
 double DistanceBetweenConvexHulls(span<const double2> p, span<const double2> q, double2* axis) {
