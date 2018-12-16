@@ -40,9 +40,9 @@ mesh2 tess;
 string poly_to_str(span<const double2> p) {
 	string s;
 	for (double2 e : p) {
-		format(s, "%f", e.x);
+		format_s(s, "%.6f", e.x);
 		s += ' ';
-		format(s, "%f", e.y);
+		format_s(s, "%.6f", e.y);
 		s += ' ';
 	}
 	return s;

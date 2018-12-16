@@ -408,7 +408,7 @@ template<typename T> string& operator<<(string& s, T v) {
 }
 
 template<typename... Args>
-string format(string_view fmt, Args... args) {
+[[nodiscard]] string format(string_view fmt, Args... args) {
 	string s;
 	format_s(s, fmt, args...);
 	return s;
