@@ -19,10 +19,30 @@ struct fmat34 {
     float4 a, b, c;
 };
 
-// TODO rename to transform
+// each field is col of matrix
 struct mat34 {
     double4 a, b, c;
 };
+
+// each field is col of matrix
+struct mat44 {
+    double4 a, b, c, d;
+};
+
+// m is col matrix (m.d is position)
+inline double4 mat_mul_point(mat44 m, double4 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z + m.d;
+}
+
+// m is col matrix (m.d is position)
+inline double4 mat_mul_vec(mat34 m, double4 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z;
+}
+
+// m is col matrix (m.d is position)
+inline double4 mat_mul_vec(mat44 m, double4 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z;
+}
 
 inline bool all(int2 v) { return v.x != 0 && v.y != 0; }
 inline bool all(int4 v) { return _mm_movemask_ps(v) == 0xF; }

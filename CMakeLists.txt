@@ -69,6 +69,7 @@ set(test
 	test_map.cc
 	test_sphere.cc
 	test_broadphase.cc
+	test_quaternion.cc
 	test_zip.cc)
 
 add_executable(main main.cc ${prod} ${render})

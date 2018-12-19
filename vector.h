@@ -180,9 +180,16 @@ double4 normal3v(RND& rnd, double mean, double stdev) {
 	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), 0};
 }
 
+template<typename RND>
+double4 normal4(RND& rnd, double mean, double stdev) {
+	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev)};
+}
+
 // uniform on the unit sphere surface
 template<typename RND>
 double4 uniform_dir3(RND& rnd) { return normalize(normal3v(rnd, 0, 1)); }
+template<typename RND>
+double4 uniform_dir4(RND& rnd) { return normalize(normal4(rnd, 0, 1)); }
 
 inline bool colinear(double4 a, double4 b, double4 c) {
 	return squared(cross(b - a, c - a)) <= squared(1e-6);
