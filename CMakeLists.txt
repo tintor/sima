@@ -23,6 +23,7 @@ set(prod
 	timestamp.cc
 	mesh_import.cc
 	callstack.cc
+	buffer.cc
 	sphere.cc
 	segment.cc
 	classify.cc
@@ -53,6 +54,7 @@ set(test
 	test_properties.cc
 	test_generators.cc
 	test_convex_hull.cc
+	test_buffer.cc
 	test_shape.cc
 	test_primitives.cc
 	test_tesselate.cc

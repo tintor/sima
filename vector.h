@@ -64,7 +64,8 @@ inline double squared(double4 a) { return dot(a, a); }
 
 inline double2 vlength(double2 a) { return sqrt(vdot(a, a)); }
 inline double4 vlength(double4 a) { return sqrt(vdot(a, a)); }
-template<typename V> double length(V a) { return vlength(a).x; }
+inline double length(double2 a) { return vlength(a).x; }
+inline double length(double4 a) { return vlength(a).x; }
 
 // TODO div(sqrt) might be slower than mul(rsqrt)
 inline auto normalize(double2 a) { return a / vlength(a); }

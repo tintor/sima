@@ -175,7 +175,7 @@ inline double signed_double_area(span<const double2> poly) {
 	return area;
 }
 
-inline double area(const polygon2& poly) {
+inline double area(span<const double2> poly) {
 	return abs(signed_double_area(poly) / 2);
 }
 

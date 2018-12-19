@@ -65,3 +65,5 @@ EXCEPTION(not_implemented);
 EXCEPTION(invalid_argument);
 
 #define THROW(TYPE, ...) throw TYPE(ThrowLoc{__PRETTY_FUNCTION__, __FUNCTION__, __FILE__, __LINE__}, ##__VA_ARGS__)
+
+#define ASSERT_ALWAYS(E, ...) { if (!(E)) THROW(runtime_error, ##__VA_ARGS__); }

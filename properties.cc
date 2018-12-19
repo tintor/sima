@@ -54,6 +54,19 @@ double4 CenterOfMass(const mesh3& mesh) {
 	return P / (V * 4);
 }
 
+double2 centroid(span<const double2> poly) {
+	double2 P = {0, 0};
+	double2 V = 0;
+	for (auto i : range(poly.size())) {
+		double2 a = poly[i];
+		double2 b = poly[(i + 1) % poly.size()];
+		double v = a.x * b.y - a.y * b.x;
+		P += (a + b) * v;
+		V += v;
+	}
+	return P / (V * 3);
+}
+
 double2 CenterOfMass(const polygon2& poly) {
 	double2 P = {0, 0};
 	double2 V = 0;
