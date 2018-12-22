@@ -1,6 +1,5 @@
 #pragma once
 
-#include "rendering.h"
 #include "primitives.h"
 #include "triangle.h"
 #include "solid_bsp_tree.h"

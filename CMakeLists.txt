@@ -34,10 +34,10 @@ set(prod
 	lodepng/lodepng.cc)
 
 set(render
-	window.cc
-	font.cc
-	rendering.cc
-	shader.cc
+	view/window.cc
+	view/font.cc
+	view/rendering.cc
+	view/shader.cc
 	glad/src/glad.c)
 
 set(test
@@ -58,7 +58,7 @@ set(test
 	test_shape.cc
 	test_primitives.cc
 	test_tesselate.cc
-	test_integration.cc
+	sim/test_integration.cc
  	test_auto.cc
 	test_array_deque.cc
 	#test_array_set.cc
@@ -93,6 +93,7 @@ include_directories(glm)
 # brew install freetype
 include_directories(/usr/local/Cellar/freetype/2.9.1/include/freetype2)
 
+include_directories(.)
 include_directories(glad/include)
 
 add_subdirectory(glfw)

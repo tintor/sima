@@ -1,15 +1,13 @@
-// general
 #include "callstack.h"
 #include "format.h"
-#include "integration.h"
+#include <sim/integration.h>
 #include "util.h"
-#include "glm.h"
 
-// render
-#include "font.h"
-#include "window.h"
-#include "shader.h"
-#include "vertex_buffer.h"
+#include <view/glm.h>
+#include <view/font.h>
+#include <view/window.h>
+#include <view/shader.h>
+#include <view/vertex_buffer.h>
 
 bool gSimulate = false;
 

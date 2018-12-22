@@ -1,4 +1,4 @@
-#include "integration.h"
+#include <sim/integration.h>
 #include "range.h"
 #include "catch.hpp"
 

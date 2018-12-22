@@ -1,4 +1,4 @@
-#include "shader.h"
+#include <view/shader.h>
 #include "auto.h"
 #include "format.h"
 

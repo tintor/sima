@@ -18,11 +18,11 @@
 #include <queue>
 using namespace std::chrono_literals;
 
-#include "font.h"
-#include "window.h"
-#include "shader.h"
-#include "vertex_buffer.h"
-#include "glm.h"
+#include <view/font.h>
+#include <view/window.h>
+#include <view/shader.h>
+#include <view/vertex_buffer.h>
+#include <view/glm.h>
 
 int kSel = 0;
 double kParam[3] = {-200, 0.001, -20};

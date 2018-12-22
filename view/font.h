@@ -1,6 +1,6 @@
 #pragma once
 #include "std.h"
-#include "color.h"
+#include <view/color.h>
 
 // TODO: ANTI-ALIAS: Valve's signed distance fields:
 //       - https://steamcdn-a.akamaihd.net/apps/valve/2007/SIGGRAPH2007_AlphaTestedMagnification.pdf

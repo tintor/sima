@@ -1,4 +1,4 @@
-#include "window.h"
+#include <view/window.h>
 
 static void error_callback(int error, const char* message) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, message);

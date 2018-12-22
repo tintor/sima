@@ -25,21 +25,19 @@
 // hinges
 // concave shapes
 
-// general
 #include "callstack.h"
 #include "format.h"
-#include "integration.h"
+#include <sim/integration.h>
 #include "util.h"
-#include "glm.h"
+#include <view/glm.h>
 #include "classify.h"
 #include "triangle.h"
 #include "properties.h"
 
-// rendering
-#include "font.h"
-#include "window.h"
-#include "shader.h"
-#include "vertex_buffer.h"
+#include <view/font.h>
+#include <view/window.h>
+#include <view/shader.h>
+#include <view/vertex_buffer.h>
 
 bool gSimulate = false;
 bool gSimulateTick = false;
