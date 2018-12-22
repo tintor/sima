@@ -11,7 +11,7 @@
 #define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h>
 
-#include "format.h"
+#include <core/format.h>
 
 void Error(const char* name);
 
@@ -62,5 +62,5 @@ private:
 	};
 
 	int _current_input = 0;
-	std::vector<Input*> _inputs;
+	vector<Input*> _inputs;
 };

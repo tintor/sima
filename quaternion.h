@@ -1,6 +1,6 @@
 #pragma once
 #include "vector.h"
-#include "exception.h"
+#include <core/exception.h>
 
 // Partialy based on Matrix and Quaternion FAQ, http://mccammon.ucsd.edu/~adcock/matrixfaq.html
 

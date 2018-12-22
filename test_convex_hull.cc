@@ -1,6 +1,6 @@
 #include "convex_hull.h"
 #include "is_valid.h"
-#include "zip.h"
+#include <core/zip.h>
 #include "properties.h"
 #include "generators.h"
 #include <random>
@@ -8,7 +8,7 @@
 #include <algorithm>
 #include "mesh_import.h"
 #include "is_valid.h"
-#include "timestamp.h"
+#include <core/timestamp.h>
 
 using poly_mesh3 = vector<polygon3>;
 
@@ -31,7 +31,7 @@ bool less(double4 a, double4 b) {
 	return a.z < b.z;
 }
 
-bool less(span<const double4> v, size_t a, size_t b) {
+bool less(cspan<double4> v, size_t a, size_t b) {
 	for (auto i : range(v.size())) {
 		double4 aa = v[(a + i) % v.size()];
 		double4 bb = v[(b + i) % v.size()];
@@ -41,7 +41,7 @@ bool less(span<const double4> v, size_t a, size_t b) {
 	return false;
 };
 
-bool less(span<const double4> a, span<const double4> b) {
+bool less(cspan<double4> a, cspan<double4> b) {
 	if (a.size() != b.size())
 		return a.size() < b.size();
 	for (auto [aa, bb] : czip(a, b))
@@ -50,7 +50,7 @@ bool less(span<const double4> a, span<const double4> b) {
 	return false;
 };
 
-static aligned_vector<double4> normalize(span<const double4> v) {
+static aligned_vector<double4> normalize(cspan<double4> v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
@@ -63,7 +63,7 @@ static aligned_vector<double4> normalize(span<const double4> v) {
 	return w;
 }
 
-static poly_mesh3 hull(span<const double4> a) {
+static poly_mesh3 hull(cspan<double4> a) {
 	mesh3 m = convex_hull(a);
 	// convert mesh3 to ipoly3 with triangles
 	poly_mesh3 p;

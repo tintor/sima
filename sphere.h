@@ -1,6 +1,6 @@
 #pragma once
-#include "format.h"
-#include "span.h"
+#include <core/format.h>
+#include <core/span.h>
 #include "vector.h"
 
 class sphere {
@@ -19,7 +19,7 @@ sphere minimal_sphere(point3 a, point3 b);
 sphere minimal_sphere(point3 a, point3 b, point3 c);
 sphere minimal_sphere(point3 a, point3 b, point3 c, point3 d);
 
-sphere minimal_sphere(span<const point3> points);
+sphere minimal_sphere(cspan<point3> points);
 
 // not minimal, but close to it and faster to compute than minimal
-sphere bounding_sphere(span<const point3> points);
+sphere bounding_sphere(cspan<point3> points);

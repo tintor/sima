@@ -8,6 +8,8 @@ project(sima)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(prod
+	core/callstack.cc
+	core/file.cc
 	aabb.cc
 	convex_hull.cc
 	is_valid.cc
@@ -18,11 +20,9 @@ set(prod
 	solid_bsp_tree.cc
 	csg.cc
 	shape.cc
-	file.cc
 	primitives.cc
 	timestamp.cc
 	mesh_import.cc
-	callstack.cc
 	buffer.cc
 	sphere.cc
 	segment.cc
@@ -42,10 +42,20 @@ set(render
 
 set(test
 	test.cc
+	core/test_span.cc
+	core/test_util.cc
+	core/test_bits.cc
+	core/test_format.cc
+	core/test_range.cc
+	core/test_zip.cc
+	core/test_map.cc
+	core/test_dynamic_array.cc
+ 	core/test_auto.cc
+	core/test_array_deque.cc
+	core/test_array_set.cc
+	sim/test_integration.cc
 	test_vector.cc
-	test_span.cc
 	test_aabb.cc
-	test_util.cc
 	test_aabb.cc
 	test_classify.cc
 	test_is_valid.cc
@@ -58,19 +68,9 @@ set(test
 	test_shape.cc
 	test_primitives.cc
 	test_tesselate.cc
-	sim/test_integration.cc
- 	test_auto.cc
-	test_array_deque.cc
-	#test_array_set.cc
-	test_bits.cc
-	test_dynamic_array.cc
-	test_format.cc
-	test_range.cc
-	test_map.cc
 	test_sphere.cc
 	test_broadphase.cc
-	test_quaternion.cc
-	test_zip.cc)
+	test_quaternion.cc)
 
 add_executable(main main.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})

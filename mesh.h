@@ -1,12 +1,12 @@
 #pragma once
-#include "span.h"
+#include <core/span.h>
 #include "vector.h"
-#include "align_alloc.h"
+#include <core/align_alloc.h>
 #include "segment.h"
-#include "auto.h"
-#include "each.h"
+#include <core/auto.h>
+#include <core/each.h>
 #include "plane.h"
-#include "exception.h"
+#include <core/exception.h>
 
 using mesh2 = vector<triangle2>;
 using mesh3 = aligned_vector<triangle3>;
@@ -60,24 +60,24 @@ public:
 // face can have arbitrary number of vertices and holes
 // first ring is exterior, other rings are interior and oriented opposite
 struct face {
-	face(const point3* vertices, span<const uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) { }
-	span<const point3> operator[](uint idx) const {
-		return span<const point3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
+	face(const point3* vertices, cspan<uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) { }
+	cspan<point3> operator[](uint idx) const {
+		return cspan<point3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
 	}
 	plane plane() const { return _plane; }
 	uint size() const { return _offsets.size() - 1; }
 	uint vertex_size() const { return _offsets.back() - _offsets[0]; }
 
-	span<const uint> offsets() const { return _offsets; }
-	span<const point3> vertices() const {
-		return span<const point3>(_vertices + _offsets[0], _vertices + _offsets.back());
+	cspan<uint> offsets() const { return _offsets; }
+	cspan<point3> vertices() const {
+		return cspan<point3>(_vertices + _offsets[0], _vertices + _offsets.back());
 	}
 
 	auto begin() const { return array_iterator<face>(0, *this); }
 	auto end() const { return array_iterator<face>(size(), *this); }
 private:
 	const point3* _vertices;
-	span<const uint> _offsets;
+	cspan<uint> _offsets;
 	class plane _plane;
 };
 
@@ -94,7 +94,7 @@ struct face_edge_iter {
 			ring += 1;
 		}
 		if (ring >= f.size()) return {};
-		span<const double4> r = f[ring];
+		cspan<double4> r = f[ring];
 		ON_SCOPE_EXIT(vertex += 1);
 		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
 	}
@@ -125,7 +125,7 @@ public:
 	uint size() const { return _ring_offsets.size() - 1; }
 
 	face operator[](uint idx) const {
-		span<const uint> offsets(_offsets.data() + _ring_offsets[idx], _offsets.data() + _ring_offsets[idx + 1]);
+		cspan<uint> offsets(_offsets.data() + _ring_offsets[idx], _offsets.data() + _ring_offsets[idx + 1]);
 		return face(_vertices.data(), offsets, _facePlanes[idx]);
 	}
 
@@ -133,9 +133,9 @@ public:
 	auto end() const { return array_iterator<xmesh3>(size(), *this); }
 
 	// contains duplicates!
-	span<const point3> vertices() const { return _vertices; }
+	cspan<point3> vertices() const { return _vertices; }
 
-	span<const point3> uniqueVertices() const { THROW(not_implemented); }
+	cspan<point3> uniqueVertices() const { THROW(not_implemented); }
 	vector<pair<segment3, double4>> uniqueEdges() const { THROW(not_implemented); }
 
 private:

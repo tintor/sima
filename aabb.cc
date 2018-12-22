@@ -1,7 +1,7 @@
 #include "aabb.h"
-#include "util.h"
+#include <core/util.h>
 
-/*pair<int4, int4> compute_aabb(span<const int4> vectors) {
+/*pair<int4, int4> compute_aabb(cspan<int4> vectors) {
 	if (vectors.size() <= 1) {
 		if (vectors.size() == 1)
 			return {vectors[0], vectors[0]};

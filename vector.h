@@ -1,8 +1,8 @@
 #pragma once
-#include "format.h"
+#include <core/format.h>
 #include "vec.h"
-#include "util.h"
-#include "align_alloc.h"
+#include <core/util.h>
+#include <core/align_alloc.h>
 #include <random>
 
 inline long2 lbroad2(long a) { return {a, a}; }

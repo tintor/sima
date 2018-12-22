@@ -1,5 +1,5 @@
 #include "classify.h"
-#include "exception.h"
+#include <core/exception.h>
 #include "edges.h"
 #include "project.h"
 #include "properties.h"
@@ -28,7 +28,7 @@ static int ClassifySegmentRayHelper(double2 ea, double2 eb, double2 p) {
 	return (signed_double_area(ea, eb, p) < 0) ? -1 : 1;
 }
 
-bool PointInPolygon(double2 p, span<const double2> ring) {
+bool PointInPolygon(double2 p, cspan<double2> ring) {
 	bool result = false;
 	double entrance = 0;
 	size_t m = IndexOfMax(ring, [p](double2 v) { return abs(v.y - p.y); });

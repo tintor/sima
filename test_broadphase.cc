@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "broadphase.h"
-#include "range.h"
-#include "timestamp.h"
+#include <core/range.h>
+#include <core/timestamp.h>
 
 void Bruteforce(const vector<sphere>& spheres, vector<pair<int, int>>& intersections) {
 	for (auto i : range(spheres.size()))

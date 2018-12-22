@@ -1,5 +1,5 @@
 #include "sphere.h"
-#include "range.h"
+#include <core/range.h>
 #include "catch.hpp"
 #include "aabb.h"
 
@@ -18,7 +18,7 @@ TEST_CASE("minimal_sphere(sphere, sphere)", "[sphere]") {
 	}
 }
 
-sphere minimal_sphere_brute_force(span<const point3> points) {
+sphere minimal_sphere_brute_force(cspan<point3> points) {
 	if (points.size() == 1)
 		return sphere(points[0], 0);
 	if (points.size() == 2)
@@ -38,21 +38,21 @@ sphere minimal_sphere_brute_force(span<const point3> points) {
 	return minimal;
 }
 
-double max_distance(point3 center, span<const point3> points) {
+double max_distance(point3 center, cspan<point3> points) {
 	double d2 = 0;
 	for (point3 p : points)
 		d2 = max(d2, squared(p - center));
 	return sqrt(d2);
 }
 
-bool contains(sphere s, span<const point3> points) {
+bool contains(sphere s, cspan<point3> points) {
 	for (auto p : points)
 		if (!s.contains(p))
 			return false;
 	return true;
 }
 
-sphere bounding_sphere_iterative(span<const point3> points, double eps) {
+sphere bounding_sphere_iterative(cspan<point3> points, double eps) {
 	// first approximation is center of aabb
 	aabb4 box(points);
 	point3 center = box.center();

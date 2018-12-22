@@ -1,7 +1,7 @@
 #pragma once
 #include "vector.h"
 #include "quaternion.h"
-#include "exception.h"
+#include <core/exception.h>
 
 struct Pose2 {
 	double2 position;

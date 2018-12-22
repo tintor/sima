@@ -1,5 +1,5 @@
 #pragma once
-#include "std.h"
+#include <core/std.h>
 #include <view/glm.h>
 
 #define GL_SILENCE_DEPRECATION

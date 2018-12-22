@@ -1,9 +1,9 @@
 #include "tesselate.h"
 #include "catch.hpp"
-#include "range.h"
-#include "string_util.h"
+#include <core/range.h>
+#include <core/string_util.h>
 #include "is_valid.h"
-#include "file.h"
+#include <core/file.h>
 #include <random>
 #include <fstream>
 
@@ -37,7 +37,7 @@ static polygon2 random_polygon(int size, RNG& rng) {
 vector<polygon2> test_cases;
 mesh2 tess;
 
-string poly_to_str(span<const double2> p) {
+string poly_to_str(cspan<double2> p) {
 	string s;
 	for (double2 e : p) {
 		format_s(s, "%.6f", e.x);

@@ -1,6 +1,6 @@
 #include "segment.h"
 #include "aabb.h"
-#include "exception.h"
+#include <core/exception.h>
 #include "classify.h"
 
 // D - disjoint

@@ -1,7 +1,6 @@
 #include <Eigen/Dense>
 #include "properties.h"
 #include "aabb.h"
-#include "scalar.h"
 #include "primitives.h"
 
 double SignedTriangleVolume6(double4 a, double4 b, double4 c) {
@@ -15,7 +14,7 @@ double SignedTriangleVolume6(double4 a, double4 b, double4 c) {
 	return s * z;
 }
 
-double SignedRingVolume6(span<const point3> ring) {
+double SignedRingVolume6(cspan<point3> ring) {
 	double z = 0;
 	for (auto e : ring)
 		 z += e.z;
@@ -54,7 +53,7 @@ double4 CenterOfMass(const mesh3& mesh) {
 	return P / (V * 4);
 }
 
-double2 centroid(span<const double2> poly) {
+double2 centroid(cspan<double2> poly) {
 	double2 P = {0, 0};
 	double2 V = 0;
 	for (auto i : range(poly.size())) {
@@ -120,7 +119,7 @@ bool is_aabb(const mesh3& mesh) {
 	return true;
 }
 
-double4 eigen_vector(span<const point3> points) {
+double4 eigen_vector(cspan<point3> points) {
 	// compute mean
 	double4 m = {0, 0, 0, 0};
 	for (point3 p : points)

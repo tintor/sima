@@ -4,10 +4,10 @@
 #include "triangle.h"
 #include "plane.h"
 
-inline constexpr long double operator "" _deg(long double a) { return a * (M_PI / 180); }
-inline constexpr long double operator "" _deg(unsigned long long a) { return a * (M_PI / 180); }
+inline constexpr long double operator "" _deg(long double a) { return a * (PI / 180); }
+inline constexpr long double operator "" _deg(unsigned long long a) { return a * (PI / 180); }
 
-inline string deg(long double r) { return format("%g deg", r * (180 / M_PI)); }
+inline string deg(long double r) { return format("%g deg", r * (180 / PI)); }
 
 inline constexpr double clamp(double t, double min = 0, double max = 1) {
 	if (t < min) return min;

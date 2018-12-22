@@ -1,6 +1,6 @@
 #include <view/shader.h>
-#include "auto.h"
-#include "format.h"
+#include <core/auto.h>
+#include <core/format.h>
 
 Shader::Shader(string_view source) {
 	size_t n = source.rfind("#version ");

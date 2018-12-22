@@ -1,7 +1,7 @@
 #pragma once
-#include "common.h"
-#include "format.h"
-#include "hash.h"
+#include <core/int.h>
+#include <core/format.h>
+#include <core/hash.h>
 #include <immintrin.h>
 
 #define vshuffle __builtin_shufflevector

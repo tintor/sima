@@ -1,7 +1,7 @@
 #include "generators.h"
 #include "tesselate.h"
-#include "align_alloc.h"
-#include "auto.h"
+#include <core/align_alloc.h>
+#include <core/auto.h>
 #include "properties.h"
 
 mesh3 generate_box(double4 size) {
@@ -21,7 +21,7 @@ mesh3 generate_cylinder(uint sides, double rmin, double rmax, double zmin, doubl
 			vertices.push_back(double4{0, 0, z, 1});
 		else
 			for (int i : range(sides)) {
-				double a = (2 * M_PI / sides) * i;
+				double a = (2 * PI / sides) * i;
 				double x = cos(a) * r;
 				double y = sin(a) * r;
 				vertices.push_back(double4{x, y, z, 1});
@@ -70,7 +70,7 @@ struct Edge {
 	double len;
 };
 
-void print_volume(int e, span<const double4> vertex, span<const Edge> edges) {
+void print_volume(int e, cspan<double4> vertex, cspan<Edge> edges) {
 	double volume = 0;
 	for (auto i : range(edges.size() / 3)) {
 		auto a = vertex[edges[i * 3].a];
@@ -82,7 +82,7 @@ void print_volume(int e, span<const double4> vertex, span<const Edge> edges) {
 	print("%s: volume %s\n", e, abs(volume));
 }
 
-mesh3 generate_regular_polyhedra(span<const Edge> edges) {
+mesh3 generate_regular_polyhedra(cspan<Edge> edges) {
 	int count = 0;
 	for (auto e : edges)
 		count = max(count, e.a + 1, e.b + 1);
@@ -98,7 +98,7 @@ mesh3 generate_regular_polyhedra(span<const Edge> edges) {
 	for (auto i : range(count))
 		vertex[i] = uniform3(rnd, -1, 1);
 
-	print_volume(0, span<const double4>(vertex, count), edges);
+	print_volume(0, cspan<double4>(vertex, count), edges);
 	for (auto e : range(100)) {
 		for (auto i : range(count))
 			delta[i] = {0, 0, 0};
@@ -110,18 +110,18 @@ mesh3 generate_regular_polyhedra(span<const Edge> edges) {
 		}
 		for (auto i : range(count))
 			vertex[i] += delta[i];
-		print_volume(e + 1, span<const double4>(vertex, count), edges);
+		print_volume(e + 1, cspan<double4>(vertex, count), edges);
 	}
 
 	return mesh3();
 }
 
 inline double2 vec(int k, int n) {
-	double a = (2 * M_PI * k) / n;
+	double a = (2 * PI * k) / n;
 	return {cos(a), sin(a)};
 }
 
-mesh3 generate_regular_polyhedra(span<const span<const int>> faces) {
+mesh3 generate_regular_polyhedra(cspan<cspan<int>> faces) {
 	vector<Edge> edges;
 	for (auto f : faces) {
 		int c = 1;
@@ -139,7 +139,7 @@ mesh3 generate_regular_polyhedra(span<const span<const int>> faces) {
 	return generate_regular_polyhedra(edges);
 }
 
-double print_volume2(int e, span<const double4> vertex, unordered_map<pair<int, int>, double, hash_t<pair<int, int>>>& edges) {
+double print_volume2(int e, cspan<double4> vertex, unordered_map<pair<int, int>, double, hash_t<pair<int, int>>>& edges) {
 	double loss = 0;
 	const double Inf = std::numeric_limits<double>::max();
 	// for each vertex find its top3 nearest vertices (#1 and #2 should be at distance 0, #3 at distance 1)
@@ -169,7 +169,7 @@ double print_volume2(int e, span<const double4> vertex, unordered_map<pair<int, 
 // create each regular polygon face first as free floating and all diagonal edges
 // create weaker attraction force between every pair of edges (not on the same face)
 // if not sealed after 100 iterations, randomize and repeat
-mesh3 generate_regular_polyhedra2(span<const pair<int, int>> faces) {
+mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 	int count = 0;
 	for (auto p : faces)
 		count += p.first * p.second;

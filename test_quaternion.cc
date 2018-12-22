@@ -1,9 +1,9 @@
 #include "catch.hpp"
 #include "quaternion.h"
-#include "range.h"
+#include <core/range.h>
 
 TEST_CASE("quat from axis angle", "[quaternion]") {
-	quat q = quat_from_axis_angle(double4{1, 0, 0}, M_PI / 2);
+	quat q = quat_from_axis_angle(double4{1, 0, 0}, PI / 2);
 	auto v = quat_rotate(q, double4{0, 1, 0, 0});
 	REQUIRE(length(v - double4{0, 0, 1, 0}) <= 1e-15);
 }

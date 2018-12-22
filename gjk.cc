@@ -1,7 +1,7 @@
 #include "gjk.h"
 #include "buffer.h"
 #include "pose.h"
-#include "range.h"
+#include <core/range.h>
 
 // double ß = 0;
 // double Θ = 2;
@@ -81,7 +81,7 @@ struct Shape2 {
 	vector<double2> vertices;
 };
 
-pair<double, double> MinMaxDotProduct(span<const double2> p, double2 d) {
+pair<double, double> MinMaxDotProduct(cspan<double2> p, double2 d) {
 	double v_max = -std::numeric_limits<double>::infinity();
 	double v_min = std::numeric_limits<double>::infinity();
 	for (double2 v : p) {
@@ -127,7 +127,7 @@ struct Manifold2 {
 	double2 dir2;
 	constexpr int N = 120;
 	for (int i : range(N)) {
-		double e = (M_PI / N) * i;
+		double e = (PI / N) * i;
 		double2 dir{cos(e), sin(e)}; // TODO precompute
 		auto ia = MinMaxDotProduct(sa.vertices, dir);
 		auto ib = MinMaxDotProduct(sb.vertices, dir);
@@ -150,7 +150,7 @@ struct Manifold2 {
 // TODO if no axis then difference of centers is better guess!
 // TODO it is possible to terminate early for Intersects
 // TODO return final axis
-/*bool AreConvexHullsIntersecting(span<const double2> p, span<const double2> q, double2* axis) {
+/*bool AreConvexHullsIntersecting(cspan<double2> p, cspan<double2> q, double2* axis) {
 	double2 D = axis ? *axis : (q[0] - p[0]);
 	double2 A = Support(p, D) - Support(q, -D);
 	if (dot(A, D) < 0) {
@@ -180,7 +180,7 @@ struct Manifold2 {
 	return NearestSimplex3(S1, S2, A);
 }*/
 
-/*double DistanceBetweenConvexHulls(span<const double2> p, span<const double2> q, double2* axis) {
+/*double DistanceBetweenConvexHulls(cspan<double2> p, cspan<double2> q, double2* axis) {
 	double2 initial_axis = axis ? *axis : (q[0] - p[0]);
 	double2 A = Support(p, initial_axis) - Support(q, -initial_axis);
 	double2 D = -A;
@@ -232,15 +232,15 @@ struct Manifold2 {
 	}
 }*/
 
-double SignedDistanceBetweenConvexHulls(span<const double2> p, span<const double2> q, double2* axis) {
+double SignedDistanceBetweenConvexHulls(cspan<double2> p, cspan<double2> q, double2* axis) {
 	THROW(not_implemented);
 }
 
-optional<segment2> MinSegmentBetweenConvexHulls(span<const double2> p, span<const double2> q, double2* axis) {
+optional<segment2> MinSegmentBetweenConvexHulls(cspan<double2> p, cspan<double2> q, double2* axis) {
 	THROW(not_implemented);
 }
 
-/*double DistanceBetweenConvexHulls2(span<const double2> p, span<const double2> q, int pi, int qi) {
+/*double DistanceBetweenConvexHulls2(cspan<double2> p, cspan<double2> q, int pi, int qi) {
 	// start with two candidate points
 	// try to jiggle (move each point prev/next as long as it is reducing distance)
 	// when we have two closest points, find which of the 4 vertex/edge is closest
@@ -320,7 +320,7 @@ static bool NearestSimplex4(double4 d, double4 c, double4 b, double4 a) {
 // TODO if no axis then difference of centers is better guess!
 // TODO it is possible to terminate early for Intersects
 // TODO return final axis
-/*bool AreConvexHullsIntersecting(span<const double4> p, span<const double4> q, double4* axis) {
+/*bool AreConvexHullsIntersecting(cspan<double4> p, cspan<double4> q, double4* axis) {
 	double4 initial_axis = axis ? *axis : (q[0] - p[0]);
 	double4 A = Support(p, initial_axis) - Support(q, -initial_axis);
 	double4 D = -A;
@@ -357,14 +357,14 @@ static bool NearestSimplex4(double4 d, double4 c, double4 b, double4 a) {
 	return NearestSimplex4(simplex[0], simplex[1], simplex[2], simplex[3]);
 }*/
 
-double DistanceBetweenConvexHulls(span<const double4> p, span<const double4> q, double4* axis) {
+double DistanceBetweenConvexHulls(cspan<double4> p, cspan<double4> q, double4* axis) {
 	THROW(not_implemented);
 }
 
-double SignedDistanceBetweenConvexHulls(span<const double4> p, span<const double4> q, double4* axis) {
+double SignedDistanceBetweenConvexHulls(cspan<double4> p, cspan<double4> q, double4* axis) {
 	THROW(not_implemented);
 }
 
-optional<segment3> MinSegmentBetweenConvexHulls(span<const double4> p, span<const double4> q, double4* axis) {
+optional<segment3> MinSegmentBetweenConvexHulls(cspan<double4> p, cspan<double4> q, double4* axis) {
 	THROW(not_implemented);
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include "triangle.h"
-#include "exception.h"
+#include <core/exception.h>
 
 // TODO move polygon and mesh stuff outside
 
@@ -21,13 +21,13 @@ public:
 		_offsets.back() += 1;
 	}
 
-	void add(span<const Vec> poly) {
+	void add(cspan<Vec> poly) {
 		_vertices << poly;
 		_offsets.push_back(_offsets.back() + poly.size());
 	}
 
-	span<const Vec> operator[](uint idx) const {
-		return span<const Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
+	cspan<Vec> operator[](uint idx) const {
+		return cspan<Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
 	}
 
 	span<Vec> operator[](uint idx) {
@@ -41,7 +41,7 @@ public:
 		_offsets.reserve(rings + 1);
 	}
 
-	span<const Vec> vertices() const { return span<const Vec>(_vertices); }
+	cspan<Vec> vertices() const { return cspan<Vec>(_vertices); }
 
 	span<Vec> vertices() { return span<Vec>(_vertices); }
 
@@ -73,7 +73,7 @@ inline void format_e(string& s, string_view spec, const xpolygon3& p) {
 	s += ")";
 }
 
-inline array<span<const double2>, 1> Rings(const polygon2& poly) {
+inline array<cspan<double2>, 1> Rings(const polygon2& poly) {
 	return { poly };
 }
 
@@ -81,7 +81,7 @@ struct rings_iter {
 	int ring;
 	const xpolygon2& poly;
 
-	optional<span<const double2>> next() {
+	optional<cspan<double2>> next() {
 		if (ring == poly.size())
 			return nullopt;
 		return poly[ring++];
@@ -107,7 +107,7 @@ struct xpolygon_edge_iter {
 		}
 		if (ring >= poly.size())
 			return {};
-		span<const Vec> r = poly[ring];
+		cspan<Vec> r = poly[ring];
 		ON_SCOPE_EXIT(vertex += 1);
 		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
 	}
@@ -165,7 +165,7 @@ inline string wkt(const polygon2& poly) {
 	return s;
 }
 
-inline double signed_double_area(span<const double2> poly) {
+inline double signed_double_area(cspan<double2> poly) {
 	double area = 0;
 	if (poly.size() >= 3) {
 		area += signed_double_edge_area(poly.back(), poly[0]);
@@ -175,7 +175,7 @@ inline double signed_double_area(span<const double2> poly) {
 	return area;
 }
 
-inline double area(span<const double2> poly) {
+inline double area(cspan<double2> poly) {
 	return abs(signed_double_area(poly) / 2);
 }
 

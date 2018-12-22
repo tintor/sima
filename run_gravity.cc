@@ -1,7 +1,7 @@
-#include "callstack.h"
-#include "format.h"
+#include <core/callstack.h>
+#include <core/format.h>
 #include <sim/integration.h>
-#include "util.h"
+#include <core/util.h>
 
 #include <view/glm.h>
 #include <view/font.h>
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
 
 	std::array<vec2, 25> v;
 	for (int i = 0; i < v.size() - 1; i++) {
-		auto a = 2 * M_PI / (v.size() - 1) * i;
+		auto a = 2 * PI / (v.size() - 1) * i;
 		v[i].x = cos(a);
 		v[i].y = sin(a);
 	}
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-	std::vector<Body> bodies;
+	vector<Body> bodies;
 	bodies.resize(3);
 	bodies[0] = {.mass=2e8, .radius=1, .pos=vec2(600, 450)};
 	bodies[1] = {.mass=600, .radius=1, .pos=vec2(200, 450), .velocity=vec2(0, 400 / (150000000 / 30))};

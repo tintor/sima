@@ -59,7 +59,7 @@ mesh3 generate_icosahedron(double radius);
 
 mesh3 generate_prism(const polygon2& poly, double zmin, double zmax);
 
-mesh3 generate_pipe(span<const double4> path, double radius, double vertices);
+mesh3 generate_pipe(cspan<double4> path, double radius, double vertices);
 
-mesh3 generate_regular_polyhedra2(span<const pair<int, int>> faces);
-mesh3 generate_regular_polyhedra(span<const span<const int>> faces);
+mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces);
+mesh3 generate_regular_polyhedra(cspan<cspan<int>> faces);

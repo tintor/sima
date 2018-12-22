@@ -1,7 +1,7 @@
 #include "sphere.h"
-#include "range.h"
+#include <core/range.h>
 #include "aabb.h"
-#include "exception.h"
+#include <core/exception.h>
 
 sphere minimal_sphere(sphere a, sphere b) {
 	double4 d = b.center() - a.center();
@@ -31,7 +31,7 @@ sphere minimal_sphere(sphere a, point3 b) {
 	return sphere(c_center, c_radius);
 }
 
-sphere correct_radius(sphere s, span<const point3> points) {
+sphere correct_radius(sphere s, cspan<point3> points) {
 	double r = s.radius();
 	for (auto p : points)
 		while (!s.contains(p)) {
@@ -116,7 +116,7 @@ sphere minimal_sphere(point3 a, point3 b, point3 c, point3 d) {
 	return correct_radius(sphere_from(a, b, c, d), {a, b, c, d});
 }
 
-sphere minimal_sphere_brute_force_x(span<const point3> points) {
+sphere minimal_sphere_brute_force_x(cspan<point3> points) {
 	sphere minimal(double4{0, 0, 0, 1}, -1);
 	for (auto a : range(points.size()))
 		for (auto b : range(a + 1, points.size()))
@@ -129,7 +129,7 @@ sphere minimal_sphere_brute_force_x(span<const point3> points) {
 	return minimal;
 }
 
-sphere minimal_sphere(span<const point3> interior, array<point3, 4>& surface, int surface_size) {
+sphere minimal_sphere(cspan<point3> interior, array<point3, 4>& surface, int surface_size) {
 	if (surface_size == 4)
 		return sphere_from(surface[0], surface[1], surface[2], surface[3]);
 
@@ -162,12 +162,12 @@ sphere minimal_sphere(span<const point3> interior, array<point3, 4>& surface, in
 	return s;
 }
 
-sphere minimal_sphere(span<const point3> points) {
+sphere minimal_sphere(cspan<point3> points) {
 	array<point3, 4> surface;
 	return minimal_sphere(points, surface, 0);
 }
 
-sphere extermal_points_optimal_sphere(span<const point3> points, span<const float4> normals) {
+sphere extermal_points_optimal_sphere(cspan<point3> points, cspan<float4> normals) {
 	if (points.empty())
 		THROW(invalid_argument, "points must be non-empty");
 	if (points.size() <= normals.size() * 2)
@@ -209,6 +209,6 @@ array<float4, 13> g_normals = {
 	{1, 1, 1, 0}, {1, 1, -1, 0}, {1, -1, 1, 0}, {-1, 1, 1, 0}
 };
 
-sphere bounding_sphere(span<const point3> points) {
+sphere bounding_sphere(cspan<point3> points) {
 	return extermal_points_optimal_sphere(points, g_normals);
 }

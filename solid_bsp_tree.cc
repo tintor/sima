@@ -1,8 +1,8 @@
 #include "solid_bsp_tree.h"
 #include "aabb.h"
-#include "util.h"
+#include <core/util.h>
 #include "properties.h"
-#include "exception.h"
+#include <core/exception.h>
 #include "primitives.h"
 
 void SolidBSPTree::evaluate_candidate(

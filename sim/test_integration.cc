@@ -1,5 +1,5 @@
 #include <sim/integration.h>
-#include "range.h"
+#include <core/range.h>
 #include "catch.hpp"
 
 TEST_CASE("Numerical integrators") {

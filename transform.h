@@ -1,6 +1,6 @@
 #pragma once
 #include "triangle.h"
-#include "span.h"
+#include <core/span.h>
 
 inline float4 transform(float4 v, fmat34 matrix) {
 	// dot products
@@ -12,7 +12,7 @@ inline float4 transform(float4 v, fmat34 matrix) {
 	return q;
 }
 
-void transform(span<const vec3_8> in, fmat34 matrix, span<vec3_8> out);
+void transform(cspan<vec3_8> in, fmat34 matrix, span<vec3_8> out);
 
 /*void translate(array_ptr<ivec4> vectors, ivec4 t);
 void translate(array_ptr<ivec3_8> vectors, ivec4 t);*/

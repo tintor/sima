@@ -41,9 +41,9 @@ TEST_CASE("Sign(segment2, double2)", "[classify]") {
 
 TEST_CASE("operator<<(vector<T>, span<T>)", "[classify]") {
 	vector<int> a;
-	a << span<const int>{2, 3};
-	a << span<const int>{};
-	a << span<const int>{4};
+	a << cspan<int>{2, 3};
+	a << cspan<int>{};
+	a << cspan<int>{4};
 	REQUIRE(a == vector<int>{2, 3, 4});
 }
 
@@ -51,7 +51,7 @@ double2 swap(double2 a) {
 	return double2{a.y, a.x};
 }
 
-double distanceRingPoint(span<const double2> ring, double2 p) {
+double distanceRingPoint(cspan<double2> ring, double2 p) {
 	double dist = std::numeric_limits<double>::max();
 	for (const segment2& e : Edges(ring))
 		dist = min(dist, distance(e, p));
@@ -483,7 +483,7 @@ double TransformUntilContact(polygon2& a, const polygon2& b, std::function<void(
 }
 
 double RotateUntilContact(polygon2& a, const polygon2& b, double t) {
-	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Rotate(m, t); }, M_PI / 72);
+	return TransformUntilContact(a, b, [t](polygon2& m, double a) { Rotate(m, t); }, PI / 72);
 }
 
 double TranslateUntilContact(polygon2& a, const polygon2& b, double2 t) {
@@ -528,7 +528,7 @@ TEST_CASE("Classify(polygon2, polygon2) offset boxes", "[classify2]") {
 
 TEST_CASE("Classify(polygon2, polygon2) rotated box", "[classify2]") {
 	polygon2 a = MakeRect(-1, 1);
-	Rotate(a, M_PI / 4);
+	Rotate(a, PI / 4);
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
@@ -552,7 +552,7 @@ TEST_CASE("Classify(polygon2, polygon2) same boxes", "[classify2]") {
 TEST_CASE("Classify(polygon2, polygon2) square and L", "[classify2]") {
 	polygon2 a = MakeRect(-1, 1);
 	polygon2 b = MakeL(1, 1, 0.2);
-	Rotate(b, M_PI * 3 / 2);
+	Rotate(b, PI * 3 / 2);
 	Translate(b, double2{5, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
 	vector<Contact2> contacts;

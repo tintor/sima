@@ -3,8 +3,8 @@
 #include <unordered_set>
 
 #include "shape.h"
-#include "util.h"
-#include "timestamp.h"
+#include <core/util.h>
+#include <core/timestamp.h>
 
 #ifdef xxx
 // Shape is 3d solid, immutable, purely geometric and with origin in center of mass
@@ -43,7 +43,7 @@ Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 	FOR_EACH(face, m_mesh)
 		FOR(i, 3) {
 			const dvec3& a = face[i], b = face[(i + 1) % 3], c = face[(i + 2) % 3];
-			if (edge_angle(a, b, c, third_vertex[segment3(b, a)]) < M_PI) {
+			if (edge_angle(a, b, c, third_vertex[segment3(b, a)]) < PI) {
 				if (lexicographical_less(a, b))
 					m_convex_edges.push_back(segment3(a, b));
 			} else {
@@ -148,7 +148,7 @@ bool intersects_edge_interior(const segment3& edge, const Shape& shape) {
 
 	// Note: assumes edge vertices are outside of shape
 	constexpr real eps = 1e-8; // TODO
-	/*std::vector<triangle3> nearest;
+	/*vector<triangle3> nearest;
 	FOR_EACH(face, shape.faces()) {
 		// if edge goes strictly through interior of triangle TODO and edge vertices are not on the plane
 		if (intersects_in_point(edge, face)
@@ -265,8 +265,8 @@ bool approx_intersects(const segment3& v, const Shape& shape) {
 }
 
 // Assuming shares aren't intersecting, look for pairs of features that are within ContactEpsilon
-std::vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
-	std::vector<Contact> contacts;
+vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+	vector<Contact> contacts;
 	Contact contact;
 
 	// vertex vs face contacts

@@ -1,7 +1,7 @@
 #include "properties.h"
 #include "generators.h"
 #include "catch.hpp"
-#include "align_alloc.h"
+#include <core/align_alloc.h>
 
 // TODO center of mass
 // TODO translate mesh

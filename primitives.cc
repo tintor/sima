@@ -1,5 +1,5 @@
 #include "primitives.h"
-#include "exception.h"
+#include <core/exception.h>
 
 double distance(segment2 a, double2 b) {
 	return length(a.nearest(b) - b);

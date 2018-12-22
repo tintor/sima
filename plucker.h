@@ -1,5 +1,5 @@
 #pragma once
-#include "format.h"
+#include <core/format.h>
 
 struct plucker {
 	double4 u, v;

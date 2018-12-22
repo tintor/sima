@@ -13,4 +13,4 @@ void mesh_reduce(imesh3& m, uint tolerance);
 void mesh_round(imesh3& a, uint amount);
 
 // extrude a set of faces in some direction
-void extrude_faces(imesh3& a, const std::vector<uint>& faces, ivec3 amount);
+void extrude_faces(imesh3& a, const vector<uint>& faces, ivec3 amount);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "std.h"
+#include <core/std.h>
 #include <view/glm.h>
 
 #define GL_SILENCE_DEPRECATION
@@ -19,13 +19,13 @@ public:
 		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vec2), 0);
 	}
 
-	void write(span<const vec2> vertices) {
+	void write(cspan<vec2> vertices) {
 		glBindVertexArray(m_vao);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(vec2), vertices.data());
 	}
 
-	void draw(uint type, span<const vec2> vertices) {
+	void draw(uint type, cspan<vec2> vertices) {
 		glBindVertexArray(m_vao);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(vec2), vertices.data());

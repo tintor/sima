@@ -1,6 +1,6 @@
 #include "project.h"
 #include "aabb.h"
-#include "exception.h"
+#include <core/exception.h>
 
 ray2 Project(const ray3& s, int axis) {
 	THROW(not_implemented);

@@ -1,5 +1,4 @@
 #include "tesselate.h"
-#include "scalar.h"
 #include "segment.h"
 
 static bool intersects(segment2 p, segment2 q) {

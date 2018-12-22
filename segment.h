@@ -1,6 +1,6 @@
 #pragma once
 #include "vector.h"
-#include "hash.h"
+#include <core/hash.h>
 #include <cassert>
 
 constexpr double Tolerance = 0.5e-6;

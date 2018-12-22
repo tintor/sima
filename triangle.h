@@ -1,10 +1,9 @@
 #pragma once
 #include "segment.h"
-#include "range.h"
-#include "scalar.h"
+#include <core/range.h>
 #include "edges.h"
-#include "align_alloc.h"
-#include "auto.h"
+#include <core/align_alloc.h>
+#include <core/auto.h>
 
 template<typename Vec>
 struct triangle {

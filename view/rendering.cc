@@ -1,5 +1,5 @@
 #include <view/rendering.h>
-#include "range.h"
+#include <core/range.h>
 
 #include <vector>
 #include <iostream>
@@ -29,10 +29,10 @@ int gen_buffer(GLenum target, GLsizei size, const void* data) {
 
 // Render::Texture
 
-void load_png_texture(std::string_view filename) {
+void load_png_texture(string_view filename) {
 	unsigned char* image;
 	unsigned width, height;
-	std::string fn(filename);
+	string fn(filename);
 	unsigned error = lodepng_decode32_file(&image, &width, &height, fn.c_str());
 	if (error) {
 		fprintf(stderr, "lodepgn_decode32_file error %u: %s\n", error, lodepng_error_text(error));
@@ -44,13 +44,13 @@ void load_png_texture(std::string_view filename) {
 
 // Render::Shader
 
-std::string read_file(std::string_view filename) {
-	std::string fn(filename);
+string read_file(string_view filename) {
+	string fn(filename);
 	std::ifstream in(fn, std::ios::in | std::ios::binary);
 	if (!in) {
 		fprintf(stderr, "File '%s' not found\n", fn.c_str());
 	}
-	std::string contents;
+	string contents;
 	in.seekg(0, std::ios::end);
 	contents.resize(in.tellg());
 	in.seekg(0, std::ios::beg);
@@ -59,9 +59,9 @@ std::string read_file(std::string_view filename) {
 	return contents;
 }
 
-GLuint make_shader(GLenum type, std::string_view source) {
+GLuint make_shader(GLenum type, string_view source) {
 	GLuint shader = glCreateShader(type);
-	std::string src(source);
+	string src(source);
 	const GLchar* c = src.c_str();
 	glShaderSource(shader, 1, &c, NULL);
 	glCompileShader(shader);
@@ -79,11 +79,11 @@ GLuint make_shader(GLenum type, std::string_view source) {
 	return shader;
 }
 
-GLuint load_shader(GLenum type, std::string_view name, std::string_view ext) {
+GLuint load_shader(GLenum type, string_view name, string_view ext) {
 	return make_shader(type, read_file(format("shaders/%s.%s", name, ext)));
 }
 
-GLuint make_program(const std::vector<GLuint>& shaders) {
+GLuint make_program(const vector<GLuint>& shaders) {
 	GLuint program = glCreateProgram();
 	for (GLuint shader : shaders)
 		glAttachShader(program, shader);
@@ -104,8 +104,8 @@ GLuint make_program(const std::vector<GLuint>& shaders) {
 	return program;
 }
 
-GLuint load_program(std::string_view name, bool geometry) {
-	std::vector<GLuint> shaders;
+GLuint load_program(string_view name, bool geometry) {
+	vector<GLuint> shaders;
 	shaders.push_back(load_shader(GL_VERTEX_SHADER, name, "vert"));
 	if (geometry) shaders.push_back(load_shader(GL_GEOMETRY_SHADER, name, "geom"));
 	shaders.push_back(load_shader(GL_FRAGMENT_SHADER, name, "frag"));
@@ -151,7 +151,7 @@ bool Console::KeyToChar(int key, int mods, char& ch) {
 	return true;
 }
 
-void Console::PrintInternal(std::string_view s) {
+void Console::PrintInternal(string_view s) {
 	char* w = _output[_last_line];
 	for (char c : s) {
 		if (c == '\n') {
@@ -186,7 +186,7 @@ bool Console::OnKey(int key, int mods) {
 		return true;
 	}
 	if (key == GLFW_KEY_ENTER && contains_non_space(input.buffer.data() + 1, input.cursor - 1)) {
-		Execute(std::string_view(input.buffer.data() + 1, input.cursor - 1));
+		Execute(string_view(input.buffer.data() + 1, input.cursor - 1));
 		if (_current_input != _inputs.size() - 1) {
 			delete _inputs.back();
 			_inputs.pop_back();
@@ -225,15 +225,15 @@ bool Console::OnKey(int key, int mods) {
 	{
 		std::lock_guard lock(_mutex);
 		for (int i = _last_line + 1; i < ConsoleHeight; i++)
-			text->PrintBuffer(std::string_view(_output[i], ConsoleWidth));
+			text->PrintBuffer(string_view(_output[i], ConsoleWidth));
 		for (int i = 0; i <= _last_line; i++)
-			text->PrintBuffer(std::string_view(_output[i], ConsoleWidth));
+			text->PrintBuffer(string_view(_output[i], ConsoleWidth));
 	}
 
 	Input& input = *_inputs[_current_input];
 	if (input.cursor < ConsoleWidth)
 		input.buffer[input.cursor] = (fmod(time, 1.6f) <= 0.8) ? '_' : ' ';
-	text->PrintBuffer(std::string_view(input.buffer.data(), input.buffer.size()));
+	text->PrintBuffer(string_view(input.buffer.data(), input.buffer.size()));
 }*/
 
 /*json_t* Console::save()

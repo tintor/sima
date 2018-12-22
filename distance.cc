@@ -1,5 +1,5 @@
 #include "classify.h"
-#include "exception.h"
+#include <core/exception.h>
 #include "edges.h"
 #include "project.h"
 #include "properties.h"
@@ -51,7 +51,7 @@ static double DistanceFaceVertexPairs(const xmesh3& ma, const xmesh3& mb, sphere
 }
 
 // distance between the closest pair of points
-double Distance(span<const double4> ma, span<const double4> mb, sphere sa, sphere sb, segment3* nearest) {
+double Distance(cspan<double4> ma, cspan<double4> mb, sphere sa, sphere sb, segment3* nearest) {
 	// TODO can make it faster if there is a separating plane between two point sets
 	//      use two bounding spheres to estimate potentiall separating plane
 	//      sort both sets based on distance from plane

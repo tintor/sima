@@ -4,7 +4,7 @@
 #include "properties.h"
 #include "convex_hull.h"
 #include "catch.hpp"
-#include "timestamp.h"
+#include <core/timestamp.h>
 
 TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
     try {

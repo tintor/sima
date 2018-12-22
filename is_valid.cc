@@ -1,14 +1,14 @@
 #include "is_valid.h"
-#include "union_find.h"
+#include <core/union_find.h>
 #include "properties.h"
-#include "util.h"
+#include <core/util.h>
 #include "aabb.h"
-#include "exception.h"
+#include <core/exception.h>
 #include "primitives.h"
 #include "project.h"
 #include "classify.h"
 
-bool IsValidPolygon(span<const double2> poly) {
+bool IsValidPolygon(cspan<double2> poly) {
 	auto n = poly.size();
 	if (n < 3)
 		return false;

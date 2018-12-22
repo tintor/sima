@@ -25,10 +25,10 @@
 // hinges
 // concave shapes
 
-#include "callstack.h"
-#include "format.h"
+#include <core/callstack.h>
+#include <core/format.h>
 #include <sim/integration.h>
-#include "util.h"
+#include <core/util.h>
 #include <view/glm.h>
 #include "classify.h"
 #include "triangle.h"
@@ -91,7 +91,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 
 struct Body {
 	polygon2 shape;
-	std::vector<vec2> shapef;
+	vector<vec2> shapef;
 
 	aabb2 box;
 	double radius;
@@ -380,7 +380,7 @@ int main(int argc, char** argv) {
 
 	std::array<vec2, 25> v;
 	for (int i = 0; i < v.size() - 1; i++) {
-		auto a = 2 * M_PI / (v.size() - 1) * i;
+		auto a = 2 * PI / (v.size() - 1) * i;
 		v[i].x = cos(a);
 		v[i].y = sin(a);
 	}
@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-	std::vector<Body> bodies;
+	vector<Body> bodies;
 	bodies.push_back({.mass=130*130, .radius=130, .pos=vec2(200, 200)});
 	bodies.push_back({.mass=90*90, .radius=90, .pos=vec2(400, 400)});
 	bodies.push_back({.mass=50*50, .radius=50, .pos=vec2(600, 600)});
@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
 
 	shape.clear();
 	for (int i = 0; i < 24; i++) {
-		auto a = 2 * M_PI / 24 * i;
+		auto a = 2 * PI / 24 * i;
 		shape.push_back(double2{cos(a), sin(a)} * 100);
 	}
 	shape.push_back(double2{0, 0});
@@ -414,7 +414,7 @@ int main(int argc, char** argv) {
 
 	shape.clear();
 	for (int i = 0; i < 24; i++) {
-		auto a = 2 * M_PI / 24 * i;
+		auto a = 2 * PI / 24 * i;
 		shape.push_back(double2{cos(a), sin(a)} * 50);
 	}
 	shape.push_back(double2{0, 0});
@@ -518,7 +518,7 @@ int main(int argc, char** argv) {
 			transform = glm::translate(transform, vec2(body.pos));
 			transform = glm::rotate(transform, float(body.ang_pos));
 			transformUniform = transform;
-			buffer.write(span<const vec2>(body.shapef.data(), body.shapef.size()));
+			buffer.write(cspan<vec2>(body.shapef.data(), body.shapef.size()));
 			glDrawArrays(GL_LINE_LOOP, 0, body.shapef.size());
 		}
 	});

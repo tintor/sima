@@ -7,7 +7,7 @@
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }
 inline aabb2 Box(const xpolygon2& p) { return aabb2(p.vertices()).buffer(Tolerance); }
-inline aabb4 Box(span<const double4> s) { return aabb4(s).buffer(Tolerance); }
+inline aabb4 Box(cspan<double4> s) { return aabb4(s).buffer(Tolerance); }
 
 // All Sign() functions return:
 // +1 above / positive side
@@ -55,7 +55,7 @@ inline int Classify(segment2 s, double2 v) {
 }
 
 // TESTED polygon vs point
-bool PointInPolygon(double2 p, span<const double2> polygon);
+bool PointInPolygon(double2 p, cspan<double2> polygon);
 int Classify(const polygon2& a, double2 p, aabb2 box);
 int Classify(const xpolygon2& a, double2 p, aabb2 box);
 inline int Classify(const polygon2& a, double2 p) { return Classify(a, p, Box(a)); }

@@ -1,9 +1,9 @@
 #pragma once
-#include "range.h"
+#include <core/range.h>
 #include "triangle.h"
-#include "span.h"
+#include <core/span.h>
 
-pair<int4, int4> compute_aabb(span<const int4> vectors);
+pair<int4, int4> compute_aabb(cspan<int4> vectors);
 
 template<typename Vec>
 struct aabb {
@@ -39,13 +39,13 @@ struct aabb {
 		add(p.c);
 	}
 
-	explicit aabb(span<const Vec> p) {
+	explicit aabb(cspan<Vec> p) {
 		reset();
 		for (auto v : p)
 			add(v);
 	}
 
-	explicit aabb(span<const triangle<Vec>> ap) {
+	explicit aabb(cspan<triangle<Vec>> ap) {
 		reset();
 		for (auto p : ap) {
 			add(p.a);

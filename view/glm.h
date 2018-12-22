@@ -6,7 +6,7 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "format.h"
+#include <core/format.h>
 
 using glm::dvec2;
 using glm::dvec3;

@@ -1,17 +1,17 @@
 #pragma once
-#include "std.h"
+#include <core/std.h>
 #include "segment.h"
-#include "each.h"
-#include "auto.h"
+#include <core/each.h>
+#include <core/auto.h>
 #include <type_traits>
 
 // Use to iterate over all segment<Vec> generated from triangle<Vec> or polygon<Vec>
 template<typename Vec>
 struct edges_flat {
 	int vertex = 0;
-	span<const Vec> s;
+	cspan<Vec> s;
 
-	edges_flat(span<const Vec> s) : s(s) { }
+	edges_flat(cspan<Vec> s) : s(s) { }
 	optional<segment<Vec>> next() {
 		if (vertex >= s.size()) return nullopt;
 		ON_SCOPE_EXIT(vertex += 1);
@@ -25,7 +25,7 @@ constexpr auto Edges(const vector<T>& poly) {
 }
 
 template<typename T>
-constexpr auto Edges(span<const T> poly) {
+constexpr auto Edges(cspan<T> poly) {
 	return iterable(edges_flat(poly));
 }
 

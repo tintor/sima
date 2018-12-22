@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "aabb.h"
-#include "format.h"
-#include "util.h"
+#include <core/format.h>
+#include <core/util.h>
 #include <random>
 
 TEST_CASE("aabb4 basic", "[aabb]") {
@@ -42,7 +42,7 @@ TEST_CASE("aabb::add()", "[aabb]") {
 
 /*TEST_CASE("aabb(array_cptr<ivec4>) simd", "[aabb]") {
 	std::default_random_engine rnd;
-	std::vector<ivec4> w;
+	vector<ivec4> w;
 	w.resize(6);
 	std::uniform_int_distribution<int> dist1(0, 1), dist2(1, 6);
 	for (auto i : range(100)) {

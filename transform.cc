@@ -1,7 +1,7 @@
 #include "transform.h"
-#include "format.h"
-#include "util.h"
-#include "exception.h"
+#include <core/format.h>
+#include <core/util.h>
+#include <core/exception.h>
 
 // 7 instructions
 // input a.w is ignored (as long as matrix is fully initialized 4x4)
@@ -27,7 +27,7 @@ float8 transform(float8 a, float8 m[4]) {
 }
 
 // inner loop is 15 instructions for 8 vectors!
-void transform(span<const vec3_8> in, fmat34 m, span<vec3_8> out) {
+void transform(cspan<vec3_8> in, fmat34 m, span<vec3_8> out) {
 	if (in.size() != out.size())
 		THROW(invalid_argument, "array sizes must be the same");
 	if (!aligned<32>(in.begin()) || !aligned<32>(out.begin()))

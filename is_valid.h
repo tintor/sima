@@ -1,9 +1,9 @@
 #pragma once
 #include "mesh.h"
 #include "polygon.h"
-#include "format.h"
+#include <core/format.h>
 
-bool IsValidPolygon(span<const double2> poly);
+bool IsValidPolygon(cspan<double2> poly);
 bool IsValid(const polygon2& poly);
 bool IsValid(const xpolygon2& poly);
 

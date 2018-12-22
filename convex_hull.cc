@@ -2,11 +2,11 @@
 #include "is_valid.h"
 #include "properties.h"
 #include "aabb.h"
-#include "util.h"
+#include <core/util.h>
 #include "primitives.h"
-#include "exception.h"
+#include <core/exception.h>
 
-bool is_convex(span<const triangle3> mesh) {
+bool is_convex(cspan<triangle3> mesh) {
 	// Extract all unique vertices
 	aligned_vector<point3> vertices;
 	vertices.reserve(mesh.size() * 3);
@@ -95,7 +95,7 @@ double boundary_dist(aabb4 box, double4 v) {
 //    idea is to build hull of simplified point set first, which is a "good" approximation of the point set
 //    (problem, one dimension could be thinner than other two, so after a few rounding we end up with 2d case)
 
-void convex_hull_fast(span<const double4> points, mesh3& hull) {
+void convex_hull_fast(cspan<double4> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;
@@ -133,7 +133,7 @@ void convex_hull_fast(span<const double4> points, mesh3& hull) {
 	THROW(not_implemented);
 }
 
-void convex_hull(span<const double4> points, mesh3& hull) {
+void convex_hull(cspan<double4> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;

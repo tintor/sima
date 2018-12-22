@@ -11,8 +11,8 @@
 #include FT_FREETYPE_H
 
 #include <view/shader.h>
-#include "auto.h"
-#include "format.h"
+#include <core/auto.h>
+#include <core/format.h>
 
 constexpr int CharsPerBuffer = 100;
 
