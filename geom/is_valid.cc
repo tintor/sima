@@ -1,12 +1,12 @@
-#include "is_valid.h"
+#include <geom/is_valid.h>
 #include <core/union_find.h>
 #include "properties.h"
 #include <core/util.h>
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/exception.h>
 #include "primitives.h"
 #include "project.h"
-#include "classify.h"
+#include <geom/classify.h>
 
 bool IsValidPolygon(cspan<double2> poly) {
 	auto n = poly.size();

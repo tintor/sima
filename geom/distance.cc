@@ -1,6 +1,6 @@
-#include "classify.h"
+#include <geom/classify.h>
 #include <core/exception.h>
-#include "edges.h"
+#include <geom/edges.h>
 #include "project.h"
 #include "properties.h"
 #include "sphere.h"

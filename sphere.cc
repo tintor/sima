@@ -1,6 +1,6 @@
 #include "sphere.h"
 #include <core/range.h>
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/exception.h>
 
 sphere minimal_sphere(sphere a, sphere b) {

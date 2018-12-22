@@ -1,7 +1,7 @@
 #include "sphere.h"
 #include <core/range.h>
 #include "catch.hpp"
-#include "aabb.h"
+#include <geom/aabb.h>
 
 TEST_CASE("minimal_sphere(sphere, sphere)", "[sphere]") {
 	std::default_random_engine rnd;

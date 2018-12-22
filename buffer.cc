@@ -1,4 +1,4 @@
-#include "buffer.h"
+#include <geom/buffer.h>
 #include <core/exception.h>
 
 static void GenerateCircularArc(vector<double2>& arc, double2 center, double start_angle, double end_angle, double radius, int count, bool end) {

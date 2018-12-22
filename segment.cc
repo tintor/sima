@@ -1,7 +1,7 @@
 #include "segment.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/exception.h>
-#include "classify.h"
+#include <geom/classify.h>
 
 // D - disjoint
 // O - overlap

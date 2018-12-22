@@ -10,15 +10,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(prod
 	core/callstack.cc
 	core/file.cc
-	aabb.cc
-	convex_hull.cc
-	is_valid.cc
+	geom/aabb.cc
+	geom/classify.cc
+	geom/convex_hull.cc
+	geom/csg.cc
+	geom/distance.cc
+	geom/is_valid.cc
+	geom/gjk.cc
 	tesselate.cc
 	transform.cc
 	properties.cc
 	generators.cc
 	solid_bsp_tree.cc
-	csg.cc
 	shape.cc
 	primitives.cc
 	timestamp.cc
@@ -26,11 +29,8 @@ set(prod
 	buffer.cc
 	sphere.cc
 	segment.cc
-	classify.cc
 	project.cc
-	distance.cc
 	broadphase.cc
-	gjk.cc
 	lodepng/lodepng.cc)
 
 set(render
@@ -42,29 +42,28 @@ set(render
 
 set(test
 	test.cc
-	core/test_span.cc
-	core/test_util.cc
-	core/test_bits.cc
-	core/test_format.cc
-	core/test_range.cc
-	core/test_zip.cc
-	core/test_map.cc
-	core/test_dynamic_array.cc
- 	core/test_auto.cc
 	core/test_array_deque.cc
 	core/test_array_set.cc
+ 	core/test_auto.cc
+	core/test_bits.cc
+	core/test_dynamic_array.cc
+	core/test_format.cc
+	core/test_map.cc
+	core/test_range.cc
+	core/test_span.cc
+	core/test_util.cc
+	core/test_zip.cc
 	sim/test_integration.cc
+	geom/test_aabb.cc
+	geom/test_buffer.cc
+	geom/test_classify.cc
+	geom/test_convex_hull.cc
+	geom/test_is_valid.cc
 	test_vector.cc
-	test_aabb.cc
-	test_aabb.cc
-	test_classify.cc
-	test_is_valid.cc
 	test_transform.cc
 	test_solid_bsp_tree.cc
 	test_properties.cc
 	test_generators.cc
-	test_convex_hull.cc
-	test_buffer.cc
 	test_shape.cc
 	test_primitives.cc
 	test_tesselate.cc

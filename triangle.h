@@ -1,7 +1,7 @@
 #pragma once
 #include "segment.h"
 #include <core/range.h>
-#include "edges.h"
+#include <geom/edges.h>
 #include <core/align_alloc.h>
 #include <core/auto.h>
 

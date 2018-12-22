@@ -1,4 +1,4 @@
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/util.h>
 
 /*pair<int4, int4> compute_aabb(cspan<int4> vectors) {

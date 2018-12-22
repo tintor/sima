@@ -4,7 +4,7 @@
 #include "triangle.h"
 #include "solid_bsp_tree.h"
 #include "transform.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 
 // Shape is 3d solid, immutable, purely geometric and with origin in center of mass
 struct Shape {

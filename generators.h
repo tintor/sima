@@ -2,7 +2,7 @@
 
 #include "mesh.h"
 #include "polygon.h"
-#include "convex_hull.h"
+#include <geom/convex_hull.h>
 #include "primitives.h"
 
 mesh3 generate_box(double4 size);

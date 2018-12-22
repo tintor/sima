@@ -1,5 +1,5 @@
 #include "solid_bsp_tree.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/util.h>
 #include "properties.h"
 #include <core/exception.h>

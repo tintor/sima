@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/format.h>
 #include <core/util.h>
 #include <random>

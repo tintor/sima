@@ -1,5 +1,5 @@
 #include "project.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/exception.h>
 
 ray2 Project(const ray3& s, int axis) {

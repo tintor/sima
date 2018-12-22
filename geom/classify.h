@@ -2,7 +2,7 @@
 #include "mesh.h"
 #include "segment.h"
 #include "plane.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include "polygon.h"
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }

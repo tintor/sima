@@ -1,7 +1,7 @@
-#include "convex_hull.h"
-#include "is_valid.h"
+#include <geom/convex_hull.h>
+#include <geom/is_valid.h>
 #include "properties.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include <core/util.h>
 #include "primitives.h"
 #include <core/exception.h>

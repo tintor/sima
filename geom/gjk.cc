@@ -1,5 +1,5 @@
-#include "gjk.h"
-#include "buffer.h"
+#include <geom/gjk.h>
+#include <geom/buffer.h>
 #include "pose.h"
 #include <core/range.h>
 

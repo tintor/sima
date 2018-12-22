@@ -1,8 +1,8 @@
 #include "solid_bsp_tree.h"
 #include "mesh_import.h"
-#include "is_valid.h"
+#include <geom/is_valid.h>
 #include "properties.h"
-#include "convex_hull.h"
+#include <geom/convex_hull.h>
 #include "catch.hpp"
 #include <core/timestamp.h>
 

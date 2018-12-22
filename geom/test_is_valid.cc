@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "is_valid.h"
+#include <geom/is_valid.h>
 #include <core/string_util.h>
 
 bool is_valid2(string_view text) {

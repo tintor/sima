@@ -1,5 +1,5 @@
-#include "convex_hull.h"
-#include "is_valid.h"
+#include <geom/convex_hull.h>
+#include <geom/is_valid.h>
 #include <core/zip.h>
 #include "properties.h"
 #include "generators.h"
@@ -7,7 +7,6 @@
 #include <iostream>
 #include <algorithm>
 #include "mesh_import.h"
-#include "is_valid.h"
 #include <core/timestamp.h>
 
 using poly_mesh3 = vector<polygon3>;

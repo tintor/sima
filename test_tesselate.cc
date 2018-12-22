@@ -2,7 +2,7 @@
 #include "catch.hpp"
 #include <core/range.h>
 #include <core/string_util.h>
-#include "is_valid.h"
+#include <geom/is_valid.h>
 #include <core/file.h>
 #include <random>
 #include <fstream>

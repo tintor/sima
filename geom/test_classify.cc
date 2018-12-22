@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "classify.h"
+#include <geom/classify.h>
 #include "primitives.h"
 
 TEST_CASE("Sign(segment2, double2)", "[classify]") {

@@ -1,6 +1,6 @@
 #include <Eigen/Dense>
 #include "properties.h"
-#include "aabb.h"
+#include <geom/aabb.h>
 #include "primitives.h"
 
 double SignedTriangleVolume6(double4 a, double4 b, double4 c) {

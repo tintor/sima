@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "buffer.h"
+#include <geom/buffer.h>
 #include <core/range.h>
 #include "polygon.h"
 #include "properties.h"

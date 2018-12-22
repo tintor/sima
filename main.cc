@@ -30,7 +30,7 @@
 #include <sim/integration.h>
 #include <core/util.h>
 #include <view/glm.h>
-#include "classify.h"
+#include <geom/classify.h>
 #include "triangle.h"
 #include "properties.h"
 
