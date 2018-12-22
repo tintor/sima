@@ -387,8 +387,12 @@ void format_s(string& s, string_view fmt, Args... args) {
 		}
 		auto q = p;
 		while (true) {
-			if (p == e)
-				throw std::runtime_error("format: unterminated %");
+			if (p == e) {
+				string m = "format: unterminated % in [";
+				m += fmt;
+				m += ']';
+				throw std::runtime_error(m);
+			}
 			c = *p++;
 			if (c == '%' && p - q == 1) {
 				s += '%';
