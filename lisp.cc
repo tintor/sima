@@ -1,20 +1,23 @@
 #include <lisp.h>
+#include <core/auto.h>
 #include <core/range.h>
 #include <core/format.h>
 #include <core/exception.h>
 
-static bool is_cent(string_view s) {
-	if (s.size() > 0 && s[0] == '-')
+static bool is_integer(string_view s) {
+	if (s.size() > 0 && (s[0] == '-' || s[0] == '+'))
 		s = s.substr(1);
 	if (s.empty())
 		return false;
+	if (s[0] == '0')
+		return s.size() == 1;
 	for (char c : s)
 		if (c < '0' || c > '9')
 			return false;
 	return true;
 }
 
-static cent parse_cent(string_view s) {
+static long parse_long(string_view s) {
 	cent a = 0;
 	int i = 0;
 	if (s[0] == '-') {
@@ -26,6 +29,8 @@ static cent parse_cent(string_view s) {
 		}
 		a = -a;
 	} else {
+		if (s[0] == '+')
+			i += 1;
 		while (i < s.size()) {
 			char c = s[i];
 			a = a * 10 + c - '0';
@@ -36,15 +41,23 @@ static cent parse_cent(string_view s) {
 }
 
 struct Node;
-static unordered_map<string_view, const Node*> g_symbols;
+
+unordered_map<string_view, const Node*> g_keywords;
+
+struct Context {
+	unordered_map<string_view, const Node*> symbols;
+	unordered_map<const Node*, const Node*> variables;
+};
+
+static Context* g_context = nullptr;
 
 enum class Type : uint8_t {
-	None=0, List, Keyword, Symbol, Integer, Decimal, String
+	List, Keyword, Symbol, /*Int128,*/ String
 };
 
 struct Node {
 private:
-	Type _type = Type::None;
+	Type _type;
 	uint _size = 0;
 	void* _data = nullptr; // TODO allocate memory inline
 
@@ -63,39 +76,33 @@ private:
 		return n;
 	}
 
-	const Node* get(uint index) const {
-		ASSERT_ALWAYS(is_list());
-		ASSERT_ALWAYS(index < _size);
-		const Node** data = (const Node**) _data;
-		return data[index];
-	}
-
 	void set(uint index, const Node* n) {
-		ASSERT_ALWAYS(is_list());
-		ASSERT_ALWAYS(index < _size);
 		const Node** data = (const Node**) _data;
 		data[index] = n;
 	}
 
 public:
-	static const Node* symbol(string_view a, bool reserved = true) {
-		auto it = g_symbols.find(a);
-		if (it != g_symbols.end())
+	static const Node* keyword(string_view a) {
+		Node* n = alloc_raw(a.size());
+		n->_type = Type::Keyword;
+		memcpy(n->_data, a.data(), a.size());
+		g_keywords.insert({n->symbol(), n});
+		return n;
+	}
+
+	static const Node* symbol(string_view a) {
+		auto it = g_context->symbols.find(a);
+		if (it != g_context->symbols.end())
 			return it->second;
 
 		Node* n = alloc_raw(a.size());
-		n->_type = reserved ? Type::Keyword : Type::Symbol;
+		n->_type = Type::Symbol;
 		memcpy(n->_data, a.data(), a.size());
-		g_symbols.insert({n->symbol(), n});
+		g_context->symbols.insert({n->symbol(), n});
 		return n;
 	}
 
-	static const Node* integer(cent a) {
-		Node* n = alloc_raw(sizeof(a));
-		n->_type = Type::Integer;
-		memcpy(n->_data, &a, sizeof(a));
-		return n;
-	}
+	static const Node* integer(long a);
 
 	static const Node* str(string_view a) {
 		Node* n = alloc_raw(a.size());
@@ -103,8 +110,6 @@ public:
 		memcpy(n->_data, a.data(), a.size());
 		return n;
 	}
-
-	static const Node* list() { return alloc_list(0); }
 
 	static const Node* list(string_view a, string_view b) {
 		auto n = alloc_list(2);
@@ -145,6 +150,7 @@ public:
 
 	static const Node* list(span<const Node*> elements) {
 		auto n = alloc_list(elements.size());
+		// TODO memcpy
 		for (uint i : range(elements.size()))
 			n->set(i, elements[i]);
 		return n;
@@ -152,121 +158,121 @@ public:
 
 	static const Node* list(std::initializer_list<const Node*> elements) {
 		auto n = alloc_list(elements.size());
+		// TODO memcpy
 		for (uint i : range(elements.size()))
 			n->set(i, elements.begin()[i]);
 		return n;
 	}
 
-	bool is_symbol() const {
-		return _type == Type::Keyword || _type == Type::Symbol;
-	}
-	bool is_strict_symbol() const {
-		return _type == Type::Symbol;
-	}
-	bool is_keyword() const {
-		return _type == Type::Keyword;
-	}
-	string_view symbol() const {
-		ASSERT_ALWAYS(is_strict_symbol() || is_keyword());
-		const char* atom = (const char*) _data;
-		return string_view(atom, _size);
-	}
+	auto type() const { return _type; }
 
-	bool is_integer() const {
-		return _type == Type::Integer;
-	}
-	cent integer() const {
-		ASSERT_ALWAYS(is_integer());
-		return *(cent*)_data;
-	}
+	bool is_symbol() const { return _type == Type::Symbol; }
+	bool is_keyword() const { return _type == Type::Keyword; }
+	string_view symbol() const { return string_view((const char*)_data, _size); }
 
-	bool is_string() const {
-		return _type == Type::String;
-	}
-	string_view str() const {
-		ASSERT_ALWAYS(is_string());
-		const char* atom = (const char*) _data;
-		return string_view(atom, _size);
-	}
+	bool is_integer() const { return reinterpret_cast<long>(this) & 1; }
+	long integer() const { return reinterpret_cast<long>(this) >> 1; }
 
-	bool is_list() const {
-		return _type == Type::List;
-	}
-	uint size() const {
-		ASSERT_ALWAYS(is_list());
-		return _size;
-	}
-	const Node* first() const {
-		ASSERT_ALWAYS(is_list());
-		ASSERT_ALWAYS(size() > 0);
-		const Node** data = (const Node**) _data;
-		return data[0];
-	}
+	bool is_string() const { return _type == Type::String; }
+	string_view str() const { return string_view((const char*)_data, _size); }
+
+	bool is_list() const { return _type == Type::List; }
+	uint size() const { return _size; }
+	const Node* first() const { return *(const Node**) _data; }
 	auto elements() const {
-		ASSERT_ALWAYS(is_list());
-		const Node** data = (const Node**) _data;
-		return span<const Node*>(data, _size);
+		return span<const Node*>((const Node**)_data, _size);
 	}
 	auto args() const {
-		ASSERT_ALWAYS(size() > 0);
-		return elements().pop_front();
+		const Node** data = (const Node**) _data;
+		return span<const Node*>(data + 1, _size - 1);
 	}
+	const Node* get(uint index) const { return ((const Node**)_data)[index]; }
 };
 
-const Node* NUMBER = Node::symbol("#");
+#define K(N, S) const Node* N = Node::keyword(#S);
+K(NUMBER, #)
+K(ERROR, error)
+K(DEF, def)
 
-const Node* ERROR = Node::symbol("error");
-const Node* DEF = Node::symbol("def");
 
-const Node* TRUE = Node::symbol("true");
-const Node* FALSE = Node::symbol("false");
-const Node* AND = Node::symbol("and");
-const Node* OR = Node::symbol("or");
-const Node* NOT = Node::symbol("not");
+K(TRUE, true)
+K(FALSE, false)
+K(AND, and)
+K(OR, or)
+K(NOT, not)
 
-const Node* AMP = Node::symbol("&");
-const Node* PIPE = Node::symbol("|");
-const Node* CAPPA = Node::symbol("^");
-const Node* TILDA = Node::symbol("~");
+K(AMP, &)
+K(PIPE, |)
+K(CAPPA, ^)
+K(TILDA, ~)
 
-const Node* PLUS = Node::symbol("+");
-const Node* PLUS_EQUAL = Node::symbol("+=");
-const Node* MINUS = Node::symbol("-");
-const Node* MINUS_EQUAL = Node::symbol("-=");
-const Node* STAR = Node::symbol("*");
-const Node* STAR_EQUAL = Node::symbol("*=");
-const Node* DIV_DIV = Node::symbol("//");
-const Node* DIV_DIV_EQUAL = Node::symbol("//=");
-const Node* DIV = Node::symbol("/");
-const Node* DIV_EQUAL = Node::symbol("/=");
-const Node* PERCENT = Node::symbol("%");
-const Node* PERCENT_EQUAL = Node::symbol("%=");
+K(EQUAL, =)
+K(PLUS, +)
+K(PLUS_EQUAL, +=)
+K(MINUS, -)
+K(MINUS_EQUAL, -=)
+K(STAR, *)
+K(STAR_EQUAL, *=)
+K(DIV, /)
+K(DIV_EQUAL, /=)
+K(PERCENT, %)
+K(PERCENT_EQUAL, %=)
 
-const Node* LESS_LESS = Node::symbol("<<");
-const Node* GREATER_GREATER = Node::symbol(">>");
+K(LESS_LESS, <<)
+K(GREATER_GREATER, >>)
 
-const Node* IF = Node::symbol("if");
-const Node* WHILE = Node::symbol("while");
-const Node* BREAK = Node::symbol("break");
-const Node* CONTINUE = Node::symbol("continue");
+K(IF, if)
+K(WHILE, while)
+K(BREAK, break)
+K(CONTINUE, continue)
 
-const Node* LESS = Node::symbol("<");
-const Node* LESS_EQUAL = Node::symbol("<=");
-const Node* GREATER = Node::symbol(">");
-const Node* GREATER_EQUAL = Node::symbol(">=");
-const Node* EQUAL_EQUAL = Node::symbol("==");
-const Node* NOT_EQUAL = Node::symbol("!=");
+K(LESS, <)
+K(LESS_EQUAL, <=)
+K(GREATER, >)
+K(GREATER_EQUAL, >=)
+K(EQUAL_EQUAL, ==)
+K(NOT_EQUAL, !=)
+K(EQUAL_EQUAL_EQUAL, ===)
 
-const Node* PRINT = Node::symbol("print");
-const Node* PRINTLN = Node::symbol("println");
-const Node* EQUAL = Node::symbol("=");
+K(PRINT, print)
+K(PRINTLN, println)
+K(PARSE, parse)
+K(EVAL, eval)
+K(SIZE, size)
 
-const Node* N_EMPTY = Node::list(); // TODO make all empty lists return the same pointer
+const Node* DIV_DIV = Node::keyword("//");
+const Node* DIV_DIV_EQUAL = Node::keyword("//=");
+const Node* EMPTY = Node::keyword("()");
+const Node* QUOTE = Node::keyword("'");
+#undef K
+
 const Node* N_BREAK = Node::list(ERROR, BREAK);
 const Node* N_CONTINUE = Node::list(ERROR, CONTINUE);
 
+#define FAIL(...) return Node::list(ERROR, ##__VA_ARGS__)
+
+const Node* Node::integer(long a) {
+	constexpr long inline_max = numeric_limits<long>::max() >> 1;
+	constexpr long inline_min = numeric_limits<long>::min() >> 1;
+	if (a < inline_min || a > inline_max)
+		FAIL("integer overflow");
+	long v = (a << 1) | 1;
+	return reinterpret_cast<const Node*>(v);
+}
+
 static bool space(char c) { return c == ' ' || c == '\t' || c == '\n'; }
 
+static const Node* token_to_node(string_view s) {
+	if (is_integer(s))
+		// TODO return error if s can't fit into inline long
+		return Node::integer(parse_long(s));
+	auto it = g_keywords.find(s);
+	if (it != g_keywords.end())
+		return it->second;
+	return Node::symbol(s);
+}
+
+// TODO line no and column for syntax error
 static const Node* parse(string_view code) {
 	int p = 0;
 	vector<const Node*> stack = {};
@@ -283,13 +289,11 @@ static const Node* parse(string_view code) {
 			continue;
 		}
 		if (c == ')') {
-			if (size.size() == 1) {
-				print("unexpected ')'\n");
-				return nullptr;
-			}
+			if (size.size() == 1)
+				FAIL("syntax: unexpected ')'");
 			uint s = size.back();
 			size.pop_back();
-			const Node* n = Node::list(span<const Node*>(stack.data() + stack.size() - s, s));
+			const Node* n = (s == 0) ? EMPTY : Node::list(span<const Node*>(stack.data() + stack.size() - s, s));
 			stack.resize(stack.size() - s);
 
 			stack.push_back(n);
@@ -302,10 +306,8 @@ static const Node* parse(string_view code) {
 			int s = p;
 			while (p < code.size() && code[p] != '"')
 				p += 1;
-			if (p == code.size()) {
-				print("unterminated quote\n");
-				return nullptr;
-			}
+			if (p == code.size())
+				FAIL("syntax: unterminated quote");
 			const Node* n = Node::str(code.substr(s, p - s));
 			stack.push_back(n);
 			size.back() += 1;
@@ -316,23 +318,23 @@ static const Node* parse(string_view code) {
 		int s = p;
 		while (p < code.size() && !space(code[p]) && code[p] != '(' && code[p] != ')')
 			p += 1;
-		string_view ss = code.substr(s, p - s);
-		const Node* n = is_cent(ss) ? Node::integer(parse_cent(ss)) : Node::symbol(ss, false);
-		stack.push_back(n);
+		stack.push_back(token_to_node(code.substr(s, p - s)));
 		size.back() += 1;
 	}
-	if (size.size() != 1) {
-		print("unterminated list\n");
-		return nullptr;
-	}
-	return Node::list(span<const Node*>(stack.data(), stack.size()));
+	if (size.size() != 1)
+		FAIL("syntax: unterminated list");
+	if (stack.size() == 0)
+		FAIL("syntax: empty");
+	if (stack.size() > 1)
+		FAIL("syntax: only one top level expression expected");
+	return stack[0];
 }
 
 int length(const Node* n) {
 	ASSERT_ALWAYS(n != nullptr);
 	if (n->is_integer()) {
 		int s = 0;
-		cent c = n->integer();
+		long c = n->integer();
 		if (c <= 0) {
 			s += 1;
 			c = -c;
@@ -350,7 +352,7 @@ int length(const Node* n) {
 				s += 1;
 		return s + 2 + n->str().size();
 	}
-	if (n->is_strict_symbol() || n->is_keyword())
+	if (n->is_symbol() || n->is_keyword())
 		return n->symbol().size();
 
 	ASSERT_ALWAYS(n->is_list());
@@ -368,7 +370,7 @@ void format_e(string& s, string_view spec, const Node* n) {
 		format_e(s, "%s", n->integer());
 		return;
 	}
-	if (n->is_strict_symbol() || n->is_keyword()) {
+	if (n->is_symbol() || n->is_keyword()) {
 		s += n->symbol();
 		return;
 	}
@@ -422,26 +424,48 @@ void format_e(string& s, string_view spec, const Node* n) {
 	s += ")";
 }
 
-static unordered_map<const Node*, const Node*> g_variables;
-
 static bool is_error(const Node* e) {
 	return e->is_list() && e->size() > 0 && e->elements()[0] == ERROR;
 }
 
 static const Node* eval(const Node* n);
 
-#define FAIL(...) return Node::list(ERROR, ##__VA_ARGS__)
+template<typename Int>
+inline bool add_overflow(Int a, Int b) {
+	if (b >= 0)
+		return numeric_limits<Int>::max() - b < a;
+	return a < numeric_limits<Int>::min() - b;
+}
 
 const Node* eval_plus(span<const Node*> args) {
-	if (args.size() < 2)
-		FAIL("(+) min 2 args");
+	if (args.size() == 2) {
+		const Node* a = eval(args[0]);
+		const Node* b = eval(args[1]);
+		if (a->is_integer() && b->is_integer()) {
+			long av = a->integer();
+			long bv = b->integer();
+			if (add_overflow(av, bv))
+				return Node::integer(cent(av) + cent(bv));
+			return Node::integer(av + bv);
+		}
+		if (!a->is_integer() && is_error(a))
+			return a;
+		if (!b->is_integer() && is_error(b))
+			return b;
+	}
+	if (args.size() == 0)
+		FAIL("(+) min 1 arg");
+	if (args.size() == 1)
+		return eval(args[0]);
+
 	cent acc = 0;
 	for (const Node* e : args) {
 		e = eval(e);
-		if (is_error(e))
-			return e;
-		if (!e->is_integer())
+		if (!e->is_integer()) {
+			if (is_error(e))
+				return e;
 			FAIL("(+) arg not int", e);
+		}
 		acc += e->integer();
 	}
 	return Node::integer(acc);
@@ -452,17 +476,18 @@ const Node* eval_plus_equal(span<const Node*> args) {
 		FAIL("(+=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (a->is_integer() || !a->is_symbol())
 		FAIL("(+=) lhs must be symbol", a);
-	auto it = g_variables.find(a);
-	if (it == g_variables.end())
+	auto it = g_context->variables.find(a);
+	if (it == g_context->variables.end())
 		FAIL("(+=) symbol not defined", a);
 	auto& av = it->second;
 	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
+	if (!b->is_integer()) {
+		if (is_error(b))
+			return b;
 		FAIL("(+=) arg not int", b);
+	}
 	b = Node::integer(av->integer() + b->integer());
 	av = b;
 	return b;
@@ -471,25 +496,28 @@ const Node* eval_plus_equal(span<const Node*> args) {
 const Node* eval_minus(span<const Node*> args) {
 	if (args.size() == 1) {
 		auto a = eval(args[0]);
-		if (is_error(a))
-			return a;
-		if (!a->is_integer())
+		if (!a->is_integer()) {
+			if (is_error(a))
+				return a;
 			FAIL("(-) arg not int", a);
+		}
 		return Node::integer(-a->integer());
 	}
 
 	if (args.size() == 2) {
 		auto a = eval(args[0]);
-		if (is_error(a))
-			return a;
-		if (!a->is_integer())
+		if (!a->is_integer()) {
+			if (is_error(a))
+				return a;
 			FAIL("(-) arg not int", a);
+		}
 
 		auto b = eval(args[1]);
-		if (is_error(b))
-			return b;
-		if (!b->is_integer())
+		if (!b->is_integer()) {
+			if (is_error(b))
+				return b;
 			FAIL("(-) arg not int", b);
+		}
 
 		return Node::integer(a->integer() - b->integer());
 	}
@@ -501,10 +529,10 @@ const Node* eval_minus_equal(span<const Node*> args) {
 		FAIL("(-=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (!a->is_symbol())
 		FAIL("(-=) lhs must be symbol", a);
-	auto it = g_variables.find(a);
-	if (it == g_variables.end())
+	auto it = g_context->variables.find(a);
+	if (it == g_context->variables.end())
 		FAIL("(+=) symbol not defined", a);
 	auto& av = it->second;
 	const Node* b = eval(args[1]);
@@ -522,7 +550,7 @@ const Node* eval_not(span<const Node*> args) {
 		FAIL("(not) exactly 1 arg");
 
 	auto a = eval(args[0]);
-	if (is_error(a))
+	if (!a->is_integer() && is_error(a))
 		return a;
 	if (a == TRUE)
 		return FALSE;
@@ -537,7 +565,7 @@ const Node* eval_and(span<const Node*> args) {
 
 	for (auto e : args) {
 		e = eval(e);
-		if (is_error(e))
+		if (!e->is_integer() && is_error(e))
 			return e;
 		if (e == FALSE)
 			return FALSE;
@@ -553,7 +581,7 @@ const Node* eval_or(span<const Node*> args) {
 
 	for (auto e : args) {
 		e = eval(e);
-		if (is_error(e))
+		if (!e->is_integer() && is_error(e))
 			return e;
 		if (e == TRUE)
 			return TRUE;
@@ -583,10 +611,10 @@ const Node* eval_star_equal(span<const Node*> args) {
 		FAIL("(*=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (!a->is_symbol())
 		FAIL("(*=) lhs must be symbol", a);
-	auto it = g_variables.find(a);
-	if (it == g_variables.end())
+	auto it = g_context->variables.find(a);
+	if (it == g_context->variables.end())
 		FAIL("(*=) symbol not defined", a);
 	auto& av = it->second;
 	const Node* b = eval(args[1]);
@@ -623,10 +651,10 @@ const Node* eval_div_div_equal(span<const Node*> args) {
 		FAIL("(//=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (!a->is_symbol())
 		FAIL("(//=) lhs must be symbol", a);
-	auto it = g_variables.find(a);
-	if (it == g_variables.end())
+	auto it = g_context->variables.find(a);
+	if (it == g_context->variables.end())
 		FAIL("(//=) symbol not defined", a);
 	auto& av = it->second;
 	const Node* b = eval(args[1]);
@@ -663,10 +691,10 @@ const Node* eval_percent_equal(span<const Node*> args) {
 		FAIL("(%=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (!a->is_symbol())
 		FAIL("(%=) lhs must be symbol", a);
-	auto it = g_variables.find(a);
-	if (it == g_variables.end())
+	auto it = g_context->variables.find(a);
+	if (it == g_context->variables.end())
 		FAIL("(%=) symbol not defined", a);
 	auto& av = it->second;
 	const Node* b = eval(args[1]);
@@ -717,119 +745,102 @@ const Node* eval_greater_greater(span<const Node*> args) {
 	return Node::integer(a->integer() >> b->integer());
 }
 
-const Node* eval_less(span<const Node*> args) {
-	if (args.size() != 2)
-		FAIL("(<) exactly 2 args");
+#define COMPARE(OP) \
+	if (args.size() != 2) \
+		FAIL("(" #OP ") exactly 2 args"); \
+	const Node* a = eval(args[0]); \
+	const Node* b = eval(args[1]); \
+	if (a->is_integer() && b->is_integer()) \
+		return a->integer() OP b->integer() ? TRUE : FALSE; \
+	if (!a->is_integer()) { \
+		if (is_error(a)) \
+			return a; \
+		FAIL("(" #OP ") arg not int", a); \
+	} \
+	if (!b->is_integer()) { \
+		if (is_error(b)) \
+			return b; \
+		FAIL("(" #OP ") arg not int", b); \
+	} \
+	THROW(runtime_error);
 
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(<) arg not int", a);
+const Node* eval_less(span<const Node*> args) { COMPARE(<) }
+const Node* eval_less_equal(span<const Node*> args) { COMPARE(<=) }
+const Node* eval_greater(span<const Node*> args) { COMPARE(>) }
+const Node* eval_greater_equal(span<const Node*> args) { COMPARE(>=) }
 
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(<) arg not int", b);
+static bool raw_equal(const Node* a, const Node* b);
 
-	return (a->integer() < b->integer()) ? TRUE : FALSE;
+inline bool equal(const Node* a, const Node* b) {
+	if (a->is_integer())
+		return b->is_integer() && a->integer() == b->integer();
+
+	return !b->is_integer() && raw_equal(a, b);
 }
 
-const Node* eval_less_equal(span<const Node*> args) {
-	if (args.size() != 2)
-		FAIL("(<=) exactly 2 args");
+// assumes a and b are not integers
+static bool raw_equal(const Node* a, const Node* b) {
+	if (a->type() != b->type())
+		return false;
 
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(<=) arg not int", a);
-
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(<=) arg not int", b);
-
-	return (a->integer() <= b->integer()) ? TRUE : FALSE;
+	switch (a->type()) {
+	case Type::String:
+		return a->str() == b->str();
+	case Type::Symbol:
+		return a == b;
+	case Type::Keyword:
+		return a == b;
+	case Type::List:
+		if (a->size() != b->size())
+			return false;
+		for (auto i : range(a->size()))
+			if (!equal(a->get(i), b->get(i)))
+				return false;
+		return true;
+	}
+	THROW(runtime_error);
 }
 
-const Node* eval_greater(span<const Node*> args) {
-	if (args.size() != 2)
-		FAIL("(>) exactly 2 args");
-
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(>) arg not int", a);
-
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(>) arg not int", b);
-
-	return (a->integer() > b->integer()) ? TRUE : FALSE;
-}
-
-const Node* eval_greater_equal(span<const Node*> args) {
-	if (args.size() != 2)
-		FAIL("(>=) exactly 2 args");
-
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(>=) arg not int", a);
-
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(>=) arg not int", b);
-
-	return (a->integer() >= b->integer()) ? TRUE : FALSE;
-}
-
-// TODO compare any type (string, decimal, bool)!
 const Node* eval_equal_equal(span<const Node*> args) {
 	if (args.size() != 2)
 		FAIL("(==) exactly 2 args");
-
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(==) arg not int", a);
-
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(==) arg not int", b);
-
-	return (a->integer() == b->integer()) ? TRUE : FALSE;
+	auto a = eval(args[0]);
+	if (a->is_integer()) {
+		auto b = eval(args[1]);
+		if (b->is_integer())
+			return a->integer() == b->integer() ? TRUE : FALSE;
+		if (is_error(b))
+			return b;
+		return FALSE;
+	} else {
+		if (is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (b->is_integer())
+			return FALSE;
+		return raw_equal(a, b) ? TRUE : FALSE;
+	}
 }
 
 const Node* eval_not_equal(span<const Node*> args) {
 	if (args.size() != 2)
 		FAIL("(!=) exactly 2 args");
-
-	const Node* a = eval(args[0]);
-	if (is_error(a))
-		return a;
-	if (!a->is_integer())
-		FAIL("(!=) arg not int", a);
-
-	const Node* b = eval(args[1]);
-	if (is_error(b))
-		return b;
-	if (!b->is_integer())
-		FAIL("(!=) arg not int", b);
-
-	return (a->integer() != b->integer()) ? TRUE : FALSE;
+	auto a = eval(args[0]);
+	if (a->is_integer()) {
+		auto b = eval(args[1]);
+		if (b->is_integer())
+			return a->integer() != b->integer() ? TRUE : FALSE;
+		if (is_error(b))
+			return b;
+		return FALSE;
+	} else {
+		if (is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (b->is_integer())
+			return FALSE;
+		return !raw_equal(a, b) ? TRUE : FALSE;
+	}
 }
 
 const Node* eval_print(span<const Node*> args, bool endl) {
@@ -844,7 +855,7 @@ const Node* eval_print(span<const Node*> args, bool endl) {
 	}
 	if (endl)
 		print("\n");
-	return N_EMPTY;
+	return EMPTY;
 }
 
 const Node* eval_if(span<const Node*> args) {
@@ -857,7 +868,7 @@ const Node* eval_if(span<const Node*> args) {
 	if (a == FALSE) {
 		if (args.size() == 3)
 			return eval(args[2]);
-		return N_EMPTY;
+		return EMPTY;
 	}
 	if (is_error(a))
 		return a;
@@ -873,32 +884,20 @@ const Node* eval_while(span<const Node*> args) {
 	while (true) {
 		const Node* a = eval(cond);
 		if (a == FALSE)
-			return N_EMPTY;
+			return EMPTY;
 		if (a != TRUE)
 			FAIL("(while) condition not bool", a);
 		// execute body
 		for (auto e : body) {
 			e = eval(e);
 			if (e == N_BREAK)
-				return N_EMPTY;
+				return EMPTY;
 			if (e == N_CONTINUE)
 				break;
-			if (is_error(e))
+			if (!e->is_integer() && is_error(e))
 				return e;
 		}
 	}
-}
-
-const Node* eval_break(span<const Node*> args) {
-	if (args.size() != 0)
-		FAIL("(break) no args");
-	return N_BREAK;
-}
-
-const Node* eval_continue(span<const Node*> args) {
-	if (args.size() != 0)
-		FAIL("(continue) no args");
-	return N_CONTINUE;
 }
 
 const Node* eval_equal(span<const Node*> args) {
@@ -906,12 +905,12 @@ const Node* eval_equal(span<const Node*> args) {
 		FAIL("(=) exactly 2 args");
 
 	const Node* a = args[0];
-	if (!a->is_strict_symbol())
+	if (a->is_integer() || !a->is_symbol())
 		FAIL("(=) lhs must be symbol", a);
 	const Node* b = eval(args[1]);
-	if (is_error(b))
+	if (!b->is_integer() && is_error(b))
 		return b;
-	g_variables[a] = b;
+	g_context->variables[a] = b;
 	return b;
 }
 
@@ -921,19 +920,19 @@ const Node* eval_def(const Node* n) {
 		FAIL("(def) min 2 args");
 
 	const Node* name = args[0];
-	if (!name->is_strict_symbol())
+	if (!name->is_symbol())
 		FAIL("(def) function name must be symbol", name);
-	if (g_variables.count(name) != 0)
+	if (g_context->variables.count(name) != 0)
 		FAIL("(def) function already defined", name);
 
 	const Node* f_args = args[1];
 	if (!f_args->is_list())
 		FAIL("(def) function args must be list of symbols", f_args);
 	for (auto e : f_args->elements())
-	if (!e->is_strict_symbol())
+	if (!e->is_symbol())
 		FAIL("(def) function arg must be symbol", e);
 
-	g_variables[name] = n; // TODO convert to lambda instead
+	g_context->variables[name] = n; // TODO convert to lambda instead
 	return n;
 }
 
@@ -945,43 +944,48 @@ const Node* eval_invoke(const Node* def, span<const Node*> args) {
 	// (check for early return)
 	// restore variables that were overwritten by args
 	// return function result
-	return N_EMPTY;
+	return EMPTY;
 }
 
 static const Node* eval(const Node* n) {
-	if (n->is_string() || n->is_integer() || n == TRUE || n == FALSE)
+	if (n->is_integer() || n->is_string() || n == TRUE || n == FALSE || n == EMPTY)
 		return n;
-	if (n->is_keyword())
+
+	if (n->is_keyword()) {
+		if (n == BREAK)
+			return N_BREAK;
+		if (n == CONTINUE)
+			return N_CONTINUE;
 		FAIL("can't eval keyword", n);
+	}
+
 	if (n->is_symbol()) {
-		auto it = g_variables.find(n);
-		if (it != g_variables.end())
+		auto it = g_context->variables.find(n);
+		if (it != g_context->variables.end())
 			return it->second;
 		FAIL("undefined symbol", n);
 	}
+
 	ASSERT_ALWAYS(n->is_list());
-	// TODO empty list should be a symbol instead to avoid this check
-	if (n->size() == 0)
-		FAIL("list must begin with symbol", n);
 	auto op = n->first();
+	if (op->is_integer() || op->is_string() || op == TRUE || op == FALSE || op == EMPTY)
+		return n;
+
 	// TODO make these symbols into constexpr to be able to use switch
+	auto args = n->args();
 	if (op == EQUAL)
-		return eval_equal(n->args());
+		return eval_equal(args);
 	if (op == NOT)
-		return eval_not(n->args());
+		return eval_not(args);
 	if (op == AND)
-		return eval_and(n->args());
+		return eval_and(args);
 	if (op == OR)
-		return eval_or(n->args());
+		return eval_or(args);
 
 	if (op == IF)
-		return eval_if(n->args());
+		return eval_if(args);
 	if (op == WHILE)
 		return eval_while(n->args());
-	if (op == BREAK)
-		return eval_break(n->args());
-	if (op == CONTINUE)
-		return eval_continue(n->args());
 
 	if (op == PLUS)
 		return eval_plus(n->args());
@@ -1029,18 +1033,83 @@ static const Node* eval(const Node* n) {
 	if (op == DEF)
 		return eval_def(n);
 	if (op == NUMBER)
-		return N_EMPTY;
-
-	if (!op->is_symbol())
-		FAIL("list must begin with symbol", n);
-
-	auto it = g_variables.find(op);
-	if (it != g_variables.end()) {
-		auto d = it->second;
-		if (d->is_list() && d->first() == DEF) {
-			return eval_invoke(d, n->args());
+		return EMPTY;
+	if (op == PARSE) {
+		if (args.size() != 1)
+			FAIL("(parse) exactly 1 arg");
+		auto a = eval(args[0]);
+		if (a->is_integer())
+			FAIL("(parse) arg not string", a);
+		if (is_error(a))
+			return a;
+		return parse(a->str());
+	}
+	if (op == EVAL) {
+		if (args.size() != 1)
+			FAIL("(eval) exactly 1 arg");
+		auto a = eval(args[0]);
+		if (a->is_integer() || is_error(a))
+			return a;
+		return eval(a);
+	}
+	if (op == QUOTE) {
+		if (args.size() == 0)
+			return EMPTY;
+		if (args.size() == 1)
+			return args[0];
+		return Node::list(args);
+	}
+	if (op == ERROR)
+		return n;
+	if (op->is_list()) {
+		auto res = EMPTY;
+		for (auto e : n->elements()) {
+			auto a = eval(e);
+			if (!a->is_integer() && is_error(a))
+				return a;
+			res = a;
 		}
-		FAIL("can't invoke", d);
+		return res;
+	}
+	if (op == EQUAL_EQUAL_EQUAL) {
+		if (args.size() != 2)
+			FAIL("(===) exactly 2 args");
+		auto a = eval(args[0]);
+		if (!a->is_integer() && is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (!b->is_integer() && is_error(b))
+			return b;
+		return a == b ? TRUE : FALSE;
+	}
+	if (op == SIZE) {
+		if (args.size() != 1)
+			FAIL("(size) exactly 1 arg");
+		auto a = eval(args[0]);
+		if (a->is_integer())
+			FAIL("(size) arg not string, symbol or list", a);
+		if (is_error(a))
+			return a;
+		if (a->is_string())
+			return Node::integer(a->str().size());
+		if (a->is_symbol())
+			return Node::integer(a->symbol().size());
+		if (a == EMPTY)
+			return Node::integer(0);
+		if (a->is_list())
+			return Node::integer(a->size());
+		FAIL("(size) arg not string, symbol or list", a);
+	}
+
+	if (op->is_symbol()) {
+		auto it = g_context->variables.find(op);
+		if (it != g_context->variables.end()) {
+			auto d = it->second;
+			if (d->is_list() && d->first() == DEF) {
+				return eval_invoke(d, n->args());
+			}
+			FAIL("can't invoke", d);
+		}
 	}
 
 	FAIL("invalid op", op);
@@ -1049,7 +1118,7 @@ static const Node* eval(const Node* n) {
 static const Node* eval_block(const Node* n) {
 	if (!n->is_list())
 		FAIL("list expected", n);
-	const Node* result = N_EMPTY;
+	const Node* result = EMPTY;
 	for (auto e : n->elements()) {
 		result = eval(e);
 		if (is_error(result))
@@ -1059,48 +1128,47 @@ static const Node* eval_block(const Node* n) {
 }
 
 // TODO escape sequences in strings
-// TODO in operator for maps
-// TODO in operator for lists
-// TODO in operator for strings
-// TODO literal for lists [value value]
-// TODO literal for maps {key value key value}
-// TODO bigint mode for integers
-// TODO big rational type
-// TODO big decimal type
-// TODO hexadecimal literals
-// TODO binary literals
-// TODO unit tests
-// TODO bit operators
-// TODO to_str, to_int, to_real
-// TODO double datatype
 // TODO function call
 // TODO lambda
 // TODO return from function
 // TODO read terminal input
 // TODO read file into string
 // TODO write string into file
-// TODO constants
 // TODO list as data type
-// TODO size of list / string
-// TODO random access operator on list
+// TODO get index on list
+// TODO set index on list
+// TODO (map) (map key value key value)
+// TODO get key on map
+// TODO set key on map
+// TODO in operator for maps
 // TODO string as list
 // TODO operator + += on list
-// TODO push_back, pop_back, pop_front, push_front
+// TODO push_back, pop_back
 // TODO map (struct is just a map of fields and values)
-// TODO break and continue without parenthesises
-// TODO type operator (return type of variable / constant)
+
 // TODO bootstrap!
+
+// TODO multiline strings
 // TODO for each loop
 // TODO memory leaks?
+// TODO type operator (return type of variable / constant)
 // TODO importing public functions from other files
+// TODO pop_front, push_front
+// TODO big integer type
+// TODO big rational type
+// TODO big decimal type
+// TODO hexadecimal / binary literals
+// TODO in operator for lists
+// TODO in operator for strings
+// TODO literal for lists [value value]
+// TODO literal for maps {key value key value}
+// TODO bit operators
+// TODO to_str, to_int, to_real
+// TODO double datatype
+// TODO complex double datatype
+// TODO constants
 
 /*
-int main(int argc, char** argv) {
-	InitSegvHandler();
-
-string_view code = R"END(
-"This is comment"
-(# This is comment)
 (def sum (a b)
 	(+ a b)
 )
@@ -1120,7 +1188,6 @@ string_view code = R"END(
 (println (+ (* 3 4) -7))
 (println (== 0 (+ -4 4)))
 (if (< 3 2) (println "more") (println "less"))
-(+ 1 4)
 (println (- 2))
 (= a 1)
 (= b 2)
@@ -1131,12 +1198,33 @@ string_view code = R"END(
 	(= a b)
 	(= b c)
 )
-)END";
-	const Node* n = parse(code);
-	if (n == nullptr)
-		return 1;
-	print("code: %s\n", n);
-	const Node* e = eval_block(n);
-	print("eval: %s\n", e);
-	return 0;
 }*/
+
+Lisp::Lisp() {
+	m_handle = new Context;
+}
+
+Lisp::~Lisp() {
+	delete reinterpret_cast<Context*>(m_handle);
+}
+
+string Lisp::format(Lisp::node n) {
+	return ::format("%s", reinterpret_cast<const Node*>(n));
+}
+
+Lisp::node Lisp::parse(string_view code) {
+	g_context = reinterpret_cast<Context*>(m_handle);
+	ON_SCOPE_EXIT(g_context = nullptr);
+	auto n = ::parse(code);
+	return reinterpret_cast<Lisp::node>(n);
+}
+
+Lisp::node Lisp::eval(Lisp::node n) {
+	g_context = reinterpret_cast<Context*>(m_handle);
+	ON_SCOPE_EXIT(g_context = nullptr);
+	return reinterpret_cast<Lisp::node>(::eval(reinterpret_cast<const Node*>(n)));
+}
+
+bool Lisp::equal(Lisp::node a, Lisp::node b) {
+	return ::equal(reinterpret_cast<const Node*>(a), reinterpret_cast<const Node*>(b));
+}

@@ -1,20 +1,18 @@
 #pragma once
-#include <core/std.h>
+#include <string_view>
+#include <string>
 
 class Lisp {
 public:
-	using Node = const void*;
+	using node = const int*;
 
-	Node parse(string_view code);
-	Node eval(Node n);
+	Lisp();
+	~Lisp();
 
-	Node parse_block(string_view code);
-	Node eval_block(Node n);
-
-	void format(string& s, Node node);
-
-	bool equal(Node, Node);
-
+	std::string format(node n);
+	node parse(std::string_view code);
+	node eval(node n);
+	static bool equal(node, node);
 private:
 	void* m_handle;
 };
