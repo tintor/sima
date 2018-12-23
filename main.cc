@@ -27,17 +27,72 @@
 
 #include <core/callstack.h>
 #include <core/format.h>
-#include <sim/integration.h>
 #include <core/util.h>
-#include <view/glm.h>
+
+#include <sim/integration.h>
+
 #include <geom/classify.h>
 #include <geom/triangle.h>
 #include <geom/properties.h>
+#include <geom/pose.h>
 
+#include <view/glm.h>
 #include <view/font.h>
 #include <view/window.h>
 #include <view/shader.h>
 #include <view/vertex_buffer.h>
+
+struct Spheres2 {
+	vector<double2> centers;
+	double radius;
+};
+
+struct IContact2 {
+	double2 point; // world coordinates
+	double2 normal; // from b to a
+};
+
+int classify(const Spheres2& sa, Pose2 pa, const Spheres2& sb, Pose2 pb) {
+	bool close = false;
+	const double r = sa.radius + sb.radius;
+	const double high = squared(r + Tolerance);
+	const double low = squared(r - Tolerance);
+
+	for (double2 a : sa.centers) {
+		auto wa = pa.apply(a);
+		for (double2 b : sb.centers) {
+			auto wb = pb.apply(b);
+			double s = squared(wa - wb);
+			if (s < low)
+				return -1;
+			if (s <= high)
+				close = true;
+		}
+	}
+	return close ? 0 : 1;
+}
+
+void get_contacts(const Spheres2& sa, Pose2 pa, const Spheres2& sb, Pose2 pb, vector<IContact2>& contacts) {
+	const double r = sa.radius + sb.radius;
+	const double high = squared(r + Tolerance);
+
+	for (double2 a : sa.centers) {
+		double2 wa = pa.apply(a);
+		for (double2 b : sb.centers) {
+			double2 wb = pb.apply(b);
+			double2 delta = wa - wb;
+			double s = squared(delta);
+			if (s <= high) {
+				IContact2 c;
+				double d = sqrt(s);
+				double t = ((sa.radius - sb.radius) / d + 1) * 0.5;
+				c.point = wa * t + wb * (1 - t);
+				c.normal = delta / d;
+				contacts.push_back(c);
+			}
+		}
+	}
+}
 
 bool gSimulate = false;
 bool gSimulateTick = false;
