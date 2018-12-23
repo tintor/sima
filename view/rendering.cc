@@ -6,7 +6,7 @@
 #include <fstream>
 
 #define LODEPNG_COMPILE_CPP
-#include "lodepng/lodepng.h"
+#include <lodepng/lodepng.h>
 
 void Error(const char* name) {
 	int error = glGetError();

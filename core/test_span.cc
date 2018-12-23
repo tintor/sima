@@ -1,5 +1,5 @@
 #include <core/span.h>
-#include "catch.hpp"
+#include <catch.hpp>
 #include <array>
 
 #include <core/format.h>

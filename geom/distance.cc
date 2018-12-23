@@ -1,10 +1,10 @@
 #include <geom/classify.h>
 #include <core/exception.h>
 #include <geom/edges.h>
-#include "project.h"
-#include "properties.h"
-#include "sphere.h"
-#include "primitives.h"
+#include <geom/project.h>
+#include <geom/properties.h>
+#include <geom/sphere.h>
+#include <geom/primitives.h>
 
 double Distance(sphere s, double4 v) {
 	return max(0.0, length(s.center() - v) - s.radius());

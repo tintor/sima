@@ -1,6 +1,6 @@
 #include <core/zip.h>
 #include <core/std.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 void test_zip(cspan<int> a, cspan<int> b, cspan<pair<int, int>> exp) {
 	vector<pair<int, int>> c;

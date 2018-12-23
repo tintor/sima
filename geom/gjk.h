@@ -1,4 +1,4 @@
-#include "segment.h"
+#include <geom/segment.h>
 
 // 2D
 bool AreConvexHullsIntersecting(cspan<double2> p, cspan<double2> q, double2* axis);

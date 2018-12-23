@@ -1,6 +1,6 @@
 #include <core/util.h>
 #include <core/string_util.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("min", "[util]") {
 	REQUIRE(min(2, 1) == 1);

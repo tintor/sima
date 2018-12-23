@@ -1,6 +1,6 @@
 #pragma once
 #include <core/std.h>
-#include "segment.h"
+#include <geom/segment.h>
 #include <core/each.h>
 #include <core/auto.h>
 #include <type_traits>

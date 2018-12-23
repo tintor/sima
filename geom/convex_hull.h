@@ -1,5 +1,5 @@
 #pragma once
-#include "mesh.h"
+#include <geom/mesh.h>
 #include <core/span.h>
 
 // Is this valid mesh a convex polyhedron?

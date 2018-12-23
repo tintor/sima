@@ -1,6 +1,6 @@
-#include "catch.hpp"
+#include <catch.hpp>
 #include <geom/classify.h>
-#include "primitives.h"
+#include <geom/primitives.h>
 
 TEST_CASE("Sign(segment2, double2)", "[classify]") {
 	segment2 s(double2{2, 0}, double2{1, 0});

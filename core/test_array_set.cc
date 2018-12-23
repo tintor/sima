@@ -1,6 +1,6 @@
 //#include <core/array_set.h>
 #include <core/range.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 /*TEST_CASE("array_set") {
 	array_set<int> a;

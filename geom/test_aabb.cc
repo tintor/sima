@@ -1,4 +1,4 @@
-#include "catch.hpp"
+#include <catch.hpp>
 #include <geom/aabb.h>
 #include <core/format.h>
 #include <core/util.h>

@@ -8,8 +8,10 @@ project(sima)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(prod
+	lisp.cc
 	core/callstack.cc
 	core/file.cc
+	core/timestamp.cc
 	geom/aabb.cc
 	geom/classify.cc
 	geom/convex_hull.cc
@@ -17,21 +19,19 @@ set(prod
 	geom/distance.cc
 	geom/is_valid.cc
 	geom/gjk.cc
-	tesselate.cc
-	transform.cc
-	properties.cc
-	generators.cc
-	solid_bsp_tree.cc
-	shape.cc
-	primitives.cc
-	timestamp.cc
-	mesh_import.cc
-	buffer.cc
-	sphere.cc
-	segment.cc
-	project.cc
-	broadphase.cc
-	lisp.cc
+	geom/sphere.cc
+	geom/tesselate.cc
+	geom/transform.cc
+	geom/properties.cc
+	geom/generators.cc
+	geom/solid_bsp_tree.cc
+	geom/shape.cc
+	geom/primitives.cc
+	geom/mesh_import.cc
+	geom/buffer.cc
+	geom/segment.cc
+	geom/project.cc
+	geom/broadphase.cc
 	lodepng/lodepng.cc)
 
 set(render
@@ -43,6 +43,7 @@ set(render
 
 set(test
 	test.cc
+	test_lisp.cc
 	core/test_array_deque.cc
 	core/test_array_set.cc
  	core/test_auto.cc
@@ -60,18 +61,17 @@ set(test
 	geom/test_classify.cc
 	geom/test_convex_hull.cc
 	geom/test_is_valid.cc
-	test_vector.cc
-	test_transform.cc
-	test_solid_bsp_tree.cc
-	test_properties.cc
-	test_generators.cc
-	test_shape.cc
-	test_primitives.cc
-	test_tesselate.cc
-	test_sphere.cc
-	test_broadphase.cc
-	test_quaternion.cc
-	test_lisp.cc)
+	geom/test_quaternion.cc
+	geom/test_sphere.cc
+	geom/test_tesselate.cc
+	geom/test_vector.cc
+	geom/test_transform.cc
+	geom/test_solid_bsp_tree.cc
+	geom/test_properties.cc
+	geom/test_generators.cc
+	geom/test_shape.cc
+	geom/test_primitives.cc
+	geom/test_broadphase.cc)
 
 add_executable(main main.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})

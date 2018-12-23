@@ -1,4 +1,4 @@
-#include "catch.hpp"
+#include <catch.hpp>
 #include <geom/is_valid.h>
 #include <core/string_util.h>
 

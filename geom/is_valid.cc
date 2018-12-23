@@ -1,11 +1,11 @@
 #include <geom/is_valid.h>
 #include <core/union_find.h>
-#include "properties.h"
+#include <geom/properties.h>
 #include <core/util.h>
 #include <geom/aabb.h>
 #include <core/exception.h>
-#include "primitives.h"
-#include "project.h"
+#include <geom/primitives.h>
+#include <geom/project.h>
 #include <geom/classify.h>
 
 bool IsValidPolygon(cspan<double2> poly) {

@@ -1,6 +1,6 @@
 #include <core/dynamic_array.h>
 #include <core/std.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("dynamic_array") {
 	dynamic_array<int> m;

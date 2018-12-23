@@ -1,8 +1,8 @@
-#include "catch.hpp"
+#include <catch.hpp>
 #include <geom/buffer.h>
 #include <core/range.h>
-#include "polygon.h"
-#include "properties.h"
+#include <geom/polygon.h>
+#include <geom/properties.h>
 
 static double length(cspan<double2> chain) {
 	double m = 0;

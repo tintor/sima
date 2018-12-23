@@ -2,7 +2,7 @@
 #include <core/dynamic_array.h>
 #include <core/bits.h>
 #include <core/range.h>
-#include "catch.hpp"
+#include <catch.hpp>
 #include <functional>
 #include <iostream>
 

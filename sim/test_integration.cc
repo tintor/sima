@@ -1,6 +1,6 @@
 #include <sim/integration.h>
 #include <core/range.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("Numerical integrators") {
 	// differential edquation: y' = y, y(0) = 1

@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_RUNNER
-#include "catch.hpp"
+#include <catch.hpp>
 #include <core/callstack.h>
 #include <core/timestamp.h>
 

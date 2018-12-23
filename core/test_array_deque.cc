@@ -1,6 +1,6 @@
 #include <core/array_deque.h>
 #include <core/range.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("array_deque basic", "[array_deque]") {
 	array_deque<int> deque;

@@ -1,9 +1,9 @@
 #pragma once
-#include "mesh.h"
-#include "segment.h"
-#include "plane.h"
+#include <geom/mesh.h>
+#include <geom/segment.h>
+#include <geom/plane.h>
 #include <geom/aabb.h>
-#include "polygon.h"
+#include <geom/polygon.h>
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }
 inline aabb2 Box(const xpolygon2& p) { return aabb2(p.vertices()).buffer(Tolerance); }

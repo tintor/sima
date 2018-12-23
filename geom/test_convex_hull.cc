@@ -1,12 +1,12 @@
 #include <geom/convex_hull.h>
 #include <geom/is_valid.h>
 #include <core/zip.h>
-#include "properties.h"
-#include "generators.h"
+#include <geom/properties.h>
+#include <geom/generators.h>
 #include <random>
 #include <iostream>
 #include <algorithm>
-#include "mesh_import.h"
+#include <geom/mesh_import.h>
 #include <core/timestamp.h>
 
 using poly_mesh3 = vector<polygon3>;
@@ -20,7 +20,7 @@ inline bool operator==(const poly_mesh3& a, const poly_mesh3& b) {
 	return true;
 }
 
-#include "catch.hpp"
+#include <catch.hpp>
 
 bool less(double4 a, double4 b) {
 	if (a.x != b.x)

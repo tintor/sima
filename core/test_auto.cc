@@ -1,5 +1,5 @@
 #include <core/auto.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("auto") {
 	int a = 1;

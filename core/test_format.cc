@@ -1,6 +1,6 @@
 #include <core/format.h>
 #include <core/int.h>
-#include "catch.hpp"
+#include <catch.hpp>
 #include <iostream>
 
 using namespace std::literals;

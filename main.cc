@@ -31,8 +31,8 @@
 #include <core/util.h>
 #include <view/glm.h>
 #include <geom/classify.h>
-#include "triangle.h"
-#include "properties.h"
+#include <geom/triangle.h>
+#include <geom/properties.h>
 
 #include <view/font.h>
 #include <view/window.h>

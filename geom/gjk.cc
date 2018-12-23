@@ -1,6 +1,6 @@
 #include <geom/gjk.h>
 #include <geom/buffer.h>
-#include "pose.h"
+#include <geom/pose.h>
 #include <core/range.h>
 
 // double ß = 0;

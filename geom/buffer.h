@@ -1,6 +1,6 @@
 #pragma once
 #include <core/std.h>
-#include "vector.h"
+#include <geom/vector.h>
 
 // convex.size() > 0
 // if convex.size() >= 3 it must be oriented counter-clockwise

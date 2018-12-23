@@ -1,6 +1,6 @@
 #pragma once
 #include <core/range.h>
-#include "triangle.h"
+#include <geom/triangle.h>
 #include <core/span.h>
 
 pair<int4, int4> compute_aabb(cspan<int4> vectors);

@@ -1,9 +1,9 @@
 #include <geom/classify.h>
 #include <core/exception.h>
 #include <geom/edges.h>
-#include "project.h"
-#include "properties.h"
-#include "primitives.h"
+#include <geom/project.h>
+#include <geom/properties.h>
+#include <geom/primitives.h>
 
 int Classify(const xpolygon2& f, ray2 s) {
 	THROW(not_implemented);

@@ -1,9 +1,9 @@
 #include <geom/convex_hull.h>
 #include <geom/is_valid.h>
-#include "properties.h"
+#include <geom/properties.h>
 #include <geom/aabb.h>
 #include <core/util.h>
-#include "primitives.h"
+#include <geom/primitives.h>
 #include <core/exception.h>
 
 bool is_convex(cspan<triangle3> mesh) {

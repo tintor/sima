@@ -1,6 +1,6 @@
 #pragma once
-#include "mesh.h"
-#include "polygon.h"
+#include <geom/mesh.h>
+#include <geom/polygon.h>
 #include <core/format.h>
 
 bool IsValidPolygon(cspan<double2> poly);

@@ -1,5 +1,5 @@
 #include <core/range.h>
-#include "catch.hpp"
+#include <catch.hpp>
 
 TEST_CASE("range format") {
 	REQUIRE(format("%s", range(5)) == "range(5)");
