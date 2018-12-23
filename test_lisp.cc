@@ -123,6 +123,28 @@ false		false
 (size (' z))	1
 (size (' xyz))	3
 (size (parse "(4 5 6 7)"))	4
+
+(size (map))				0
+(size (map "a" 1))			1
+(size (map "a" 1 "b" 2))	2
+
+(in 10 (map 10 1))		true
+(in 20 (map 10 1))		false
+
+(in "a" (map "a" 1))	true
+(in "b" (map "a" 1))	false
+
+(get (10 20 30) -1)		()
+(get (10 20 30) 0)		10
+(get (10 20 30) 1)		20
+(get (10 20 30) 2)		30
+(get (10 20 30) 3)		()
+
+(get (map "a" 1) "a")	1
+(get (map "a" 1) "b")	()
+
+((= m (map)) (set m "a" 4) (set m "b" 3) (get m "a"))			4
+((= m (map)) (set m "a" 4) (set m "a" 3) (+ (get m "a") 10))	13
 )""");
 }
 
@@ -141,4 +163,14 @@ static string eval(string_view s) {
 	Lisp lisp;
 	auto a = lisp.eval(lisp.parse(s));
 	return lisp.format(a);
+}
+
+TEST_CASE("lisp format", "[lisp]") {
+	REQUIRE(eval("(map)") == "(map)");
+	REQUIRE(eval("(map 7 10)") == "(map 7 10)");
+	auto s = eval("(map 3 4 () -2)");
+	REQUIRE((s == "(map 3 4 () -2)" || s == "(map () -2 3 4)"));
+
+	REQUIRE(eval("((= m (1 2 3)) (set m 0 10) m)") == "(10 2 3)");
+	REQUIRE(eval("((= m (1 2 3)) (set m -1 40) m)") == "(error \"(set) index out of bounds\" -1)");
 }

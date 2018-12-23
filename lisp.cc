@@ -51,9 +51,26 @@ struct Context {
 
 static Context* g_context = nullptr;
 
+bool equal(const Node*, const Node*);
+size_t hash(const Node*);
+
 enum class Type : uint8_t {
-	List, Keyword, Symbol, /*Int128,*/ String
+	List, Keyword, Symbol, String, Map
 };
+
+struct MapHash {
+	auto operator ()(const Node* a) const {
+		return hash(a);
+	}
+};
+
+struct MapEqual {
+	bool operator ()(const Node* a, const Node* b) const {
+		return equal(a, b);
+	}
+};
+
+using Map = unordered_map<const Node*, const Node*, MapHash, MapEqual>;
 
 struct Node {
 private:
@@ -74,11 +91,6 @@ private:
 		n->_size = size;
 		n->_data = malloc(size * 8);
 		return n;
-	}
-
-	void set(uint index, const Node* n) {
-		const Node** data = (const Node**) _data;
-		data[index] = n;
 	}
 
 public:
@@ -187,6 +199,20 @@ public:
 		return span<const Node*>(data + 1, _size - 1);
 	}
 	const Node* get(uint index) const { return ((const Node**)_data)[index]; }
+	void set(uint index, const Node* n) {
+		const Node** data = (const Node**) _data;
+		data[index] = n;
+	}
+
+	// Map
+	static const Node* make_map() {
+		Node* n = alloc_raw(sizeof(Map));
+		n->_type = Type::Map;
+		new(n->_data) Map();
+		return n;
+	}
+	bool is_map() const { return _type == Type::Map; }
+	const Map* map() const { return reinterpret_cast<const Map*>(_data); }
 };
 
 #define K(N, S) const Node* N = Node::keyword(#S);
@@ -239,6 +265,10 @@ K(PRINTLN, println)
 K(PARSE, parse)
 K(EVAL, eval)
 K(SIZE, size)
+K(MAP, map)
+K(IN, in)
+K(GET, get)
+K(SET, set)
 
 const Node* DIV_DIV = Node::keyword("//");
 const Node* DIV_DIV_EQUAL = Node::keyword("//=");
@@ -354,6 +384,12 @@ int length(const Node* n) {
 	}
 	if (n->is_symbol() || n->is_keyword())
 		return n->symbol().size();
+	if (n->is_map()) {
+		int s = 0;
+		for (const auto& p : *n->map())
+			s += length(p.first) + length(p.second);
+		return s + 5 + n->map()->size() * 2;
+	}
 
 	ASSERT_ALWAYS(n->is_list());
 	if (n->size() == 0)
@@ -364,28 +400,20 @@ int length(const Node* n) {
 	return s + 1 + n->size();
 }
 
-void format_e(string& s, string_view spec, const Node* n) {
-	ASSERT_ALWAYS(n != nullptr);
-	if (n->is_integer()) {
-		format_e(s, "%s", n->integer());
-		return;
-	}
-	if (n->is_symbol() || n->is_keyword()) {
-		s += n->symbol();
-		return;
-	}
-	if (n->is_string()) {
-		s += '"';
-		for (char c : n->str()) {
-			if (c == '"' || c == '\\')
-				s += '\\';
-			s += c;
-		}
-		s += '"';
-		return;
-	}
-	ASSERT_ALWAYS(n->is_list());
+void format_e(string& s, string_view spec, const Node* n);
 
+void format_map(string& s, string_view spec, const Map& m) {
+	s += "(map";
+	for (const auto& p : m) {
+		s += ' ';
+		format_e(s, spec, p.first);
+		s += ' ';
+		format_e(s, spec, p.second);
+	}
+	s += ')';
+}
+
+void format_list(string& s, string_view spec, const Node* n) {
 	if (length(n) <= 120) {
 		s += '(';
 		bool first = true;
@@ -422,6 +450,35 @@ void format_e(string& s, string_view spec, const Node* n) {
 	for (int i : range(s_depth * 2))
 		s += ' ';
 	s += ")";
+}
+
+void format_e(string& s, string_view spec, const Node* n) {
+	ASSERT_ALWAYS(n != nullptr);
+	if (n->is_integer()) {
+		format_e(s, "%s", n->integer());
+		return;
+	}
+	switch (n->type()) {
+	case Type::Symbol:
+	case Type::Keyword:
+		s += n->symbol();
+		return;
+	case Type::String:
+		s += '"';
+		for (char c : n->str()) {
+			if (c == '"' || c == '\\')
+				s += '\\';
+			s += c;
+		}
+		s += '"';
+		return;
+	case Type::Map:
+		format_map(s, spec, *n->map());
+		return;
+	case Type::List:
+		format_list(s, spec, n);
+		return;
+	}
 }
 
 static bool is_error(const Node* e) {
@@ -771,11 +828,45 @@ const Node* eval_greater_equal(span<const Node*> args) { COMPARE(>=) }
 
 static bool raw_equal(const Node* a, const Node* b);
 
-inline bool equal(const Node* a, const Node* b) {
+size_t hash(const Node* a) {
 	if (a->is_integer())
-		return b->is_integer() && a->integer() == b->integer();
+		return a->integer();
 
-	return !b->is_integer() && raw_equal(a, b);
+	size_t h = 0;
+	switch (a->type()) {
+	case Type::String:
+		return a->str().size(); // TODO horible!
+	case Type::Symbol:
+	case Type::Keyword:
+		return reinterpret_cast<size_t>(a);
+	case Type::Map:
+		for (const auto& p : *a->map())
+			h += hash(p.first) + hash(p.second);
+		return h;
+	case Type::List:
+		for (auto e : a->elements())
+			h += hash(e);
+		return h; // TODO horible!
+	}
+}
+
+bool equal(const Node* a, const Node* b) {
+	if (a == b)
+		return true;
+	if (a->is_integer() || b->is_integer())
+		return false;
+	return raw_equal(a, b);
+}
+
+static bool maps_equal(const Map& a, const Map& b) {
+	if (a.size() != b.size())
+		return false;
+	for (const auto& p : a) {
+		auto q = b.find(p.first);
+		if (q == b.end() || !equal(p.second, q->second))
+			return false;
+	}
+	return true;
 }
 
 // assumes a and b are not integers
@@ -790,6 +881,8 @@ static bool raw_equal(const Node* a, const Node* b) {
 		return a == b;
 	case Type::Keyword:
 		return a == b;
+	case Type::Map:
+		return maps_equal(*a->map(), *b->map());
 	case Type::List:
 		if (a->size() != b->size())
 			return false;
@@ -808,7 +901,7 @@ const Node* eval_equal_equal(span<const Node*> args) {
 	if (a->is_integer()) {
 		auto b = eval(args[1]);
 		if (b->is_integer())
-			return a->integer() == b->integer() ? TRUE : FALSE;
+			return a == b ? TRUE : FALSE;
 		if (is_error(b))
 			return b;
 		return FALSE;
@@ -829,7 +922,7 @@ const Node* eval_not_equal(span<const Node*> args) {
 	if (a->is_integer()) {
 		auto b = eval(args[1]);
 		if (b->is_integer())
-			return a->integer() != b->integer() ? TRUE : FALSE;
+			return a != b ? TRUE : FALSE;
 		if (is_error(b))
 			return b;
 		return FALSE;
@@ -846,12 +939,16 @@ const Node* eval_not_equal(span<const Node*> args) {
 const Node* eval_print(span<const Node*> args, bool endl) {
 	for (auto e : args) {
 		e = eval(e);
+		if (e->is_integer()) {
+			print("%s", e->integer());
+			continue;
+		}
 		if (is_error(e))
 			return e;
 		if (e->is_string())
 			print("%s", e->str());
 		else
-			print("%s", eval(e));
+			print("%s", e);
 	}
 	if (endl)
 		print("\n");
@@ -870,11 +967,12 @@ const Node* eval_if(span<const Node*> args) {
 			return eval(args[2]);
 		return EMPTY;
 	}
-	if (is_error(a))
+	if (!a->is_integer() && is_error(a))
 		return a;
 	FAIL("(if) condition not bool", a);
 }
 
+// TODO return last expression from while's body
 const Node* eval_while(span<const Node*> args) {
 	if (args.size() < 1)
 		FAIL("(while) min 1 arg");
@@ -885,8 +983,11 @@ const Node* eval_while(span<const Node*> args) {
 		const Node* a = eval(cond);
 		if (a == FALSE)
 			return EMPTY;
-		if (a != TRUE)
+		if (a != TRUE) {
+			if (!a->is_integer() && is_error(a))
+				return a;
 			FAIL("(while) condition not bool", a);
+		}
 		// execute body
 		for (auto e : body) {
 			e = eval(e);
@@ -1092,13 +1193,109 @@ static const Node* eval(const Node* n) {
 			return a;
 		if (a->is_string())
 			return Node::integer(a->str().size());
+		if (a->is_map())
+			return Node::integer(a->map()->size());
 		if (a->is_symbol())
 			return Node::integer(a->symbol().size());
 		if (a == EMPTY)
 			return Node::integer(0);
 		if (a->is_list())
 			return Node::integer(a->size());
-		FAIL("(size) arg not string, symbol or list", a);
+		FAIL("(size) arg not string, symbol, list or map", a);
+	}
+	if (op == MAP) {
+		if (args.size() % 2 != 0)
+			FAIL("(map) even numbers of args");
+		auto n = Node::make_map();
+		auto& m = *const_cast<Map*>(n->map());
+		for (auto i : range(args.size() / 2)) {
+			auto k = eval(args[i * 2]);
+			// key can be: list, string, symbol, integer, bool
+			if (!k->is_integer() && is_error(k))
+				return k;
+			auto v = eval(args[i * 2 + 1]);
+			if (!v->is_integer() && is_error(v))
+				return v;
+			m[k] = v;
+		}
+		return n;
+	}
+	if (op == IN) {
+		if (args.size() != 2)
+			FAIL("(in) exactly 2 args");
+		auto a = eval(args[0]);
+		if (!a->is_integer() && is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (b->is_integer())
+			FAIL("(in) second arg must be map", b);
+		if (is_error(b))
+			return b;
+		if (!b->is_map())
+			FAIL("(in) second arg must be map", b);
+
+		return b->map()->count(a) > 0 ? TRUE : FALSE;
+	}
+	if (op == GET) {
+		if (args.size() != 2)
+			FAIL("(get) exactly 2 args");
+
+		auto a = eval(args[0]);
+		if (a->is_integer())
+			FAIL("(get) first arg must be list or map", a);
+		if (is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (!b->is_integer() && is_error(b))
+			return b;
+
+		if (a->is_list()) {
+			if (!b->is_integer())
+				FAIL("(get) second arg must be integer for list", b);
+			long i = b->integer();
+			if (i < 0 || i >= a->size())
+				return EMPTY;
+			return a->get(i);
+		}
+		if (a->is_map()) {
+			auto it = a->map()->find(b);
+			if (it != a->map()->end())
+				return it->second;
+			return EMPTY;
+		}
+		FAIL("(get) first arg must be list or map", a);
+	}
+	if (op == SET) {
+		if (args.size() != 3)
+			FAIL("(set) exactly 3 args");
+
+		auto a = eval(args[0]);
+		if (a->is_integer())
+			FAIL("(set) first arg must be list or map", a);
+		if (is_error(a))
+			return a;
+		auto b = eval(args[1]);
+		if (!b->is_integer() && is_error(b))
+			return b;
+		auto c = eval(args[2]);
+		if (!c->is_integer() && is_error(c))
+			return c;
+
+		if (a->is_list()) {
+			if (!b->is_integer())
+				FAIL("(set) second arg must be integer for list", b);
+			long i = b->integer();
+			if (i < 0 || i >= a->size())
+				FAIL("(set) index out of bounds", b);
+			const_cast<Node*>(a)->set(i, c);
+			return c;
+		}
+		if (a->is_map()) {
+			auto& m = *const_cast<Map*>(a->map());
+			m[b] = c;
+			return c;
+		}
+		FAIL("(set) first arg must be list or map", a);
 	}
 
 	if (op->is_symbol()) {
@@ -1127,78 +1324,43 @@ static const Node* eval_block(const Node* n) {
 	return result;
 }
 
-// TODO escape sequences in strings
-// TODO function call
-// TODO lambda
-// TODO return from function
+// TODO escape sequences in strings \" \\ \n \t
+// TODO function call !!
+// TODO lambda !!
+// TODO closure !!
+// TODO early return from function !!
+// TODO recursion !!
+// TODO macros (not eval-ing function args by default) !!
 // TODO read terminal input
 // TODO read file into string
 // TODO write string into file
-// TODO list as data type
-// TODO get index on list
-// TODO set index on list
-// TODO (map) (map key value key value)
-// TODO get key on map
-// TODO set key on map
-// TODO in operator for maps
-// TODO string as list
-// TODO operator + += on list
-// TODO push_back, pop_back
-// TODO map (struct is just a map of fields and values)
+// TODO get char from string
+// TODO resizeable lists! push_back element, pop_back element, append list to list
+// TODO less parenthesis!
+// TODO infix operators
+// TODO importing public functions from other files -> start working on standard library
+// TODO minimization: move stuff that can be moved to library
+// TODO releasing memory! and catching leaks!
 
 // TODO bootstrap!
 
+// TODO tests for print
 // TODO multiline strings
 // TODO for each loop
-// TODO memory leaks?
 // TODO type operator (return type of variable / constant)
-// TODO importing public functions from other files
 // TODO pop_front, push_front
 // TODO big integer type
 // TODO big rational type
 // TODO big decimal type
 // TODO hexadecimal / binary literals
-// TODO in operator for lists
 // TODO in operator for strings
 // TODO literal for lists [value value]
-// TODO literal for maps {key value key value}
+// TODO literal for maps {key:value key:value}
 // TODO bit operators
 // TODO to_str, to_int, to_real
 // TODO double datatype
 // TODO complex double datatype
 // TODO constants
-
-/*
-(def sum (a b)
-	(+ a b)
-)
-(set a "banana" 0)
-(println "a[banana] = " (get a "banana"))
-(println "(sum 4 5) -> " (sum 4 5))
-(= names (list 1 3 5 7 9))
-(println "names[2] = " (get names 2))
-(for e names
-	(println e)
-)
-(println (and true false))
-(println (and true true))
-(= a (+ 100 20))
-(println a)
-(println "hello world" "!")
-(println (+ (* 3 4) -7))
-(println (== 0 (+ -4 4)))
-(if (< 3 2) (println "more") (println "less"))
-(println (- 2))
-(= a 1)
-(= b 2)
-(while true
-	(if (> a 10000) (break))
-	(println a)
-	(= c (+ a b))
-	(= a b)
-	(= b c)
-)
-}*/
 
 Lisp::Lisp() {
 	m_handle = new Context;
