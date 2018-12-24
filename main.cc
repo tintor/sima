@@ -47,6 +47,15 @@ struct Spheres2 {
 	double radius;
 };
 
+struct Capsule2 {
+	double length;
+	double radius;
+};
+
+struct Box2 {
+	double2 size;
+};
+
 struct IContact2 {
 	double2 point; // world coordinates
 	double2 normal; // from b to a
@@ -92,6 +101,24 @@ void get_contacts(const Spheres2& sa, Pose2 pa, const Spheres2& sb, Pose2 pb, ve
 			}
 		}
 	}
+}
+
+int classify(const Capsule2& sa, Pose2 pa, const Capsule2& sb, Pose2 pb) {
+	// TODO transform to world coordinates and compute distance between line segments in 2d
+	THROW(not_implemented);
+}
+
+void get_contacts(const Capsule2& sa, Pose2 pa, const Capsule2& sb, Pose2 pb, vector<IContact2>& contacts) {
+	THROW(not_implemented);
+}
+
+int classify(const Box2& sa, Pose2 pa, const Box2& sb, Pose2 pb) {
+	// TODO check 4 separating planes
+	THROW(not_implemented);
+}
+
+void get_contacts(const Box2& sa, Pose2 pa, const Box2& sb, Pose2 pb, vector<IContact2>& contacts) {
+	THROW(not_implemented);
 }
 
 bool gSimulate = false;
