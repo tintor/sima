@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <limits>
+#include <random>
 
 using std::regex;
 using std::string;

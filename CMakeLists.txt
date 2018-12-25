@@ -44,6 +44,7 @@ set(render
 set(test
 	test.cc
 	test_lisp.cc
+	test_matrix_multiply.cc
 	core/test_array_deque.cc
 	core/test_array_set.cc
  	core/test_auto.cc
