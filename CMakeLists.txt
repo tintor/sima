@@ -61,6 +61,7 @@ set(test
 	geom/test_buffer.cc
 	geom/test_classify.cc
 	geom/test_convex_hull.cc
+	geom/test_gjk.cc
 	geom/test_is_valid.cc
 	geom/test_quaternion.cc
 	geom/test_sphere.cc

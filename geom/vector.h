@@ -185,6 +185,12 @@ double4 normal4(RND& rnd, double mean, double stdev) {
 	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev)};
 }
 
+template<typename RND>
+double2 uniform_dir2(RND& rnd) {
+	double a = uniform(rnd, 0, 2 * PI);
+	return {cos(a), sin(a)};
+}
+
 // uniform on the unit sphere surface
 template<typename RND>
 double4 uniform_dir3(RND& rnd) { return normalize(normal3v(rnd, 0, 1)); }
