@@ -76,6 +76,8 @@ public:
 	bool has_value() const { return _has_value; }
 	T& operator*() { assert(_has_value); return _value; }
 	T* operator->() { assert(_has_value); return &_value; }
+	const T& operator*() const { assert(_has_value); return _value; }
+	const T* operator->() const { assert(_has_value); return &_value; }
 private:
 	union {
 		T _value;

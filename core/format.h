@@ -97,6 +97,14 @@ inline void format_e(string& s, string_view spec, const pair<A, B>& p) {
 	format_s(s, "(%s %s)", p.first, p.second);
 }
 
+template<typename A>
+inline void format_e(string& s, string_view spec, const optional<A>& p) {
+	if (p.has_value())
+		format_s(s, "%s", *p);
+	else
+		s += "null";
+}
+
 inline void format_e(string& s, string_view spec, const string& v) { s += v; }
 inline void format_e(string& s, string_view spec, string_view v) { s += v; }
 inline void format_e(string& s, string_view spec, const char* v) { s += v ? v : "null"; }
