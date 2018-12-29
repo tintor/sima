@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <new>
 #include <cassert>
+#include <initializer_list>
 
 template<typename T, typename = std::enable_if_t<std::is_scalar<T>::value || std::is_pod<T>::value>>
 class raw_array {
@@ -62,6 +63,7 @@ private:
     T *_data;
 };
 
+// Doesn't call constructors / destructors!
 template<typename T, typename = std::enable_if_t<std::is_scalar<T>::value> >
 class dynamic_array {
 public:
@@ -143,4 +145,52 @@ public:
 private:
     T *_data;
     uint _size;
+};
+
+// Doesn't call constructors / destructors!
+template<typename T, uint Capacity>
+class static_vector {
+public:
+	static_vector() : _size(0) { }
+	static_vector(uint size) : _size(size) { }
+
+	static_vector(std::initializer_list<T> init) : _size(init.size()) {
+		assert(init.size() <= Capacity);
+		const T* r = init.begin();
+		T* w = _data;
+		while (r != init.end())
+			*w++ = *r++;
+	}
+
+	void resize(uint size) {
+		assert(size < Capacity);
+		for (uint i = _size; i < size; i++)
+			_data[i] = T();
+		_size = size;
+	}
+
+	void push_back(const T& e) {
+		assert(_size < Capacity);
+		_data[_size++] = e;
+	}
+
+	T& operator[](uint idx) {
+		assert(idx < _size);
+		return _data[idx];
+	}
+
+	const T& operator[](uint idx) const {
+		assert(idx < _size);
+		return _data[idx];
+	}
+
+	uint size() const { return _size; }
+	T* begin() { return _data; }
+	T* end() { return _data + _size; }
+	const T* begin() const { return _data; }
+	const T* end() const { return _data + _size; }
+
+private:
+	T _data[Capacity];
+	uint _size;
 };
