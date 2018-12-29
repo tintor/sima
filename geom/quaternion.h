@@ -2,12 +2,36 @@
 #include <geom/vector.h>
 #include <core/exception.h>
 
+using quat2 = double2;
+
+inline quat2 quat_from_angle(double angle) {
+	return {sin(angle / 2), cos(angle / 2)};
+}
+
+inline quat2 quat_mul(quat2 a, quat2 b) {
+	return {a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x};
+}
+
+// returns q such that a * q == q * a == Identity
+// (assumes that q is unit quaternion, so no need to normalize)
+inline quat2 quat_inv(quat2 a) {
+	return {-a.x, a.y};
+}
+
+// TODO is there a loss of precision due to acos?
+inline double quat_angle(quat2 q) {
+	return acos(q.y) * 2;
+}
+
+inline double quat_cos_half_angle(quat2 q) {
+	return q.y;
+}
+
 // Partialy based on Matrix and Quaternion FAQ, http://mccammon.ucsd.edu/~adcock/matrixfaq.html
 
 using quat = double4;
 
 constexpr quat IDENTITY_QUAT = {0, 0, 0, 1};
-constexpr quat ZERO_QUAT = {0, 0, 0, 1};
 
 // Creates quaternion that represents rotation around axis by angle (in radians).
 //  Right-hand rule is used for rotation direction.
@@ -80,6 +104,10 @@ inline double quat_angle(quat q) {
 	//return 2 * atan2(sqrt(s), q.w);
 
 	return acos(q.w) * 2;
+}
+
+inline double quat_cos_half_angle(quat q) {
+	return q.w;
 }
 
 // first row of matrix
