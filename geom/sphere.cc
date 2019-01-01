@@ -173,7 +173,7 @@ sphere extermal_points_optimal_sphere(cspan<point3> points, cspan<float4> normal
 	if (points.size() <= normals.size() * 2)
 		return minimal_sphere(points);
 
-	aligned_vector<point3> extremal;
+	aligned_vector<point3> extremal; // TODO since this is bounded, maybe use static_vector?
 	// TODO maybe swap loops and compute two normals per point at once
 	for (auto n : normals) {
 		int imin = 0, imax = 0;
@@ -194,7 +194,7 @@ sphere extermal_points_optimal_sphere(cspan<point3> points, cspan<float4> normal
 		extremal.push_back(points[imin]);
 		extremal.push_back(points[imax]);
 	}
-	remove_dups(extremal); // TODO will this make it slower or faster?
+	remove_dups(extremal); // TODO will this make it slower or faster? (alternatively remove dups using helper index array)
 
 	sphere s = minimal_sphere(extremal);
 	for (auto p : points)
