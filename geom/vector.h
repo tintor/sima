@@ -244,87 +244,11 @@ inline bool colinear(double4 a, double4 b, double4 c) {
 	return squared(cross(b - a, c - a)) <= squared(1e-6);
 }
 
-// TODO define struct vec3
-// w can always be assumed to be 0
-// with alignas(32)
-// operator ==
-// hash
-
-/*struct alignas(32) vec3 {
-private:
-	double4 s;
-};
-
-struct alignas(32) point3 {
-	point3() : s{NAN, NAN, NAN, 1} { }
-	explicit point3(double4 v) : s{v.x, v.y, v.z, 1} { }
-	static point3 from_vec(double4 v) { return v; }
-	point3(double x, double y, double z) : s{x, y, z, 1} { }
-	point3(const point3& p) : s(p.s) { }
-
-	bool operator==(point3 v) const { return equal(s, v.s); }
-	bool operator!=(point3 v) const { return !equal(s, v.s); }
-
-	bool operator<(point3 v) const {
-		if (s.x < v.s.x) return true;
-		if (s.x > v.s.x) return false;
-		if (s.y < v.s.y) return true;
-		if (s.y > v.s.y) return false;
-		return s.z < v.s.z;
-	}
-
-	double4 operator-(point3 v) const { return s - v.s; }
-
-	point3 operator+(double4 v) const { return s + v; }
-	point3 operator-(double4 v) const { return s - v; }
-	point3 operator+(double4 v) const { return s + double4{v.x, v.y, v.z, 0}; }
-	point3 operator-(double4 v) const { return s - double4{v.x, v.y, v.z, 0}; }
-
-	point3& operator+=(double4 v) { s += v; return *this; }
-	point3& operator-=(double4 v) { s -= v; return *this; }
-	point3& operator+=(double4 v) { s += {v.x, v.y, v.z, 0}; return *this; }
-	point3& operator-=(double4 v) { s -= {v.x, v.y, v.z, 0}; return *this; }
-
-	double x() const { return s.x; }
-	double y() const { return s.y; }
-	double z() const { return s.z; }
-
-	friend void broadcast(point3& a, double b);
-	friend point3 avg(point3 a, point3 b);
-	friend point3 vmin(point3 a, point3 b);
-	friend point3 vmax(point3 a, point3 b);
-	friend double dot(point3 a, double4 b);
-	friend double dot(double4 a, point3 b);
-	friend float dot(point3 a, float4 b);
-	friend float dot(float4 a, point3 b);
-
-	double4 vec() const { return s; }
-private:
-	point3(double4 v) : s(v) { }
-	double4 s;
-};*/
-
-/*inline void format_e(string& s, string_view spec, point3 v) {
-	format_e(s, spec, v.x());
-	s += ' ';
-	format_e(s, spec, v.y());
-	s += ' ';
-	format_s(s, spec, v.z());
-}
-
-namespace std {
-
-template<> struct hash<point3> {
-	size_t operator()(point3 v) const { return ::hash(v.x(), v.y(), v.z()); }
-};
-
-}*/
-
 using point3 = double4;
 
 inline point3 avg(point3 a, point3 b) { return (a + b) / 2; }
-inline float dot(point3 a, float4 b) { return dot(vconvert(a, float4), b); }
-inline float dot(float4 a, point3 b) { return dot(a, vconvert(b, float4)); }
+inline double dot(point3 a, float4 b) { return dot(a, vconvert(b, double4)); }
+inline double dot(float4 a, point3 b) { return dot(vconvert(a, double4), b); }
 
 inline double4 compute_normal(point3 a, point3 b, point3 c) { return cross(b - a, c - a); }
 
