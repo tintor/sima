@@ -72,8 +72,8 @@ sphere minimal_sphere(point3 a, point3 b, point3 c) {
 
 // Finds E such that:
 // x[i] * e.x + y[i] * e.y + z[i] * e.z = w[i]
-double4 solve_linear_col(double4 x, double4 y, double4 z, double4 w) {
-	double4 e = {det(w, y, z), det(x, w, z), det(x, y, w)};
+double3 solve_linear_col(double3 x, double3 y, double3 z, double3 w) {
+	double3 e = {det(w, y, z), det(x, w, z), det(x, y, w)};
 	return e / det(x, y, z);
 }
 
@@ -81,20 +81,23 @@ double4 solve_linear_col(double4 x, double4 y, double4 z, double4 w) {
 // dot(a, e) = w[0]
 // dot(b, e) = w[1]
 // dot(c, e) = w[2]
-double4 solve_linear_row(double4 a, double4 b, double4 c, double4 w) {
-	double4 x = {a.x, b.x, c.x};
-	double4 y = {a.y, b.y, c.y};
-	double4 z = {a.z, b.z, c.z};
+double3 solve_linear_row(double3 a, double3 b, double3 c, double3 w) {
+	double3 x = {a.x, b.x, c.x};
+	double3 y = {a.y, b.y, c.y};
+	double3 z = {a.z, b.z, c.z};
 	return solve_linear_col(x, y, z, w);
 }
+
+// TODO temporary
+double3 d3(double4 e) { return e.xyz; }
 
 sphere sphere_from(point3 a, point3 b, point3 c, point3 d) {
 	// 2(x1 - x2) `dot` c = |x1|^2 - |x2|^2
 	// 2(x1 - x3) `dot` c = |x1|^2 - |x3|^2
 	// 2(x1 - x4) `dot` c = |x1|^2 - |x4|^2
 	double sa = squared(a), sb = squared(b), sc = squared(c), sd = squared(d);
-   	double4 w = {sa - sb, sa - sc, sa - sd};
-	point3 center(solve_linear_row(2 * (a - b), 2 * (a - c), 2 * (a - d), w));
+   	double3 w = {sa - sb, sa - sc, sa - sd};
+	point3 center = cast4(solve_linear_row(d3(2 * (a - b)), d3(2 * (a - c)), d3(2 * (a - d)), w));
 	center.w = 1;
 	return sphere(center, length(a - center));
 }

@@ -1,11 +1,18 @@
 #pragma once
 #include <core/format.h>
-#include <geom/vec.h>
+#include <geom/simd.h>
 #include <core/util.h>
 #include <core/align_alloc.h>
 #include <random>
 
-inline double4 cast_to_d4(double3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
+#define REQUIRE_NEAR(A, B, T) do { auto aa = A; auto bb = B; auto tt = T; auto dd = length(aa - bb); ASSERT_ALWAYS(dd <= tt, "a = %s\nb = %s\nexpected <= %s, actual = %s", aa, bb, tt, dd); } while (false);
+
+inline double2 d2(double x, double y) { return {x, y}; }
+inline double3 d3(double x, double y, double z) { return {x, y, z}; }
+inline double4 d4(double x, double y, double z, double w) { return {x, y, z, w}; }
+
+inline double3 extend(double2 v, double z) { return {v.x, v.y, z}; }
+inline double4 extend(double3 v, double w) { return {v.x, v.y, v.z, w}; }
 
 inline long2 lbroad2(long a) { return {a, a}; }
 inline double2 broad2(double a) { return {a, a}; }
@@ -32,13 +39,8 @@ inline bool lex_less(double4 a, double4 b) {
 }
 
 inline double2 sqrt(double2 a) { return _mm_sqrt_pd(a); }
-inline double3 sqrt(double3 a) { return double4(_mm256_sqrt_pd(cast_to_d4(a))).xyz; }
+inline double3 sqrt(double3 a) { return double4(_mm256_sqrt_pd(cast4(a))).xyz; }
 inline double4 sqrt(double4 a) { return _mm256_sqrt_pd(a); }
-
-inline __m128d bit_and(__m128d a, __m128d b) { return _mm_and_pd(a, b); }
-inline __m256d bit_and(__m256d a, __m256d b) { return _mm256_and_pd(a, b); }
-inline __m128d bit_or(__m128d a, __m128d b) { return _mm_or_pd(a, b); }
-inline __m256d bit_or(__m256d a, __m256d b) { return _mm256_or_pd(a, b); }
 
 // returns 1.0 or -1.0 for each component (depending if >= +0, or <= -0)
 inline double4 sign_no_zero(double4 d) {
@@ -57,37 +59,34 @@ inline double4 vdot(double4 a, double4 b) {
 	return q + q.zwxy;
 }
 
-inline double3 vdot(double3 a, double3 b) {
-	return vdot(cast_to_d4(a), cast_to_d4(b)).xyz;
-}
-
 inline float dot(float4 a, float4 b) { return vdot(a, b).x; }
 
 inline double dot(double2 a, double2 b) { return vdot(a, b).x; }
-inline double dot(double3 a, double3 b) { return vdot(a, b).x; }
+inline double dot(double3 a, double3 b) { double3 q = a * b; return q.x + q.y + q.z; }
 inline double dot(double4 a, double4 b) { return vdot(a, b).x; }
 
-inline constexpr auto squared(double a) { return a * a; }
-
+inline constexpr double squared(double a) { return a * a; }
 inline double squared(double2 a) { return dot(a, a); }
 inline double squared(double3 a) { return dot(a, a); }
 inline double squared(double4 a) { return dot(a, a); }
 
 inline double2 vlength(double2 a) { return sqrt(vdot(a, a)); }
-inline double3 vlength(double3 a) { return sqrt(vdot(a, a)); }
 inline double4 vlength(double4 a) { return sqrt(vdot(a, a)); }
 
+inline constexpr double length(double a) { return (a >= 0) ? a : -a; }
 inline double length(double2 a) { return vlength(a).x; }
-inline double length(double3 a) { return vlength(a).x; }
+inline double length(double3 a) { return sqrt(dot(a, a)); }
 inline double length(double4 a) { return vlength(a).x; }
 
 // TODO div(sqrt) might be slower than mul(rsqrt)
 inline auto normalize(double2 a) { return a / vlength(a); }
+inline auto normalize(double3 a) { return a / length(a); }
 inline auto normalize(double4 a) { return a / vlength(a); }
 
 template<typename V> bool is_unit(V v) { return ordered(1-1e-12, squared(v), 1+1e-12); }
 
 template<int M> double2 round(double2 v, int mode) { return _mm_round_pd(v, M | _MM_FROUND_NO_EXC); }
+template<int M> double3 round(double3 v, int mode) { double4 e = _mm256_round_pd(cast4(v), M | _MM_FROUND_NO_EXC); return e.xyz; }
 template<int M> double4 round(double4 v, int mode) { return _mm256_round_pd(v, M | _MM_FROUND_NO_EXC); }
 
 template<typename V> V round_nearest(V v) { return round<_MM_FROUND_TO_NEAREST_INT>(v); }
@@ -97,7 +96,17 @@ template<typename V> V round_down(V v) { return round<_MM_FROUND_TO_NEG_INF>(v);
 
 constexpr ulong SignBit64 = ulong(1) << 63;
 inline double2 abs(double2 v) { return bit_and(v, lbroad2(~SignBit64)); }
+inline double3 abs(double3 v) { double4 e = bit_and(cast4(v), lbroad4(~SignBit64)); return e.xyz; }
 inline double4 abs(double4 v) { return bit_and(v, lbroad4(~SignBit64)); }
+
+inline double3 any_normal(double3 v) {
+	double3 a = abs(v);
+	if (a.x <= a.y && a.x <= a.z)
+		return {0, -v.z, v.y};
+	if (a.y <= a.z)
+		return {-v.z, 0, v.x};
+	return {-v.y, v.x, 0};
+}
 
 inline double4 any_normal(double4 v) {
 	double4 a = abs(v);
@@ -110,6 +119,12 @@ inline double4 any_normal(double4 v) {
 
 inline double cross(double2 a, double2 b) { return a.x * b.y - b.x * a.y; }
 
+inline double3 cross(double3 a, double3 b) {
+	return {a.y * b.z - b.y * a.z,
+            a.z * b.x - b.z * a.x,
+            a.x * b.y - b.x * a.y};
+}
+
 inline double4 cross(double4 a, double4 b) {
 	assert(a.w == 0);
 	assert(b.w == 0);
@@ -119,7 +134,12 @@ inline double4 cross(double4 a, double4 b) {
 			0};
 }
 
-// returns angle in range [0, PI)
+// returns angle in range [0, PI]
+inline auto angle(double3 a, double3 b) {
+	return std::atan2(length(cross(a, b)), dot(a, b));
+}
+
+// returns angle in range [0, PI]
 inline auto angle(double4 a, double4 b) {
 	return std::atan2(length(cross(a, b)), dot(a, b));
 }
@@ -139,7 +159,7 @@ inline double det(double2 a, double2 b) {
 
 // det(A) == det(transposed(A))
 // 3x3 det
-inline double det(double4 a, double4 b, double4 c) {
+inline double det(double3 a, double3 b, double3 c) {
 	return a.x * det(b.yz, c.yz)
          - b.x * det(a.yz, c.yz)
 		 + c.x * det(a.yz, b.yz);
@@ -147,10 +167,10 @@ inline double det(double4 a, double4 b, double4 c) {
 
 // det(A) == det(transposed(A))
 inline double det(double4 a, double4 b, double4 c, double4 d) {
-	return a.x * det(b.yzww, c.yzww, d.yzww)
-         - b.x * det(a.xzww, c.xzww, d.xzww)
-		 + c.x * det(a.xyww, b.xyww, d.xyww)
-		 - d.x * det(a.xyzw, b.xyzw, c.xyzw);
+	return a.x * det(b.yzw, c.yzw, d.yzw)
+         - b.x * det(a.xzw, c.xzw, d.xzw)
+		 + c.x * det(a.xyw, b.xyw, d.xyw)
+		 - d.x * det(a.xyz, b.xyz, c.xyz);
 }
 
 template<typename RND>
@@ -166,7 +186,12 @@ double2 uniform2(RND& rnd, double min, double max) {
 
 // uniform point inside a cube
 template<typename RND>
-double4 uniform3(RND& rnd, double min, double max) {
+double3 uniform3(RND& rnd, double min, double max) {
+	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max)};
+}
+
+template<typename RND>
+double4 uniform3p(RND& rnd, double min, double max) {
 	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), 1};
 }
 
@@ -197,6 +222,10 @@ double4 normal3v(RND& rnd, double mean, double stdev) {
 template<typename RND>
 double4 normal4(RND& rnd, double mean, double stdev) {
 	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev)};
+}
+template<typename RND>
+double4 uniform4(RND& rnd, double min, double max) {
+	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max)};
 }
 
 template<typename RND>

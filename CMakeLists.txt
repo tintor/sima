@@ -71,6 +71,8 @@ set(test
 	geom/test_transform.cc
 	geom/test_solid_bsp_tree.cc
 	geom/test_properties.cc
+	geom/test_pose.cc
+	geom/test_matrix.cc
 	geom/test_generators.cc
 	geom/test_shape.cc
 	geom/test_primitives.cc

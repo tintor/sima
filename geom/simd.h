@@ -7,88 +7,65 @@
 #define vshuffle __builtin_shufflevector
 #define vconvert __builtin_convertvector
 
-// use double4 for computation (with w=1 for points and w=0 for directions)
+#define m128 __m128d
+#define m256 __m256d
+#define m512 __m512d
 
-// 8x vec3 in component order,
-// each component fits into one 256-bit AVX2 register
-struct vec3_8 {
-    float8 x, y, z;
-};
+inline int4 cast4(int3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
+inline long4 cast4(long3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
+inline float4 cast4(float3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
+inline double4 cast4(double3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
 
-/*struct fmat34 {
-    float4 a, b, c;
-};*/
+// use m128 and m256 to allow input of differrent types (but equal size)
+inline m128 bit_and(m128 a, m128 b) { return _mm_and_pd(a, b); }
+inline m256 bit_and(m256 a, m256 b) { return _mm256_and_pd(a, b); }
 
-// each field is col of matrix
-struct mat22 {
-    double2 a, b;
-};
+inline m128 bit_or(m128 a, m128 b) { return _mm_or_pd(a, b); }
+inline m256 bit_or(m256 a, m256 b) { return _mm256_or_pd(a, b); }
 
-inline double2 mul(mat22 m, double2 v) {
-	return m.a * v.x + m.b * v.y;
-}
-
-// each field is col of matrix
-struct mat33 {
-    double3 a, b, c;
-};
-
-inline double3 mul(mat33 m, double3 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z;
-}
-
-// each field is col of matrix
-/*struct mat34 {
-    double4 a, b, c;
-};*/
-
-// each field is col of matrix
-struct mat44 {
-    double4 a, b, c, d;
-};
-
-inline double4 mul(mat44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z + m.d * v.w;
-}
-
-// m is col matrix (m.d is position)
-/*inline double4 mat_mul_point(mat44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z + m.d;
-}*/
-
-// m is col matrix (m.d is position)
-/*inline double4 mul(mat34 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z;
-}*/
-
-// m is col matrix (m.d is position)
-inline double4 mat_mul_vec(mat44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z + m.d * v.w;
-}
+inline m128 bit_xor(m128 a, m128 b) { return _mm_xor_pd(a, b); }
+inline m256 bit_xor(m256 a, m256 b) { return _mm256_xor_pd(a, b); }
 
 inline bool all(int2 v) { return v.x != 0 && v.y != 0; }
+inline bool all(int3 v) { return _mm_movemask_ps(cast4(v)) == 0xF; }
 inline bool all(int4 v) { return _mm_movemask_ps(v) == 0xF; }
-inline bool any(int2 v) { return v.x != 0 || v.y != 0; }
-inline bool any(int4 v) { return _mm_movemask_ps(v) != 0; }
 
 inline bool all(long2 v) { return _mm_movemask_pd(v) == 0x3; }
+inline bool all(long3 v) { return _mm256_movemask_pd(cast4(v)) == 0xF; }
 inline bool all(long4 v) { return _mm256_movemask_pd(v) == 0xF; }
+
+inline bool any(int2 v) { return v.x != 0 || v.y != 0; }
+inline bool any(int3 v) { return _mm_movemask_ps(cast4(v)) != 0; }
+inline bool any(int4 v) { return _mm_movemask_ps(v) != 0; }
+
 inline bool any(long2 v) { return _mm_movemask_pd(v) != 0; }
+inline bool any(long3 v) { return _mm256_movemask_pd(cast4(v)) != 0; }
 inline bool any(long4 v) { return _mm256_movemask_pd(v) != 0; }
 
 inline bool equal(int2 a, int2 b) { return all(a == b); }
-inline bool equal(double2 a, double2 b) { return all(a == b); }
-inline bool equal(double4 a, double4 b) { return all(a == b); }
-
-inline double4 floor(double4 a) { return _mm256_floor_pd(a); }
-inline double4 ceil(double4 a) { return _mm256_ceil_pd(a); }
+inline bool equal(int3 a, int3 b) { return all(a == b); }
+inline bool equal(int4 a, int4 b) { return all(a == b); }
 
 // requires AVX512
 //inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
 //inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
 
+inline bool equal(double2 a, double2 b) { return all(a == b); }
+inline bool equal(double3 a, double3 b) { return all(a == b); }
+inline bool equal(double4 a, double4 b) { return all(a == b); }
+
+inline double2 floor(double2 a) { return _mm_floor_pd(a); }
+inline double3 floor(double3 a) { double4 v = _mm256_floor_pd(cast4(a)); return v.xyz; }
+inline double4 floor(double4 a) { return _mm256_floor_pd(a); }
+
+inline double2 ceil(double2 a) { return _mm_ceil_pd(a); }
+inline double3 ceil(double3 a) { double4 v = _mm256_ceil_pd(cast4(a)); return v.xyz; }
+inline double4 ceil(double4 a) { return _mm256_ceil_pd(a); }
+
 inline hash operator<<(hash h, int2 a) { return h << a.x << a.y; }
+
 inline hash operator<<(hash h, double2 a) { return h << a.x << a.y; }
+inline hash operator<<(hash h, double3 a) { return h << a.x << a.y << a.z; }
 inline hash operator<<(hash h, double4 a) { return h << a.x << a.y << a.z << a.w; }
 
 template<typename T>
@@ -98,7 +75,6 @@ struct equal_t {
 	}
 };
 
-// SIMD helpers
 inline int8 vmin(int8 a, int8 b) { return _mm256_min_epi32(a, b); }
 inline int4 vmin(int4 a, int4 b) { return _mm_min_epi32(a, b); }
 

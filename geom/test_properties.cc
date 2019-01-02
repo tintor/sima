@@ -46,7 +46,7 @@ TEST_CASE("eigen - plane normal", "[eigen]") {
 	for (int j = 0; j < 200000; j++) {
 		double4 normal = uniform_dir3(rnd);
 		for (int i = 0; i < points.size(); i++) {
-			point3 a(uniform3(rnd, -1, 1));
+			point3 a(uniform3p(rnd, -1, 1));
 			REQUIRE(a.w == 1);
 			double aa = dot(a, normal);
 			a -= aa * normal;

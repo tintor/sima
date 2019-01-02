@@ -19,7 +19,7 @@ TEST_CASE("HashBroadphase", "[.][broadphase][benchmark]") {
 	for (int t : range(10)) {
 		vector<sphere> spheres;
 		for (int i : range(20000))
-			spheres.push_back(sphere(uniform3(rnd, -10, 10), 0.02));
+			spheres.push_back(sphere(uniform3p(rnd, -10, 10), 0.02));
 		bp.reset(1.05 * 0.02 / 0.3 * 8, 0.02);
 
 		vector<pair<int, int>> result1;

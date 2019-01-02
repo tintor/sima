@@ -77,12 +77,12 @@ TEST_CASE("LineNearest - random long and short") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<double> uni2(-6, 6);
 	for (auto i : range(20)) {
-		double4 pa = uniform3(rnd, -1000, 1000);
-		double4 qa = uniform3(rnd, -1000, 1000);
+		double4 pa = uniform3p(rnd, -1000, 1000);
+		double4 qa = uniform3p(rnd, -1000, 1000);
 		double r = static_cast<double>(pow(10, uni2(rnd)));
-		double4 pd = uniform3(rnd, -1000 * r, 1000 * r);
+		double4 pd = uniform3p(rnd, -1000 * r, 1000 * r);
 		r = static_cast<double>(pow(10, uni2(rnd)));
-		double4 qd = uniform3(rnd, -1000 * r, 1000 * r);
+		double4 qd = uniform3p(rnd, -1000 * r, 1000 * r);
 		segment3 p(pa, pa + pd);
 		segment3 q(qa, qa + qd);
 		TestLineNearest(p, q, rnd);
@@ -93,8 +93,8 @@ TEST_CASE("LineNearest - random parallel") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<double> uni2(-1, 1);
 	for (auto i : range(20)) {
-		segment3 p(uniform3(rnd, -1000, 1000), uniform3(rnd, -1000, 1000));
-		double4 t = uniform3(rnd, -1000, 1000);
+		segment3 p(uniform3p(rnd, -1000, 1000), uniform3p(rnd, -1000, 1000));
+		double4 t = uniform3p(rnd, -1000, 1000);
 		double4 dir = p.b - p.a;
 		segment3 q(p.a + t + uni2(rnd) * dir, p.b + t + uni2(rnd) * dir);
 		TestLineNearest(p, q, rnd);

@@ -96,7 +96,7 @@ mesh3 generate_regular_polyhedra(cspan<Edge> edges) {
 	std::default_random_engine rnd;
 	rnd.seed(time(nullptr));
 	for (auto i : range(count))
-		vertex[i] = uniform3(rnd, -1, 1);
+		vertex[i] = uniform3p(rnd, -1, 1);
 
 	print_volume(0, cspan<double4>(vertex, count), edges);
 	for (auto e : range(100)) {
@@ -197,7 +197,7 @@ mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 		// TODO simulate individual faces are rigid bodies, with attractive force between edges of different faces
 		// TODO better init face vertices (faces away from each other)
 		for (auto i : range(count))
-			vertex[i] = uniform3(rnd, -1, 1);
+			vertex[i] = uniform3p(rnd, -1, 1);
 
 		print_volume2(0, vertex, edges);
 		for (auto e : range(200000)) {

@@ -2,6 +2,12 @@
 #include <geom/triangle.h>
 #include <core/span.h>
 
+// 8x vec3 in component order,
+// each component fits into one 256-bit AVX2 register
+/*struct vec3_8 {
+    float8 x, y, z;
+};*/
+
 /*inline float4 transform(float4 v, fmat34 matrix) {
 	// dot products
 	float4 x = _mm_dp_ps(v, matrix.a, 0b11110001);

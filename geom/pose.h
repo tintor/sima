@@ -1,104 +1,100 @@
 #pragma once
-#include <geom/vector.h>
+#include <geom/matrix.h>
 #include <geom/quaternion.h>
-#include <core/exception.h>
 
-struct Pose2 {
+inline double2 rotate(double angle, double2 v) {
+	double c = cos(angle);
+	double s = sin(angle);
+	return { c * v.x + s * v.y, -s * v.x + c * v.y};
+}
+
+struct pose2 {
 	double2 position;
-	quat2 orientation; // unit vector
+	double orientation;
 
-	Pose2() { }
+	pose2() { }
+	pose2(double2 p, double o) : position(p), orientation(o) { }
 
-	Pose2(double2 p, quat2 o) : position(p), orientation(o) { }
-
-	// which inverse? there are two
-	Pose2 inverse() {
-		THROW(not_implemented);
-	}
-
-	double2 rotate(double2 v) const {
-		return quat_rotate(orientation, v);
-/*		return { orientation.x * v.x + orientation.y * v.y,
-				-orientation.y * v.x + orientation.x * v.y};*/
-	}
-
-	double2 apply(double2 p) const {
-		return rotate(p) + position;
-	}
+	double2 rotate(double2 v) const { return ::rotate(orientation, v); }
+	double2 apply(double2 p) const { return rotate(p) + position; }
 };
 
-inline Pose2 interpolate(const Pose2& a, const Pose2& b, double t) {
-	return Pose2(
-		a.position + (b.position - a.position) * t,
-		slerp(a.orientation, b.orientation, t));
+inline double slerp(double angle_a, double angle_b, double t) {
+	double d = angle_b - angle_a;
+	while (d >= PI)
+		d -= 2 * PI;
+	while (d < -PI)
+		d += 2 * PI;
+	return angle_a + d * t;
 }
 
-inline Pose2 mat_to_pose(const mat33& a) {
-	THROW(not_implemented);
+inline pose2 interpolate(pose2 a, pose2 b, double t) {
+	return pose2(a.position + (b.position - a.position) * t, slerp(a.orientation, b.orientation, t));
 }
 
-inline mat33 pose_to_mat(const Pose2& a) {
-	THROW(not_implemented);
+inline pose2 mat_to_pose(double33 m) {
+	double22 e = { m.a.xy, m.b.xy };
+	return pose2(m.c.xy, atan2(m.a.y, m.a.x));
 }
 
-inline mat33 mul(const mat33& p, const mat33& q) {
-	mat33 e;
-	e.a = mul(p, q.a);
-	e.b = mul(p, q.b);
-	e.c = mul(p, q.c);
-	return e;
+inline double33 pose_to_mat(pose2 p) {
+	double c = cos(p.orientation);
+	double s = sin(p.orientation);
+	return { {c, s, 0}, {-s, c, 0}, extend(p.position, 1) };
 }
 
-inline Pose2 mul(const Pose2& a, const Pose2& b) {
-	return mat_to_pose(mul(pose_to_mat(a), pose_to_mat(b)));
+inline pose2 mul(pose2 a, pose2 b) {
+	return pose2(b.apply(a.position), a.orientation + b.orientation);
 }
 
-struct Pose3 {
+inline pose2 inv(pose2 a) {
+	return pose2(-rotate(-a.orientation, a.position), -a.orientation);
+}
+
+inline double angle(pose2 a, pose2 b) {
+	double d = b.orientation - a.orientation;
+	while (d >= PI)
+		d -= 2 * PI;
+	while (d < -PI)
+		d += 2 * PI;
+	return abs(d);
+}
+
+struct pose3 {
 	double4 position; // w = 1
 	quat orientation; // unit quaternion
 
-	Pose3() { }
+	pose3() { }
+	pose3(double4 p, quat o) : position(p), orientation(o) { }
 
-	Pose3(double4 p, quat o) : position(p), orientation(o) { }
-
-	Pose3 inverse() {
-		THROW(not_implemented);
-	}
-
-	// returned w will be 0
-	double4 rotate(double4 v) const {
-		double3 e = quat_rotate(orientation, v.xyz);
-		return {e.x, e.y, e.z, 0};
-	}
-
-	double4 apply(double4 p) const {
-		return rotate(p) + position;
-	}
+	double4 rotate(double4 v) const { return extend(quat_rotate(orientation, v.xyz), 0); }
+	double4 apply(double4 p) const { return rotate(p) + position; }
 };
 
-inline Pose3 interpolate(const Pose3& a, const Pose3& b, double t) {
-	return Pose3(
+inline pose3 interpolate(pose3 a, pose3 b, double t) {
+	return pose3(
 		a.position + (b.position - a.position) * t,
 		slerp(a.orientation, b.orientation, t));
 }
 
-inline Pose3 mat_to_pose(const mat44& a) {
-	THROW(not_implemented);
+inline pose3 mat_to_pose(const double44& m) {
+	double33 e = { m.a.xyz, m.b.xyz, m.c.xyz };
+	return pose3(m.d, quat_from_matrix(e));
 }
 
-inline mat44 pose_to_mat(const Pose3& a) {
-	THROW(not_implemented);
+inline double44 pose_to_mat(pose3 p) {
+	double33 e = quat_to_matrix(p.orientation);
+	return { extend(e.a, 0), extend(e.b, 0), extend(e.c, 0), p.position };
 }
 
-inline mat44 mul(const mat44& p, const mat44& q) {
-	mat44 e;
-	e.a = mul(p, q.a);
-	e.b = mul(p, q.b);
-	e.c = mul(p, q.c);
-	e.d = mul(p, q.d);
-	return e;
-}
-
-inline Pose3 mul(const Pose3& a, const Pose3& b) {
+inline pose3 mul(pose3 a, pose3 b) {
 	return mat_to_pose(mul(pose_to_mat(a), pose_to_mat(b)));
+}
+
+inline pose3 inverse(pose3 a) {
+	return mat_to_pose(inv(pose_to_mat(a)));
+}
+
+inline double angle(pose3 a, pose3 b) {
+	return 2 * acos(dot(a.orientation, b.orientation));
 }

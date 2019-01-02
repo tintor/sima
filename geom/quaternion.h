@@ -1,55 +1,6 @@
 #pragma once
 #include <geom/vector.h>
-#include <core/exception.h>
-
-using quat2 = double2;
-
-inline quat2 quat_from_angle(double angle) {
-	return {sin(angle / 2), cos(angle / 2)};
-}
-
-inline quat2 quat_mul(quat2 a, quat2 b) {
-	return {a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x};
-}
-
-// returns q such that a * q == q * a == Identity
-// (assumes that q is unit quaternion, so no need to normalize)
-inline quat2 quat_inv(quat2 a) {
-	return {-a.x, a.y};
-}
-
-// TODO is there a loss of precision due to acos?
-inline double quat_angle(quat2 q) {
-	return acos(q.y) * 2;
-}
-
-// single both are assumed to be unit quats, this function returns
-// cos half angle to rotate from a to b
-inline double quat_dot(quat2 a, quat2 b) {
-	return a.y * b.y + a.x * b.x;
-}
-
-inline double2 quat_rotate(quat2 q, double2 a) {
-	THROW(not_implemented);
-}
-
-// Linear Interpolation
-inline quat2 lerp(quat2 p, quat2 q, double t) {
-	return p * (1 - t) + q * t;
-}
-
-// Spherical Linear Interpolation
-inline quat2 slerp(quat2 p, quat2 q, double t) {
-	double d = dot(p, q);
-	if (d >= 0) {
-		double a = acos(d);
-		double k = 1 / sin(a);
-		return p * (sin(a - t * a) * k) + q * (sin(t * a) * k);
-	}
-	double a = acos(-d);
-	double k = 1 / sin(a);
-	return p * (sin(a - t * a) * k) - q * (sin(t * a) * k);
-}
+#include <geom/matrix.h>
 
 // Partialy based on Matrix and Quaternion FAQ, http://mccammon.ucsd.edu/~adcock/matrixfaq.html
 
@@ -186,10 +137,11 @@ inline double3 quat_rotate(quat q, double3 a) {
 }
 
 // column matrix
-inline mat33 quat_to_matrix(quat q) {
+inline double33 quat_to_matrix(quat q) {
 	double x = q.x * 2;
 	double y = q.y * 2;
 	double z = q.z * 2;
+
 	double xx = q.x * x;
 	double yy = q.y * y;
 	double zz = q.z * z;
@@ -200,9 +152,9 @@ inline mat33 quat_to_matrix(quat q) {
 	double yw = q.w * y;
 	double zw = q.w * z;
 
-	double3 a = {1 - (yy + zz), xy + zw, xz - yw};
-	double3 b = {xy - zw, 1 - (xx + zz), yz + xw};
-	double3 c = {xz + yw, yz - xw, 1 - (xx + yy)};
+	double3 a = {1 - yy - zz, xy + zw, xz - yw};
+	double3 b = {xy - zw, 1 - xx - zz, yz + xw};
+	double3 c = {xz + yw, yz - xw, 1 - xx - yy};
 	return {a, b, c};
 }
 
@@ -237,7 +189,8 @@ inline quat slerp(quat p, quat q, double t) {
 	return p * (sin(a - t * a) * k) - q * (sin(t * a) * k);
 }
 
-inline quat quat_from_rot_mat(mat33 m) {
+// assumes that m is rotational matrix (ie. its colums are unit vectors and orthogonal to each other)
+inline quat quat_from_matrix(double33 m) {
 	double m00 = m.a.x;
 	double m11 = m.b.y;
 	double m22 = m.c.z;
@@ -249,11 +202,11 @@ inline quat quat_from_rot_mat(mat33 m) {
 	quat q = {x, y, z, w};
 	q = sqrt(vmax(0, q)) / 2;
 
-	if (m.c.y < m.b.z)
+	if (m.c.y > m.b.z)
 		q.x = -q.x;
-	if (m.a.z < m.c.x)
+	if (m.a.z > m.c.x)
 		q.y = -q.y;
-	if (m.b.x < m.a.y)
+	if (m.b.x > m.a.y)
 		q.z = -q.z;
 	return q;
 }

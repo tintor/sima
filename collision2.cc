@@ -77,7 +77,7 @@ optional<pair<double, double>> segment_vs_circle(segment<Vec> s, double r, const
 // contact.time will be set to 1
 bool shallow_collision(
 	const Shape2& shape_a, const Shape2& shape_b,
-	const Pose2 pose_a, const Pose2 pose_b,
+	const pose2 pose_a, const pose2 pose_b,
 	Contact2& contact) {
 	// quick bounding sphere test
 	double r = shape_a.radius + shape_b.radius;
@@ -109,7 +109,7 @@ double2 support(double2 dir, const Shape2& shape) {
 	THROW(not_implemented);
 }
 
-double2 support(double2 dir, const Shape2& shape, const Pose2& pose) {
+double2 support(double2 dir, const Shape2& shape, pose2 pose) {
 	THROW(not_implemented);
 }
 
@@ -117,10 +117,10 @@ double2 support(double2 dir, const Shape2& shape, const Pose2& pose) {
 // Times are relative: start_a is at time 0, while end_a is at time 1
 bool temporal_collision(
 	const Shape2& shape_a, const Shape2& shape_b,
-	const Pose2& start_a, const Pose2& start_b,
-	const Pose2& end_a, const Pose2& end_b,
-	const double start_time, const double end_time,
-	const double max_depth) {
+	pose2 start_a, pose2 start_b,
+	pose2 end_a, pose2 end_b,
+	double start_time, double end_time,
+	double max_depth) {
 	double2 dir = {1, 0}; // TODO init from last frame
 	return gjk_classify([&shape_a, &shape_b, &start_a, &start_b, &end_a, &end_b, start_time, end_time](double2 d) {
 		// TODO buffer both objects by -max_depth
@@ -136,9 +136,9 @@ bool temporal_collision(
 // Prevents tunneling of high speed objects.
 bool deep_collision(
 		const Shape2& shape_a, const Shape2& shape_b,
-		const Pose2 start_a, const Pose2 start_b,
-		const Pose2 end_a, const Pose2 end_b,
-		const double max_depth,
+		pose2 start_a, pose2 start_b,
+		pose2 end_a, pose2 end_b,
+		double max_depth,
 		Contact2& contact) {
 	// (1) check if two moving spheres are deeply colliding
 	segment2 s(start_a.position - start_b.position, end_a.position - end_b.position);
@@ -154,8 +154,8 @@ bool deep_collision(
 	}
 
 	// (2) quick sweeping minkowski difference test (when no deep collision)
-	double abs_error_a = shape_a.radius * (1 - quat_dot(start_a.orientation, end_a.orientation));
-	double abs_error_b = shape_b.radius * (1 - quat_dot(start_b.orientation, end_b.orientation));
+	double abs_error_a = shape_a.radius * (1 - cos(angle(start_a, end_a) / 2));
+	double abs_error_b = shape_b.radius * (1 - cos(angle(start_b, end_b) / 2));
 	double abs_error = abs_error_a + abs_error_b;
 
 	// TODO what is acceptable error? and how to compute angle based on max error?
