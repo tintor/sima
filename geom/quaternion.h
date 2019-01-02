@@ -23,8 +23,10 @@ inline double quat_angle(quat2 q) {
 	return acos(q.y) * 2;
 }
 
-inline double quat_cos_half_angle(quat2 q) {
-	return q.y;
+// single both are assumed to be unit quats, this function returns
+// cos half angle to rotate from a to b
+inline double quat_dot(quat2 a, quat2 b) {
+	return a.y * b.y + a.x * b.x;
 }
 
 // Partialy based on Matrix and Quaternion FAQ, http://mccammon.ucsd.edu/~adcock/matrixfaq.html
@@ -106,8 +108,10 @@ inline double quat_angle(quat q) {
 	return acos(q.w) * 2;
 }
 
-inline double quat_cos_half_angle(quat q) {
-	return q.w;
+// single both are assumed to be unit quats, this function returns
+// cos half angle to rotate from a to b
+inline double quat_dot(quat a, quat b) {
+	return a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 // first row of matrix
