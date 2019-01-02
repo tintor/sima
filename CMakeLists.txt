@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(prod
 	lisp.cc
+	collision2.cc
 	core/callstack.cc
 	core/file.cc
 	core/timestamp.cc
