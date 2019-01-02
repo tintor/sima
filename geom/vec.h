@@ -15,33 +15,55 @@ struct vec3_8 {
     float8 x, y, z;
 };
 
-struct fmat34 {
+/*struct fmat34 {
     float4 a, b, c;
-};
+};*/
 
 // each field is col of matrix
-struct mat34 {
-    double4 a, b, c;
+struct mat22 {
+    double2 a, b;
 };
+
+inline double2 mul(mat22 m, double2 v) {
+	return m.a * v.x + m.b * v.y;
+}
+
+// each field is col of matrix
+struct mat33 {
+    double3 a, b, c;
+};
+
+inline double3 mul(mat33 m, double3 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z;
+}
+
+// each field is col of matrix
+/*struct mat34 {
+    double4 a, b, c;
+};*/
 
 // each field is col of matrix
 struct mat44 {
     double4 a, b, c, d;
 };
 
-// m is col matrix (m.d is position)
-inline double4 mat_mul_point(mat44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z + m.d;
+inline double4 mul(mat44 m, double4 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z + m.d * v.w;
 }
 
 // m is col matrix (m.d is position)
-inline double4 mat_mul_vec(mat34 m, double4 v) {
+/*inline double4 mat_mul_point(mat44 m, double4 v) {
+	return m.a * v.x + m.b * v.y + m.c * v.z + m.d;
+}*/
+
+// m is col matrix (m.d is position)
+/*inline double4 mul(mat34 m, double4 v) {
 	return m.a * v.x + m.b * v.y + m.c * v.z;
-}
+}*/
 
 // m is col matrix (m.d is position)
 inline double4 mat_mul_vec(mat44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z;
+	return m.a * v.x + m.b * v.y + m.c * v.z + m.d * v.w;
 }
 
 inline bool all(int2 v) { return v.x != 0 && v.y != 0; }

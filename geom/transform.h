@@ -2,7 +2,7 @@
 #include <geom/triangle.h>
 #include <core/span.h>
 
-inline float4 transform(float4 v, fmat34 matrix) {
+/*inline float4 transform(float4 v, fmat34 matrix) {
 	// dot products
 	float4 x = _mm_dp_ps(v, matrix.a, 0b11110001);
 	float4 y = _mm_dp_ps(v, matrix.b, 0b11110010);
@@ -10,9 +10,9 @@ inline float4 transform(float4 v, fmat34 matrix) {
 	float4 q = x + y + z;
 	q.w = v.w;
 	return q;
-}
+}*/
 
-void transform(cspan<vec3_8> in, fmat34 matrix, span<vec3_8> out);
+//void transform(cspan<vec3_8> in, fmat34 matrix, span<vec3_8> out);
 
 /*void translate(array_ptr<ivec4> vectors, ivec4 t);
 void translate(array_ptr<ivec3_8> vectors, ivec4 t);*/
@@ -26,7 +26,7 @@ void translate(array_ptr<ivec3_8> vectors, ivec4 t);*/
 //void transform(imesh3& mesh, float4 t[3]);
 
 struct transform3 {
-	mat34 matrix;
+	//mat34 matrix;
 	/*
 
     transform3(const dvec4& position, dvec4 orientation)

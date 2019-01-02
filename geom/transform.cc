@@ -27,7 +27,7 @@ float8 transform(float8 a, float8 m[4]) {
 }
 
 // inner loop is 15 instructions for 8 vectors!
-void transform(cspan<vec3_8> in, fmat34 m, span<vec3_8> out) {
+/*void transform(cspan<vec3_8> in, fmat34 m, span<vec3_8> out) {
 	if (in.size() != out.size())
 		THROW(invalid_argument, "array sizes must be the same");
 	if (!aligned<32>(in.begin()) || !aligned<32>(out.begin()))
@@ -72,7 +72,7 @@ void transform(cspan<vec3_8> in, fmat34 m, span<vec3_8> out) {
 		a += 1;
 		b += 1;
 	}
-}
+}*/
 
 /*void translate(span<vec3_8> vectors, ivec4 t) {
 	if (!aligned<32>(vectors.begin()))

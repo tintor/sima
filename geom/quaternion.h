@@ -29,6 +29,28 @@ inline double quat_dot(quat2 a, quat2 b) {
 	return a.y * b.y + a.x * b.x;
 }
 
+inline double2 quat_rotate(quat2 q, double2 a) {
+	THROW(not_implemented);
+}
+
+// Linear Interpolation
+inline quat2 lerp(quat2 p, quat2 q, double t) {
+	return p * (1 - t) + q * t;
+}
+
+// Spherical Linear Interpolation
+inline quat2 slerp(quat2 p, quat2 q, double t) {
+	double d = dot(p, q);
+	if (d >= 0) {
+		double a = acos(d);
+		double k = 1 / sin(a);
+		return p * (sin(a - t * a) * k) + q * (sin(t * a) * k);
+	}
+	double a = acos(-d);
+	double k = 1 / sin(a);
+	return p * (sin(a - t * a) * k) - q * (sin(t * a) * k);
+}
+
 // Partialy based on Matrix and Quaternion FAQ, http://mccammon.ucsd.edu/~adcock/matrixfaq.html
 
 using quat = double4;
@@ -151,7 +173,7 @@ inline double4 quat_idir_x(quat q) {
 	}*/
 
 // rotate vector by quaternion, returns q * quat(a, 0) * inv(q)
-inline double4 quat_rotate(quat q, double4 a) {
+inline double3 quat_rotate(quat q, double3 a) {
 	double iw = q.x * a.x + q.y * a.y + q.z * a.z;
 	double ix = q.w * a.x + q.y * a.z - q.z * a.y;
 	double iy = q.w * a.y - q.x * a.z + q.z * a.x;
@@ -164,7 +186,7 @@ inline double4 quat_rotate(quat q, double4 a) {
 }
 
 // column matrix
-inline mat34 quat_to_matrix(quat q) {
+inline mat33 quat_to_matrix(quat q) {
 	double x = q.x * 2;
 	double y = q.y * 2;
 	double z = q.z * 2;
@@ -178,9 +200,9 @@ inline mat34 quat_to_matrix(quat q) {
 	double yw = q.w * y;
 	double zw = q.w * z;
 
-	double4 a = {1 - (yy + zz), xy + zw, xz - yw, 0};
-	double4 b = {xy - zw, 1 - (xx + zz), yz + xw, 0};
-	double4 c = {xz + yw, yz - xw, 1 - (xx + yy), 0};
+	double3 a = {1 - (yy + zz), xy + zw, xz - yw};
+	double3 b = {xy - zw, 1 - (xx + zz), yz + xw};
+	double3 c = {xz + yw, yz - xw, 1 - (xx + yy)};
 	return {a, b, c};
 }
 
@@ -215,7 +237,7 @@ inline quat slerp(quat p, quat q, double t) {
 	return p * (sin(a - t * a) * k) - q * (sin(t * a) * k);
 }
 
-inline quat quat_from_rot_mat(mat34 m) {
+inline quat quat_from_rot_mat(mat33 m) {
 	double m00 = m.a.x;
 	double m11 = m.b.y;
 	double m22 = m.c.z;

@@ -5,6 +5,8 @@
 #include <core/align_alloc.h>
 #include <random>
 
+inline double4 cast_to_d4(double3 a) { return vshuffle(a, a, 0, 1, 2, -1); }
+
 inline long2 lbroad2(long a) { return {a, a}; }
 inline double2 broad2(double a) { return {a, a}; }
 inline long4 lbroad4(long a) { return {a, a, a, a}; }
@@ -30,7 +32,9 @@ inline bool lex_less(double4 a, double4 b) {
 }
 
 inline double2 sqrt(double2 a) { return _mm_sqrt_pd(a); }
+inline double3 sqrt(double3 a) { return double4(_mm256_sqrt_pd(cast_to_d4(a))).xyz; }
 inline double4 sqrt(double4 a) { return _mm256_sqrt_pd(a); }
+
 inline __m128d bit_and(__m128d a, __m128d b) { return _mm_and_pd(a, b); }
 inline __m256d bit_and(__m256d a, __m256d b) { return _mm256_and_pd(a, b); }
 inline __m128d bit_or(__m128d a, __m128d b) { return _mm_or_pd(a, b); }
@@ -53,18 +57,28 @@ inline double4 vdot(double4 a, double4 b) {
 	return q + q.zwxy;
 }
 
+inline double3 vdot(double3 a, double3 b) {
+	return vdot(cast_to_d4(a), cast_to_d4(b)).xyz;
+}
+
 inline float dot(float4 a, float4 b) { return vdot(a, b).x; }
+
 inline double dot(double2 a, double2 b) { return vdot(a, b).x; }
+inline double dot(double3 a, double3 b) { return vdot(a, b).x; }
 inline double dot(double4 a, double4 b) { return vdot(a, b).x; }
 
 inline constexpr auto squared(double a) { return a * a; }
 
 inline double squared(double2 a) { return dot(a, a); }
+inline double squared(double3 a) { return dot(a, a); }
 inline double squared(double4 a) { return dot(a, a); }
 
 inline double2 vlength(double2 a) { return sqrt(vdot(a, a)); }
+inline double3 vlength(double3 a) { return sqrt(vdot(a, a)); }
 inline double4 vlength(double4 a) { return sqrt(vdot(a, a)); }
+
 inline double length(double2 a) { return vlength(a).x; }
+inline double length(double3 a) { return vlength(a).x; }
 inline double length(double4 a) { return vlength(a).x; }
 
 // TODO div(sqrt) might be slower than mul(rsqrt)

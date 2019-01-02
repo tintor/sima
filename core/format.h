@@ -358,7 +358,7 @@ inline void format_e(string& s, string_view spec, T##N v) { \
 	} \
 }
 
-#define FORMAT_VECN(T) FORMAT_VEC(T, 2); FORMAT_VEC(T, 4); FORMAT_VEC(T, 8)
+#define FORMAT_VECN(T) FORMAT_VEC(T, 2); FORMAT_VEC(T, 3); FORMAT_VEC(T, 4); FORMAT_VEC(T, 8)
 
 FORMAT_VECN(int);
 FORMAT_VECN(long);
