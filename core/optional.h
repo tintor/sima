@@ -73,7 +73,11 @@ public:
 		new(&_value) T(std::move(value));
 		_has_value = true;
 	}
+
 	bool has_value() const { return _has_value; }
+	operator bool() const { return _has_value; }
+	bool operator!() const { return !_has_value; }
+
 	T& operator*() { assert(_has_value); return _value; }
 	T* operator->() { assert(_has_value); return &_value; }
 	const T& operator*() const { assert(_has_value); return _value; }
