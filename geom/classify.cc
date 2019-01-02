@@ -138,7 +138,7 @@ int Classify(const xpolygon2& f, segment2 s, aabb2 box, vector<dpair>* intersect
 }
 
 template<typename Polygon2>
-int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector<Contact2>& contacts, bool reverse) {
+int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector<IContact2>& contacts, bool reverse) {
 	int result = 1;
 	vector<dpair> intersections;
 	for (auto ea : Edges(a)) {
@@ -151,9 +151,9 @@ int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector
 			for (const dpair& p : intersections) {
 				if (p.first == p.second && (p.first <= Tolerance || p.first >= 1 - Tolerance))
 					continue;
-				Contact2 c;
+				IContact2 c;
 				c.sa = ea.linear(p.first);
-				Contact2* v = (contacts.size() > 0) ? &contacts.back() : nullptr;
+				IContact2* v = (contacts.size() > 0) ? &contacts.back() : nullptr;
 				if (p.first == p.second && v && any(v->sa != v->sb) && (all(v->sb == c.sa) || all(v->sa == c.sa)))
 					continue;
 				c.sb = ea.linear(p.second);
@@ -168,7 +168,7 @@ int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector
 }
 
 template<typename Polygon2>
-int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) {
+int TClassify(const Polygon2& a, const Polygon2& b, vector<IContact2>* contacts) {
 	aabb2 va = Box(a), vb = Box(b);
 	if (!Intersects(va, vb))
 		return +1;
@@ -209,8 +209,8 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<Contact2>* contacts) 
 	return 1;
 }
 
-int Classify(const xpolygon2& a, const xpolygon2& b, vector<Contact2>* contacts) { return TClassify(a, b, contacts); }
-int Classify(const polygon2& a, const polygon2& b, vector<Contact2>* contacts) { return TClassify(a, b, contacts); }
+int Classify(const xpolygon2& a, const xpolygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
+int Classify(const polygon2& a, const polygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
 
 int Classify(const face& f, double4 v, const aabb4& box) {
 	if (!Intersects(box, aabb4(v)))
@@ -292,7 +292,7 @@ int Classify(plane p, const segment3& s) {
 }
 
 // [intersections] represent relative travels along segment S
-int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections, vector<Contact>* contacts) {
+int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections, vector<IContact>* contacts) {
 	if (!Intersects(Box(f.vertices()), aabb4(s)))
 		return +1;
 
@@ -316,8 +316,8 @@ int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* inte
 		if (contacts) {
 			if (c == 0) {
 				// edge V vertex/edge contact
-				Contact contact;
-				contact.type = Contact::Type::Point;
+				IContact contact;
+				contact.type = IContact::Type::Point;
 				auto i = intersections->back();
 				contact.sa = s.linear(i.first);
 				contact.normal = p.normal(); // TODO normal depends on two edges
@@ -325,8 +325,8 @@ int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* inte
 			}
 			if (c < 0) {
 				// edge V foce contact
-				Contact contact;
-				contact.type = Contact::Type::Segment;
+				IContact contact;
+				contact.type = IContact::Type::Segment;
 				auto i = intersections->back();
 				contact.sa = s.linear(i.first);
 				contact.sb = s.linear(i.second);
@@ -346,16 +346,16 @@ int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* inte
 		if (contacts) {
 			if (c < 0) {
 				// vertex V face contact
-				Contact contact;
-				contact.type = Contact::Type::Point;
+				IContact contact;
+				contact.type = IContact::Type::Point;
 				contact.sa = (ca == 0) ? s.a : s.b;
 				contact.normal = reverse ? -p.normal() : p.normal();
 				contacts->push_back(contact);
 			}
 			if (c == 0) {
 				// vertex V edge contact
-				Contact contact;
-				contact.type = Contact::Type::Point;
+				IContact contact;
+				contact.type = IContact::Type::Point;
 				contact.sa = (ca == 0) ? s.a : s.b;
 				contact.normal = p.normal(); // TODO normal?
 				contacts->push_back(contact);
@@ -376,8 +376,8 @@ int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* inte
 		return 1;
 	if (c == 0 && contacts) {
 		// edge V edge contact
-		Contact contact;
-		contact.type = Contact::Type::Point;
+		IContact contact;
+		contact.type = IContact::Type::Point;
 		contact.sa = s.linear(t);
 		//TODO contact.normal = cross(s.b - s.a, ?);
 		contacts->push_back(contact);
@@ -452,7 +452,7 @@ void Intervals::unionAll() {
 	_points.resize(w);
 }
 
-int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<Contact>* contacts) {
+int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<IContact>* contacts) {
 	if (!Intersects(box, aabb4(s)))
 		return +1;
 
@@ -483,7 +483,7 @@ int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse,
 	return 0;
 }
 
-static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4& boxb, bool reverse, vector<Contact>* contacts) {
+static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4& boxb, bool reverse, vector<IContact>* contacts) {
 	int result = 1;
 	for (const face& f : ma)
 		for (const segment3& e : Edges(f)) {
@@ -523,7 +523,7 @@ bool InteriorIntersects(segment3 p, segment3 q, double4* common) {
 
 // This will be a ground truth function. Slow and accurate.
 // TODO identify all contacts
-int Classify(const xmesh3& ma, const xmesh3& mb, vector<Contact>* contacts) {
+int Classify(const xmesh3& ma, const xmesh3& mb, vector<IContact>* contacts) {
 	auto va = Box(ma.vertices());
 	auto vb = Box(mb.vertices());
 	if (!Intersects(va, vb))
@@ -548,8 +548,8 @@ int Classify(const xmesh3& ma, const xmesh3& mb, vector<Contact>* contacts) {
 		for (auto [ea, na] : ma.uniqueEdges())
 			for (auto [eb, nb] : mb.uniqueEdges())
 				if (InteriorIntersects(ea, eb, &common)) {
-					Contact contact;
-					contact.type = Contact::Type::Point;
+					IContact contact;
+					contact.type = IContact::Type::Point;
 					contact.sa = common;
 					contact.normal = normalize(cross(ea.b - ea.a, eb.b - eb.a)); // TODO direction
 					contacts->push_back(contact);

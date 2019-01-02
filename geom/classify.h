@@ -31,12 +31,12 @@ inline int Sign(ray2 s, double2 v) {
 
 inline int Sign(plane p, double4 v) { return Sign(p.distance(v)); }
 
-struct Contact2 {
+struct IContact2 {
 	double2 normal;
 	double2 sa, sb;
 };
 
-struct Contact {
+struct IContact {
 	enum class Type { Point, Segment, Polygon };
 	Type type;
 	double4 normal;  // from mb to ma
@@ -69,8 +69,8 @@ inline int Classify(const polygon2& f, segment2 s, vector<dpair>* intersections 
 inline int Classify(const xpolygon2& f, segment2 s, vector<dpair>* intersections = nullptr) { return Classify(f, s, Box(f), intersections); }
 
 // polygon vs polygon
-int Classify(const xpolygon2& a, const xpolygon2& b, vector<Contact2>* contacts = nullptr);
-int Classify(const polygon2& a, const polygon2& b, vector<Contact2>* contacts = nullptr);
+int Classify(const xpolygon2& a, const xpolygon2& b, vector<IContact2>* contacts = nullptr);
+int Classify(const polygon2& a, const polygon2& b, vector<IContact2>* contacts = nullptr);
 
 // polygon vs ray
 int Classify(const xpolygon2& f, ray2 s);
@@ -82,7 +82,7 @@ int Classify(const face& f, double4 v, const aabb4& box);
 int Classify(const face& f, const ray3& s, double* travel = nullptr);
 pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box);
 int Classify(plane p, const segment3& s);
-int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections = nullptr, vector<Contact>* contacts = nullptr);
+int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections = nullptr, vector<IContact>* contacts = nullptr);
 int Classify(const xmesh3& m, double4 p, const aabb4& box);
-int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<Contact>* contacts = nullptr);
-int Classify(const xmesh3& ma, const xmesh3& mb, vector<Contact>* contacts = nullptr);
+int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<IContact>* contacts = nullptr);
+int Classify(const xmesh3& ma, const xmesh3& mb, vector<IContact>* contacts = nullptr);

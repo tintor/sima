@@ -509,9 +509,9 @@ TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {
 	polygon2 b = MakeRect(-2, 2);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
-	for (const Contact2& c : contacts)
+	for (const auto& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }
 
@@ -520,9 +520,9 @@ TEST_CASE("Classify(polygon2, polygon2) offset boxes", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 1});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
-	for (const Contact2& c : contacts)
+	for (const auto& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }
 
@@ -532,9 +532,9 @@ TEST_CASE("Classify(polygon2, polygon2) rotated box", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
-	for (const Contact2& c : contacts)
+	for (const auto& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }
 
@@ -543,9 +543,9 @@ TEST_CASE("Classify(polygon2, polygon2) same boxes", "[classify2]") {
 	polygon2 b = MakeRect(-1, 1);
 	Translate(b, double2{5.14, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
-	for (const Contact2& c : contacts)
+	for (const auto& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }
 
@@ -555,8 +555,8 @@ TEST_CASE("Classify(polygon2, polygon2) square and L", "[classify2]") {
 	Rotate(b, PI * 3 / 2);
 	Translate(b, double2{5, 0});
 	double t = TranslateUntilContact(a, b, double2{1, 0});
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
-	for (const Contact2& c : contacts)
+	for (const auto& c : contacts)
 		print("sa %s, sb %s, normal %s\n", c.sa, c.sb, c.normal);
 }

@@ -42,85 +42,6 @@
 #include <view/shader.h>
 #include <view/vertex_buffer.h>
 
-struct Spheres2 {
-	vector<double2> centers;
-	double radius;
-};
-
-struct Capsule2 {
-	double length;
-	double radius;
-};
-
-struct Box2 {
-	double2 size;
-};
-
-struct IContact2 {
-	double2 point; // world coordinates
-	double2 normal; // from b to a
-};
-
-int classify(const Spheres2& sa, Pose2 pa, const Spheres2& sb, Pose2 pb) {
-	bool close = false;
-	const double r = sa.radius + sb.radius;
-	const double high = squared(r + Tolerance);
-	const double low = squared(r - Tolerance);
-
-	for (double2 a : sa.centers) {
-		auto wa = pa.apply(a);
-		for (double2 b : sb.centers) {
-			auto wb = pb.apply(b);
-			double s = squared(wa - wb);
-			if (s < low)
-				return -1;
-			if (s <= high)
-				close = true;
-		}
-	}
-	return close ? 0 : 1;
-}
-
-void get_contacts(const Spheres2& sa, Pose2 pa, const Spheres2& sb, Pose2 pb, vector<IContact2>& contacts) {
-	const double r = sa.radius + sb.radius;
-	const double high = squared(r + Tolerance);
-
-	for (double2 a : sa.centers) {
-		double2 wa = pa.apply(a);
-		for (double2 b : sb.centers) {
-			double2 wb = pb.apply(b);
-			double2 delta = wa - wb;
-			double s = squared(delta);
-			if (s <= high) {
-				IContact2 c;
-				double d = sqrt(s);
-				double t = ((sa.radius - sb.radius) / d + 1) * 0.5;
-				c.point = wa * t + wb * (1 - t);
-				c.normal = delta / d;
-				contacts.push_back(c);
-			}
-		}
-	}
-}
-
-int classify(const Capsule2& sa, Pose2 pa, const Capsule2& sb, Pose2 pb) {
-	// TODO transform to world coordinates and compute distance between line segments in 2d
-	THROW(not_implemented);
-}
-
-void get_contacts(const Capsule2& sa, Pose2 pa, const Capsule2& sb, Pose2 pb, vector<IContact2>& contacts) {
-	THROW(not_implemented);
-}
-
-int classify(const Box2& sa, Pose2 pa, const Box2& sb, Pose2 pb) {
-	// TODO check 4 separating planes
-	THROW(not_implemented);
-}
-
-void get_contacts(const Box2& sa, Pose2 pa, const Box2& sb, Pose2 pb, vector<IContact2>& contacts) {
-	THROW(not_implemented);
-}
-
 bool gSimulate = false;
 bool gSimulateTick = false;
 bool gGravity = true;
@@ -208,7 +129,7 @@ void RestoreStates(vector<Body>& bodies) {
 	}
 }
 
-void Interact(Body& a, Body& b, polygon2& temp, vector<Contact2>& contacts) {
+void Interact(Body& a, Body& b, polygon2& temp, vector<IContact2>& contacts) {
 	dvec2 d = a.pos - b.pos;
 	float r = a.radius + b.radius;
 	if (glm::dot(d, d) > r * r)
@@ -232,14 +153,14 @@ void Interact(Body& a, Body& b, polygon2& temp, vector<Contact2>& contacts) {
 	}
 
 	// Translate contacts from A frame to world frame
-	for (Contact2& c : contacts) {
+	for (IContact2& c : contacts) {
 		c.sa -= double2{d.x, d.y};
 		c.sb -= double2{d.x, d.y};
 	}
 
 	// Resolve all contacts with dv at once!
 	double w = 0;
-	for (const Contact2& contact : contacts) {
+	for (const IContact2& contact : contacts) {
 		d.x = -contact.normal.x; // TODO check direction
 		d.y = -contact.normal.y; // TODO check direction
 		double u = glm::dot(d, a.vel - b.vel);
@@ -251,7 +172,7 @@ void Interact(Body& a, Body& b, polygon2& temp, vector<Contact2>& contacts) {
 
 	dvec2 wa(0, 0);
 	dvec2 wb(0, 0);
-	for (const Contact2& contact : contacts) {
+	for (const IContact2& contact : contacts) {
 		d.x = -contact.normal.x; // TODO check direction
 		d.y = -contact.normal.y; // TODO check direction
 		double ua = glm::dot(d, a.vel);
@@ -517,7 +438,7 @@ int main(int argc, char** argv) {
 	double energyMin = energy, energyMax = energy;
 
 	polygon2 temp;
-	vector<Contact2> contacts;
+	vector<IContact2> contacts;
 
 	RunEventLoop(window, [&]() {
 		glClear(GL_COLOR_BUFFER_BIT);
