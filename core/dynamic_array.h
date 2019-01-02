@@ -64,7 +64,7 @@ private:
 };
 
 // Doesn't call constructors / destructors!
-template<typename T, typename = std::enable_if_t<std::is_scalar<T>::value> >
+template<typename T>
 class dynamic_array {
 public:
 	dynamic_array() : _data(nullptr), _size(0) { }
@@ -113,7 +113,7 @@ public:
 		return _data[idx];
 	}
 
-	T operator[](uint idx) const {
+	const T& operator[](uint idx) const {
 		assert(idx < _size);
 		return _data[idx];
 	}
@@ -151,8 +151,7 @@ private:
 template<typename T, uint Capacity>
 class static_vector {
 public:
-	static_vector() : _size(0) { }
-	static_vector(uint size) : _size(size) { }
+	static_vector(uint size = 0) : _size(size) { }
 
 	static_vector(std::initializer_list<T> init) : _size(init.size()) {
 		assert(init.size() <= Capacity);
