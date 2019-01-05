@@ -16,6 +16,7 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <optional>
 
 using std::regex;
 using std::string;
@@ -42,9 +43,11 @@ using std::swap;
 
 using std::numeric_limits;
 
+using std::optional;
+using std::nullopt;
+
 using namespace std::literals;
 
-#include <core/optional.h>
 #include <core/span.h>
 
 #ifdef NDEBUG
