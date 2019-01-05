@@ -17,7 +17,7 @@ TEST_CASE("identity quat", "[quaternion]") {
 TEST_CASE("identity mat", "[quaternion]") {
 	double3 v = {1, 2, 3};
 	double33 m = { double3{1, 0, 0}, double3{0, 1, 0}, double3{0, 0, 1} };
-	REQUIRE_NEAR(v, mul(m, v), 1e-15);
+	REQUIRE_NEAR(v, m * v, 1e-15);
 }
 
 
@@ -28,11 +28,11 @@ TEST_CASE("mat mul", "[quaternion]") {
 
 	double3 v = {2, 0, 0};
 	double3 w = {2 * cos(PI / 3), 2 * sin(PI / 3), 0};
-	REQUIRE_NEAR(w, mul(m, v), 1e-15);
+	REQUIRE_NEAR(w, m * v, 1e-15);
 }
 
 TEST_CASE("quat from axis angle", "[quaternion]") {
-	quat q = quat_from_axis_angle(double4{1, 0, 0}, PI / 2);
+	quat q = quat_from_axis_angle(double3{1, 0, 0}, PI / 2);
 	auto v = quat_rotate(q, double3{0, 1, 0});
 	REQUIRE_NEAR(v, d3(0, 0, 1), 1e-15);
 }
@@ -92,7 +92,7 @@ TEST_CASE("quat rotate", "[quaternion]") {
 		double3 a = uniform3(rnd, 0, 1).xyz;
 
 		double3 b = quat_rotate(q, a);
-		double3 c = mul(quat_to_matrix(q), a);
+		double3 c = quat_to_matrix(q) * a;
 		REQUIRE_NEAR(b, c, 1e-15);
 	}
 }
@@ -128,7 +128,7 @@ TEST_CASE("quat matrix perf", "[quaternion][!hide]") {
 	for (auto k : range(100)) {
 		for (auto i : range(n)) {
 			auto v = g_quat_vec[i].second;
-			g_out_vec[i] = mul(m, v);
+			g_out_vec[i] = m * v;
 		}
 	}
 }

@@ -9,7 +9,7 @@
 TEST_CASE("solid_bsp_tree", "[!hide][solid_bsp_tree]") {
     try {
         mesh3 mm = load_stl("models/bunny.stl");
-        vector<double4> vertices;
+        vector<double3> vertices;
         for (const triangle3& f : mm)
             for (auto i : range(3))
                 vertices.push_back(f[i]);

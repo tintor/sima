@@ -12,7 +12,7 @@ TEST_CASE("inv(double22)", "[matrix]") {
 		m.b = uniform2(rnd, 0, 1);
 
 		double22 n = inv(m);
-		double22 e = mul(m, n);
+		double22 e = m * n;
 		REQUIRE_NEAR(e.a, d2(1, 0), 5e-14);
 		REQUIRE_NEAR(e.b, d2(0, 1), 5e-14);
 	}
@@ -28,7 +28,7 @@ TEST_CASE("inv(double33)", "[matrix]") {
 		m.c = uniform3(rnd, 0, 1);
 
 		double33 n = inv(m);
-		double33 e = mul(m, n);
+		double33 e = m * n;
 		REQUIRE_NEAR(e.a, d3(1, 0, 0), 1e-13);
 		REQUIRE_NEAR(e.b, d3(0, 1, 0), 1e-13);
 		REQUIRE_NEAR(e.c, d3(0, 0, 1), 1e-13);
@@ -46,7 +46,7 @@ TEST_CASE("inv(double44)", "[matrix]") {
 		m.d = uniform4(rnd, 0, 1);
 
 		double44 n = inv(m);
-		double44 e = mul(m, n);
+		double44 e = m * n;
 		REQUIRE_NEAR(e.a, d4(1, 0, 0, 0), 3e-13);
 		REQUIRE_NEAR(e.b, d4(0, 1, 0, 0), 3e-13);
 		REQUIRE_NEAR(e.c, d4(0, 0, 1, 0), 3e-13);

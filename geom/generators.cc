@@ -4,32 +4,32 @@
 #include <core/auto.h>
 #include <geom/properties.h>
 
-mesh3 generate_box(double4 size) {
-	aligned_vector<double4> vertices;
+mesh3 generate_box(double3 size) {
+	aligned_vector<double3> vertices;
 	vertices.reserve(8);
 	for (double x : {-1, 1})
 		for (double y : {-1, 1})
 			for (double z : {-1, 1})
-				vertices.push_back(double4{x, y, z, 1} * size);
+				vertices.push_back(double3{x, y, z} * size);
 	return convex_hull(vertices);
 }
 
 mesh3 generate_cylinder(uint sides, double rmin, double rmax, double zmin, double zmax) {
-	aligned_vector<double4> vertices;
+	aligned_vector<double3> vertices;
 	for (auto [z, r] : {pair{zmin, rmin}, pair{zmax, rmax}})
 		if (r == 0)
-			vertices.push_back(double4{0, 0, z, 1});
+			vertices.push_back(double3{0, 0, z});
 		else
 			for (int i : range(sides)) {
 				double a = (2 * PI / sides) * i;
 				double x = cos(a) * r;
 				double y = sin(a) * r;
-				vertices.push_back(double4{x, y, z, 1});
+				vertices.push_back(double3{x, y, z});
 			}
 	return convex_hull(vertices);
 }
 
-void AddQuad(mesh3& mesh, double4 a, double4 b, double4 c, double4 d) {
+void AddQuad(mesh3& mesh, double3 a, double3 b, double3 c, double3 d) {
 	mesh.emplace_back(a, b, c);
 	mesh.emplace_back(c, d, a);
 }
@@ -47,15 +47,15 @@ mesh3 generate_prism(const polygon2& poly, double zmin, double zmax) {
 	m3.reserve(m2.size() * 2 + poly.size() * 2);
 	for (triangle2 m : m2) {
 		// TODO check orientation of m
-		m3.emplace_back(double4{m.a.x, m.a.y, zmin, 1}, double4{m.b.x, m.b.y, zmin, 1}, double4{m.c.x, m.c.y, zmin, 1});
-		m3.emplace_back(double4{m.b.x, m.b.y, zmax, 1}, double4{m.a.x, m.a.y, zmax, 1}, double4{m.c.x, m.c.y, zmax, 1});
+		m3.emplace_back(double3{m.a.x, m.a.y, zmin}, double3{m.b.x, m.b.y, zmin}, double3{m.c.x, m.c.y, zmin});
+		m3.emplace_back(double3{m.b.x, m.b.y, zmax}, double3{m.a.x, m.a.y, zmax}, double3{m.c.x, m.c.y, zmax});
 	}
 	double2 sa = poly.back();
 	for (double2 sb : poly) {
-		double4 a{sa.x, sa.y, zmin, 1};
-		double4 b{sa.x, sa.y, zmax, 1};
-		double4 c{sb.x, sb.y, zmax, 1};
-		double4 d{sb.x, sb.y, zmin, 1};
+		double3 a{sa.x, sa.y, zmin};
+		double3 b{sa.x, sa.y, zmax};
+		double3 c{sb.x, sb.y, zmax};
+		double3 d{sb.x, sb.y, zmin};
 		m3.emplace_back(a, b, c);
 		m3.emplace_back(c, d, a);
 		sa = sb;
@@ -63,14 +63,14 @@ mesh3 generate_prism(const polygon2& poly, double zmin, double zmax) {
 	return m3;
 }
 
-double triangle_volume(double4 a, double4 b, double4 c);
+double triangle_volume(double3 a, double3 b, double3 c);
 
 struct Edge {
 	int a, b;
 	double len;
 };
 
-void print_volume(int e, cspan<double4> vertex, cspan<Edge> edges) {
+void print_volume(int e, cspan<double3> vertex, cspan<Edge> edges) {
 	double volume = 0;
 	for (auto i : range(edges.size() / 3)) {
 		auto a = vertex[edges[i * 3].a];
@@ -87,30 +87,30 @@ mesh3 generate_regular_polyhedra(cspan<Edge> edges) {
 	for (auto e : edges)
 		count = max(count, e.a + 1, e.b + 1);
 
-	AlignAlloc<double4, 32> mem;
-	double4* vertex = mem.allocate(count);
+	AlignAlloc<double3, 32> mem;
+	double3* vertex = mem.allocate(count);
 	ON_SCOPE_EXIT(mem.deallocate(vertex, count));
-	double4* delta = mem.allocate(count);
+	double3* delta = mem.allocate(count);
 	ON_SCOPE_EXIT(mem.deallocate(delta, count));
 
 	std::default_random_engine rnd;
 	rnd.seed(time(nullptr));
 	for (auto i : range(count))
-		vertex[i] = uniform3p(rnd, -1, 1);
+		vertex[i] = uniform3(rnd, -1, 1);
 
-	print_volume(0, cspan<double4>(vertex, count), edges);
+	print_volume(0, cspan<double3>(vertex, count), edges);
 	for (auto e : range(100)) {
 		for (auto i : range(count))
 			delta[i] = {0, 0, 0};
 		for (auto e : edges) {
-			double4 d = vertex[e.a] - vertex[e.b];
+			double3 d = vertex[e.a] - vertex[e.b];
 			d *= 0.05 * (e.len / length(d) - 1);
 			delta[e.a] += d;
 			delta[e.b] -= d;
 		}
 		for (auto i : range(count))
 			vertex[i] += delta[i];
-		print_volume(e + 1, cspan<double4>(vertex, count), edges);
+		print_volume(e + 1, cspan<double3>(vertex, count), edges);
 	}
 
 	return mesh3();
@@ -139,7 +139,7 @@ mesh3 generate_regular_polyhedra(cspan<cspan<int>> faces) {
 	return generate_regular_polyhedra(edges);
 }
 
-double print_volume2(int e, cspan<double4> vertex, unordered_map<pair<int, int>, double, hash_t<pair<int, int>>>& edges) {
+double print_volume2(int e, cspan<double3> vertex, unordered_map<pair<int, int>, double, hash_t<pair<int, int>>>& edges) {
 	double loss = 0;
 	const double Inf = std::numeric_limits<double>::max();
 	// for each vertex find its top3 nearest vertices (#1 and #2 should be at distance 0, #3 at distance 1)
@@ -174,7 +174,7 @@ mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 	for (auto p : faces)
 		count += p.first * p.second;
 
-	aligned_vector<double4> vertex(count), delta(count);
+	aligned_vector<double3> vertex(count), delta(count);
 
 	unordered_map<pair<int, int>, double, hash_t<pair<int, int>>> edges;
 	count = 0;
@@ -197,7 +197,7 @@ mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 		// TODO simulate individual faces are rigid bodies, with attractive force between edges of different faces
 		// TODO better init face vertices (faces away from each other)
 		for (auto i : range(count))
-			vertex[i] = uniform3p(rnd, -1, 1);
+			vertex[i] = uniform3(rnd, -1, 1);
 
 		print_volume2(0, vertex, edges);
 		for (auto e : range(200000)) {
@@ -206,7 +206,7 @@ mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 			for (auto a : range(count))
 				for (auto b : range(a)) {
 					auto it = edges.find(pair(a, b));
-					double4 d = vertex[a] - vertex[b];
+					double3 d = vertex[a] - vertex[b];
 					double dlen = length(d);
 					d /= dlen;
 					if (it != edges.end()) {

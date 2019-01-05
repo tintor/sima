@@ -7,7 +7,7 @@
 class SolidBSPTree {
 public:
     SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_random_engine& rnd);
-    bool intersects(double4 v);
+    bool intersects(double3 v);
 
 private:
     struct Node {
@@ -27,10 +27,10 @@ private:
     };
 
     struct BuildData {
-        vector<double4> vertices;
+        vector<double3> vertices;
         vector<itriangle> ifaces;
         vector<triangle3> faces;
-        vector<double4> samples;
+        vector<double3> samples;
         std::default_random_engine rnd;
     };
 
@@ -62,5 +62,5 @@ private:
     vector<Node> node;
     vector<float> percent;
     vector<Hist> hist;
-    vector<double4> box_size;
+    vector<double3> box_size;
 };

@@ -9,29 +9,29 @@ double distance(double2 a, segment2 b) {
 	return distance(b, a);
 }
 
-constexpr bool inside_triangle_prism(double4 p, triangle3 m, double4 normal) {
+constexpr bool inside_triangle_prism(double3 p, triangle3 m, double3 normal) {
 	for (auto [a, b] : Edges(m))
 		if (plane::sign(a, b, a + normal, p) > 0)
 			return false;
 	return true;
 }
 
-double distance(double4 p, triangle3 m) {
-    double4 normal = compute_normal(m);
+double distance(double3 p, triangle3 m) {
+    double3 normal = compute_normal(m);
 	for (auto [a, b] : Edges(m))
 		if (plane::sign(a, b, a + normal, p) > 0)
 			return distance(p, segment3(a, b));
 	return abs(dot(normal, p - m.a));
 }
 
-double distance(double4 v, triangle3 m, const plane& p) {
+double distance(double3 v, triangle3 m, const plane& p) {
 	for (auto [a, b] : Edges(m))
 		if (plane::sign(a, b, a + p.normal(), v) > 0)
 			return distance(v, segment3(a, b));
 	return abs(p.distance(v));
 }
 
-double distance(triangle3 m, double4 v) { return distance(v, m); }
+double distance(triangle3 m, double3 v) { return distance(v, m); }
 
 // from RealTimeCollisionDetection book
 bool intersects(line3 e, triangle3 m) {
@@ -54,7 +54,7 @@ bool intersects2(line3 e, triangle3 m) {
 }
 
 // from RealTimeCollisionDetection book
-bool intersection(line3 e, triangle3 m, /*out*/double4& result) {
+bool intersection(line3 e, triangle3 m, /*out*/double3& result) {
 	auto pa = m.a - e.origin;
 	auto pb = m.b - e.origin;
 	auto pc = m.c - e.origin;
@@ -196,6 +196,6 @@ double distance(triangle3 p, triangle3 q) {
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
 // If edge is concave than angle will be >PI
-double edge_angle(double4 a, double4 b, double4 c, double4 d) {
+double edge_angle(double3 a, double3 b, double3 c, double3 d) {
 	THROW(not_implemented);
 }

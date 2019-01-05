@@ -4,31 +4,59 @@
 // each field is col of matrix
 struct double22 {
     double2 a, b;
+
+	static constexpr double22 make(double e) { return {{e, e}, {e, e}}; }
+
+	double22 operator*(double k) const { return { a * k, b * k }; }
+	double2 operator*(double2 v) const { return a * v.x + b * v.y; }
+	double22 operator*(double22 q) const { return { *this * q.a, *this * q.b }; }
+
+	double22 operator+(double22 m) const { return {a + m.a, b + m.b}; }
+	double22 operator-(double22 m) const { return {a - m.a, b - m.b}; }
+	void operator+=(double22 m) { a += m.a; b += m.b; }
+	void operator-=(double22 m) { a -= m.a; b -= m.b; }
 };
+
+constexpr double22 double22_zero = {{0, 0}, {0, 0}};
+constexpr double22 double22_identity = {{1, 0}, {0, 1}};
 
 // each field is col of matrix
 struct double33 {
     double3 a, b, c;
+
+	static constexpr double33 make(double e) { return {{e, e, e}, {e, e, e}, {e, e, e}}; }
+
+	double33 operator*(double k) const { return { a * k, b * k, c * k }; }
+	double3 operator*(double3 v) const { return a * v.x + b * v.y + c * v.z; }
+	double33 operator*(double33 q) const { return { *this * q.a, *this * q.b, *this * q.c }; }
+
+	double33 operator+(double33 m) const { return {a + m.a, b + m.b, c + m.c}; }
+	double33 operator-(double33 m) const { return {a - m.a, b - m.b, c - m.c}; }
+	void operator+=(double33 m) { a += m.a; b += m.b; c += m.c; }
+	void operator-=(double33 m) { a -= m.a; b -= m.b; c -= m.c; }
 };
+
+constexpr double33 double33_zero = {{0, 0, 0}, {0, 0, 0}};
+constexpr double33 double33_identity = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
 // each field is col of matrix
 struct double44 {
     double4 a, b, c, d;
+
+	static constexpr double44 make(double e) { return {{e, e, e, e}, {e, e, e, e}, {e, e, e, e}, {e, e, e, e}}; }
+
+	double44 operator*(double k) const { return { a * k, b * k, c * k, d * k }; }
+	double4 operator*(double4 v) const { return a * v.x + b * v.y + c * v.z + d * v.w; }
+	double44 operator*(double44 q) const { return { *this * q.a, *this * q.b, *this * q.c, *this * q.d }; }
+
+	double44 operator+(double44 m) const { return {a + m.a, b + m.b, c + m.c, d + m.d}; }
+	double44 operator-(double44 m) const { return {a - m.a, b - m.b, c - m.c, d - m.d}; }
+	void operator+=(double44 m) { a += m.a; b += m.b; c += m.c; d += m.d; }
+	void operator-=(double44 m) { a -= m.a; b -= m.b; c -= m.c; d -= m.d; }
 };
 
-constexpr double22 IDENTITY_MAT22 = double22{ {1, 0}, {0, 1} };
-
-inline double2 mul(double22 m, double2 v) {
-	return m.a * v.x + m.b * v.y;
-}
-
-inline double3 mul(double33 m, double3 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z;
-}
-
-inline double4 mul(double44 m, double4 v) {
-	return m.a * v.x + m.b * v.y + m.c * v.z + m.d * v.w;
-}
+constexpr double44 double44_zero = {{0, 0, 0, 0}, {0, 0, 0, 0}};
+constexpr double44 double44_identity = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
 
 inline double22 transpose(double22 m) {
 	return {{ m.a.x, m.b.x },
@@ -203,29 +231,9 @@ inline double44 inv(double44 m) {
     return res;
 }
 
-inline double22 mul(const double22& p, const double22& q) {
-	double22 e;
-	e.a = mul(p, q.a);
-	e.b = mul(p, q.b);
-	return e;
-}
-
-inline double33 mul(const double33& p, const double33& q) {
-	double33 e;
-	e.a = mul(p, q.a);
-	e.b = mul(p, q.b);
-	e.c = mul(p, q.c);
-	return e;
-}
-
-inline double44 mul(const double44& p, const double44& q) {
-	double44 e;
-	e.a = mul(p, q.a);
-	e.b = mul(p, q.b);
-	e.c = mul(p, q.c);
-	e.d = mul(p, q.d);
-	return e;
-}
+inline double trace(double22 m) { return m.a.x + m.b.y; }
+inline double trace(double33 m) { return m.a.x + m.b.y + m.c.z; }
+inline double trace(double44 m) { return m.a.x + m.b.y + m.c.z + m.d.w; }
 
 inline double det(double22 m) { return det(m.a, m.b); }
 inline double det(double33 m) { return det(m.a, m.b, m.c); }

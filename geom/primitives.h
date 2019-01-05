@@ -23,25 +23,25 @@ constexpr double PlanarEpsilon = 1e-6;
 constexpr double ContactEpsilon = 10 * PlanarEpsilon;
 
 double squared_distance(segment3 p, segment3 q);
-double squared_distance(line3 m, double4 p);
+double squared_distance(line3 m, double3 p);
 
 double distance(segment2 a, double2 b);
 double distance(double2 a, segment2 b);
 
-double distance(double4 a, double4 b);
-double distance(double4 a, segment3 b);
-double distance(segment3 a, double4 b);
+double distance(double3 a, double3 b);
+double distance(double3 a, segment3 b);
+double distance(segment3 a, double3 b);
 double distance(segment3 a, segment3 b);
 
-constexpr bool inside_triangle_prism(double4 p, triangle3 m, double4 normal);
+constexpr bool inside_triangle_prism(double3 p, triangle3 m, double3 normal);
 
-double distance(double4 p, triangle3 m);
-double distance(double4 v, triangle3 m, plane p_hint);
-double distance(triangle3 m, double4 v);
+double distance(double3 p, triangle3 m);
+double distance(double3 v, triangle3 m, plane p_hint);
+double distance(triangle3 m, double3 v);
 
 bool intersects(line3 e, triangle3 m);
 bool intersects2(line3 e, triangle3 m);
-bool intersection(line3 e, triangle3 m, /*out*/double4& result);
+bool intersection(line3 e, triangle3 m, /*out*/double3& result);
 bool intersects_in_point(segment3 e, triangle3 m);
 bool intersects_in_point(ray3 e, triangle3 m);
 
@@ -56,4 +56,4 @@ double distance(triangle3 p, triangle3 q);
 // If edge is convex then angle will be <PI
 // If edge is planar then angle will be =PI
 // If edge is concave than angle will be >PI
-double edge_angle(double4 a, double4 b, double4 c, double4 d);
+double edge_angle(double3 a, double3 b, double3 c, double3 d);

@@ -5,7 +5,7 @@
 #include <geom/vector.h>
 
 bool gjk_simplex(static_vector<double2, 3>& simplex, double2& dir);
-bool gjk_simplex(static_vector<double4, 4>& simplex, double4& dir);
+bool gjk_simplex(static_vector<double3, 4>& simplex, double3& dir);
 
 // TODO use some kind of error measure instead of number of iterations
 //
@@ -24,8 +24,8 @@ inline int gjk_classify(const SupportA& support_a, const SupportB& support_b, do
 }
 
 template<typename SupportA, typename SupportB>
-inline int gjk_classify(const SupportA& support_a, const SupportB& support_b, double4& dir, uint max_iterations = 20) {
-	static_vector<double4, 4> simplex;
+inline int gjk_classify(const SupportA& support_a, const SupportB& support_b, double3& dir, uint max_iterations = 20) {
+	static_vector<double3, 4> simplex;
 	for (auto i : range(max_iterations)) {
 		auto s = support_a(dir) - support_b(-dir);
 		if (dot(s, dir) < 0)
@@ -37,20 +37,20 @@ inline int gjk_classify(const SupportA& support_a, const SupportB& support_b, do
 	return 0;
 }
 
-inline double4 sphere_support(double4 dir, double radius) {
+inline double3 sphere_support(double3 dir, double radius) {
 	return dir * (radius / length(dir));
 }
 
-inline double4 capsule_support(double4 dir, double size, double radius) {
+inline double3 capsule_support(double3 dir, double size, double radius) {
 	if (dir.x > 0)
-		return double4{size, 0, 0, 1} + dir * (radius / length(dir));
-	return double4{-size, 0, 0, 1} + dir * (radius / length(dir));
+		return double3{size, 0, 0} + dir * (radius / length(dir));
+	return double3{-size, 0, 0} + dir * (radius / length(dir));
 }
 
-inline double4 polyhedron_support(double4 dir, cspan<double4> vertices) {
+inline double3 polyhedron_support(double3 dir, cspan<double3> vertices) {
 	double md = -INF;
-	double4 mv;
-	for (double4 v : vertices) {
+	double3 mv;
+	for (double3 v : vertices) {
 		double d = dot(v, dir);
 		if (d > md) {
 			md = d;
@@ -60,6 +60,6 @@ inline double4 polyhedron_support(double4 dir, cspan<double4> vertices) {
 	return mv;
 }
 
-inline double4 box_support(double4 dir, double4 size) {
+inline double3 box_support(double3 dir, double3 size) {
 	return sign_no_zero(dir) * size;
 }

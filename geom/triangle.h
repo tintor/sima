@@ -35,14 +35,14 @@ constexpr auto Edges(const triangle<T>& m) {
 }
 
 using triangle2 = triangle<double2>;
-using triangle3 = triangle<double4>;
+using triangle3 = triangle<double3>;
 
 template<typename Vec>
 void format_e(string& s, string_view spec, triangle<Vec> v) {
 	format_s(s, "(%s, %s, %s)", v.a, v.b, v.c);
 }
 
-inline double4 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }
+inline double3 compute_normal(triangle3 v) { return compute_normal(v.a, v.b, v.c); }
 
 inline double signed_double_area(triangle2 m) {
 	return signed_double_area(m.a, m.b, m.c);

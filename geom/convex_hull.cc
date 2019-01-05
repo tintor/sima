@@ -8,15 +8,15 @@
 
 bool is_convex(cspan<triangle3> mesh) {
 	// Extract all unique vertices
-	aligned_vector<point3> vertices;
+	aligned_vector<double3> vertices;
 	vertices.reserve(mesh.size() * 3);
 	for (auto face : mesh)
 		for (auto vertex : face)
-			vertices.push_back(point3(vertex));
+			vertices.push_back(double3(vertex));
 	remove_dups(vertices);
 	// Check if every face has all vertices on its negative side
 	for (auto face : mesh) {
-		double4 n = compute_normal(face);
+		double3 n = compute_normal(face);
 		double d = dot(n, face.a);
 		for (auto v : vertices)
 			if (dot(n, v) > d)
@@ -48,8 +48,8 @@ bool is_convex(cspan<triangle3> mesh) {
 	// - find the furthest vertex among all and add it next -> update distances of vertices that were in
 
 // TODO maybe precompute this in separate array
-double boundary_dist(aabb4 box, double4 v) {
-	double4 m;
+double boundary_dist(aabb3 box, double3 v) {
+	double3 m;
 	for (auto i : range(3)) {
 		double a = box.min[i], b = box.max[i];
 		m[i] = (v[i] >= (a + b) / 2) ? (b - v[i]) : (v[i] - a);
@@ -95,21 +95,21 @@ double boundary_dist(aabb4 box, double4 v) {
 //    idea is to build hull of simplified point set first, which is a "good" approximation of the point set
 //    (problem, one dimension could be thinner than other two, so after a few rounding we end up with 2d case)
 
-void convex_hull_fast(cspan<double4> points, mesh3& hull) {
+void convex_hull_fast(cspan<double3> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;
 
 	// 1) compute aabb
-	aabb4 box(points);
+	aabb3 box(points);
 
 	// 2) sort points by reverse manhattan distance from the AABB (after manhattan dist, use lex order)
 	std::unique_ptr<uint[]> order(new uint[points.size()]);
 	for (uint i = 0; i < points.size(); i++)
 		order[i] = i;
-	const double4* pts = points.begin();
+	const double3* pts = points.begin();
 	std::sort(order.get(), order.get() + points.size(), [pts, &box] (uint a, uint b) {
-		double4 A = pts[a], B = pts[b];
+		double3 A = pts[a], B = pts[b];
 		uint da = boundary_dist(box, A);
 	    uint db = boundary_dist(box, B);
 		if (da < db) return true;
@@ -133,13 +133,13 @@ void convex_hull_fast(cspan<double4> points, mesh3& hull) {
 	THROW(not_implemented);
 }
 
-void convex_hull(cspan<double4> points, mesh3& hull) {
+void convex_hull(cspan<double3> points, mesh3& hull) {
 	hull.clear();
 	if (points.size() < 4)
 		return;
 
 	// First two points (A and B) on the hull (extremes on X axis)
-	double4 a = points[0], b = points[0];
+	double3 a = points[0], b = points[0];
 	for (auto p : points) {
 		if (p.x < a.x)
 			a = p;
@@ -151,7 +151,7 @@ void convex_hull(cspan<double4> points, mesh3& hull) {
 
 	// Third point C on the hull (furthest from line AB)
 	double max_dist2 = 0;
-	double4 c;
+	double3 c;
 	for (auto p : points) {
 		double dist2 = squared(cross(p - a, p - b));
 		if (dist2 > max_dist2) {
@@ -164,8 +164,8 @@ void convex_hull(cspan<double4> points, mesh3& hull) {
 
 	// Fourth point D on the hull (furthest from plane ABC)
 	double max_dist = 0;
-	double4 d;
-	double4 normal = compute_normal(a, b, c);
+	double3 d;
+	double3 normal = compute_normal(a, b, c);
 	double dd = dot(normal, a);
 	for (auto p : points) {
 		double dist = dot(normal, p) - dd;
@@ -205,7 +205,7 @@ void convex_hull(cspan<double4> points, mesh3& hull) {
 		for (size_t i = 0; i < hull.size(); i++) {
 			const triangle3& f = hull[i];
 			// Skip if P is not in front of face F
-			double4 normal = compute_normal(f);
+			double3 normal = compute_normal(f);
 			if (dot(normal, p - f.a) <= 0)
 				continue;
 			// Add edges of removed face to open_edges

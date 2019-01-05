@@ -6,14 +6,14 @@
 #include <geom/sphere.h>
 #include <geom/primitives.h>
 
-double Distance(sphere s, double4 v) {
+double Distance(sphere s, double3 v) {
 	return max(0.0, length(s.center() - v) - s.radius());
 }
 double Distance(sphere a, sphere b) {
 	return max(0.0, length(a.center() - b.center()) - a.radius() - b.radius());
 }
 
-int ClassifyFacePrismPoint(const face& f, double4 v, plane p) {
+int ClassifyFacePrismPoint(const face& f, double3 v, plane p) {
 	// TODO project to 2d, and run Classify
 	THROW(not_implemented);
 }
@@ -32,7 +32,7 @@ static double DistanceFaceVertexPairs(const xmesh3& ma, const xmesh3& mb, sphere
 		auto s = bounding_sphere(f.vertices());
 
 		if (Distance(s, sb) < min_distance)
-			for (const double4& v : mb.vertices()) // TODO faster if iterating over unique vertices
+			for (const double3& v : mb.vertices()) // TODO faster if iterating over unique vertices
 				if (squared(s.center() - v) < squared(min_distance + s.radius())) {
 					if (!p.has_value())
 						p = best_fit_plane(f.vertices());
@@ -51,16 +51,16 @@ static double DistanceFaceVertexPairs(const xmesh3& ma, const xmesh3& mb, sphere
 }
 
 // distance between the closest pair of points
-double Distance(cspan<double4> ma, cspan<double4> mb, sphere sa, sphere sb, segment3* nearest) {
+double Distance(cspan<double3> ma, cspan<double3> mb, sphere sa, sphere sb, segment3* nearest) {
 	// TODO can make it faster if there is a separating plane between two point sets
 	//      use two bounding spheres to estimate potentiall separating plane
 	//      sort both sets based on distance from plane
 	//      start comparing nearest pairs and maintain lower_bound and upper_bound until remaining vertices are far from plane
 
 	double ds = std::numeric_limits<double>::max();
-	for (double4 a : ma)
+	for (double3 a : ma)
 		if (squared(a - sb.center()) < squared(ds + sb.radius()))
-			for (double4 b : mb) {
+			for (double3 b : mb) {
 				double e = squared(a - b);
 				if (e < ds) {
 					ds = e;

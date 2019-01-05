@@ -60,23 +60,23 @@ public:
 // face can have arbitrary number of vertices and holes
 // first ring is exterior, other rings are interior and oriented opposite
 struct face {
-	face(const point3* vertices, cspan<uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) { }
-	cspan<point3> operator[](uint idx) const {
-		return cspan<point3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
+	face(const double3* vertices, cspan<uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) { }
+	cspan<double3> operator[](uint idx) const {
+		return cspan<double3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
 	}
 	plane plane() const { return _plane; }
 	uint size() const { return _offsets.size() - 1; }
 	uint vertex_size() const { return _offsets.back() - _offsets[0]; }
 
 	cspan<uint> offsets() const { return _offsets; }
-	cspan<point3> vertices() const {
-		return cspan<point3>(_vertices + _offsets[0], _vertices + _offsets.back());
+	cspan<double3> vertices() const {
+		return cspan<double3>(_vertices + _offsets[0], _vertices + _offsets.back());
 	}
 
 	auto begin() const { return array_iterator<face>(0, *this); }
 	auto end() const { return array_iterator<face>(size(), *this); }
 private:
-	const point3* _vertices;
+	const double3* _vertices;
 	cspan<uint> _offsets;
 	class plane _plane;
 };
@@ -94,7 +94,7 @@ struct face_edge_iter {
 			ring += 1;
 		}
 		if (ring >= f.size()) return {};
-		cspan<double4> r = f[ring];
+		cspan<double3> r = f[ring];
 		ON_SCOPE_EXIT(vertex += 1);
 		return (vertex == 0) ? segment(r.back(), r[0]) : segment(r[vertex - 1], r[vertex]);
 	}
@@ -133,18 +133,18 @@ public:
 	auto end() const { return array_iterator<xmesh3>(size(), *this); }
 
 	// contains duplicates!
-	cspan<point3> vertices() const { return _vertices; }
+	cspan<double3> vertices() const { return _vertices; }
 
-	cspan<point3> uniqueVertices() const { THROW(not_implemented); }
-	vector<pair<segment3, double4>> uniqueEdges() const { THROW(not_implemented); }
+	cspan<double3> uniqueVertices() const { THROW(not_implemented); }
+	vector<pair<segment3, double3>> uniqueEdges() const { THROW(not_implemented); }
 
 private:
-	aligned_vector<point3> _vertices;
+	aligned_vector<double3> _vertices;
 	vector<uint> _offsets;
 	vector<uint> _ring_offsets;
 
 	aligned_vector<plane> _facePlanes;
 	aligned_vector<segment3> _uniqueEdges;
-	aligned_vector<double4> _edgeNormals;
-	aligned_vector<point3> _uniqueVertices;
+	aligned_vector<double3> _edgeNormals;
+	aligned_vector<double3> _uniqueVertices;
 };

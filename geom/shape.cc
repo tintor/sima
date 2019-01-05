@@ -8,12 +8,12 @@
 
 #ifdef xxx
 // Shape is 3d solid, immutable, purely geometric and with origin in center of mass
-Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
+Shape::Shape(const Mesh3d& mesh, /*in/out*/pose3& position) {
 	if (is_valid(mesh) != Validity::OK)
 		throw runtime_error("invalid mesh");
 
 	// Move to center of mass
-	dvec3 center = center_of_mass(mesh);
+	double3 center = center_of_mass(mesh);
 	m_mesh = mesh; // copy
 	FOR_EACH(face, m_mesh)
 		face -= center;
@@ -33,16 +33,16 @@ Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 	m_box.second = max(m_mesh);
 
 	// Compute convex edges and vertices
-	std::unordered_map<segment3, dvec3> third_vertex;
+	unordered_map<segment3, double3> third_vertex;
 	FOR_EACH(face, m_mesh)
 		FOR(i, 3) {
-			const dvec3& a = face[i], b = face[(i + 1) % 3], c = face[(i + 2) % 3];
+			double3 a = face[i], b = face[(i + 1) % 3], c = face[(i + 2) % 3];
 			third_vertex[segment3(a, b)] = c;
 		}
-	std::unordered_set<dvec3> set_of_convex_vertices;
+	unordered_set<double3> set_of_convex_vertices;
 	FOR_EACH(face, m_mesh)
 		FOR(i, 3) {
-			const dvec3& a = face[i], b = face[(i + 1) % 3], c = face[(i + 2) % 3];
+			double3 a = face[i], b = face[(i + 1) % 3], c = face[(i + 2) % 3];
 			if (edge_angle(a, b, c, third_vertex[segment3(b, a)]) < PI) {
 				if (lexicographical_less(a, b))
 					m_convex_edges.push_back(segment3(a, b));
@@ -69,20 +69,20 @@ Shape::Shape(const Mesh3d& mesh, /*in/out*/transform3& position) {
 		return squared(p.a - p.b) > squared(q.a - q.b);
 	});
 	// Sort convex vertices by decreasing distance from center
-	std::sort(m_convex_vertices, [](const dvec3& p, const dvec3& q) {
+	std::sort(m_convex_vertices, [](double3 p, double3 q) {
 		return squared(p) > squared(q);
 	});
 }
 
 /*const auto random_directions = [](){
-	std::array<dvec3, 128> dirs;
+	std::array<double3, 128> dirs;
 	std::default_random_engine rnd;
 	FOR_EACH(d, dirs)
 		d = random_direction(rnd);
 	return dirs;
 }();*/
 
-real signed_distance(const dvec3& v, const Shape& shape) {
+real signed_distance(double3 v, const Shape& shape) {
 	// Can't just take the sdist sign of min_dist as two faces that share the edge can have the same dist but different sgn(sdist)
 	real min_dist = std::numeric_limits<real>::max(), max_sdist = 0;
 	constexpr real eps = ContactEpsilon; // ??? arbitrary, need to account for rounding errors when computing distance(vertex, face)
@@ -118,7 +118,7 @@ real signed_distance(const dvec3& v, const Shape& shape) {
 }
 
 real squared_distance_segment_origin(const segment3& p) {
-	dvec3 d = p.b - p.a;
+	double3 d = p.b - p.a;
 	real t = -dot(p.a, d);
 	if (t <= 0)
 		return squared(p.a);
@@ -164,16 +164,18 @@ bool intersects_edge_interior(const segment3& edge, const Shape& shape) {
 	throw new std::runtime_error("unfinished");
 }
 
-std::pair<real, real> project_obb(dvec3 obb_position, dvec3 obb_size, dmat3 obb_orientation, dvec3 dir) {
+pair<real, real> project_obb(double3 obb_position, double3 obb_size, dmat3 obb_orientation, double3 dir) {
     // TODO
-	return std::pair<real, real>(0.0, 0.0);
+	return pair<real, real>(0.0, 0.0);
 }
 
-bool are_oriented_boxes_intersecting(const std::pair<dvec3, dvec3>& box_a, const transform3& pos_a, const std::pair<dvec3, dvec3>& box_b, const transform3& pos_b) {
+bool are_oriented_boxes_intersecting(
+		const pair<double3, double3>& box_a, const pose3& pos_a,
+		const pair<double3, double3>& box_b, const pose3& pos_b) {
 	throw new std::runtime_error("unfinished");
 }
 
-bool approx_intersects(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+bool approx_intersects(const Shape& shape_a, const pose3& pos_a, const Shape& shape_b, const pose3& pos_b) {
 	// Bounding sphere check
 	if (squared(pos_a.position - pos_b.position) > squared(shape_a.sphere_radius() + shape_b.sphere_radius()))
 		return false;
@@ -181,7 +183,7 @@ bool approx_intersects(const Shape& shape_a, const transform3& pos_a, const Shap
 	return are_oriented_boxes_intersecting(shape_a.box(), pos_a, shape_b.box(), pos_b);
 }
 
-bool intersects(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+bool intersects(const Shape& shape_a, const pose3& pos_a, const Shape& shape_b, const pose3& pos_b) {
 	// Check all vertices of one against the other
 	FOR_EACH(vertex_a, shape_a.convex_vertices())
 		if (intersects(pos_b.to_local(pos_a.to_global(vertex_a)), shape_b))
@@ -206,8 +208,8 @@ bool intersects(const Shape& shape_a, const transform3& pos_a, const Shape& shap
 // - same test, but with bunnies
 // - OpenGL visualization (for debugging the test)
 
-bool is_vertex_triangle_contact(const dvec3& p, const triangle3& m, Contact& /*out*/contact) {
-	dvec3 normal = Normal(m);
+bool is_vertex_triangle_contact(double3 p, const triangle3& m, Contact& /*out*/contact) {
+	double3 normal = Normal(m);
 
 	// if P is outside of triangle
 	FOR_EACH_EDGE(a, b, m)
@@ -215,7 +217,7 @@ bool is_vertex_triangle_contact(const dvec3& p, const triangle3& m, Contact& /*o
 			return false;
 
 	// P is inside of triangle
-	dvec3 nearest = p - normal * dot(normal, p - m.a);
+	double3 nearest = p - normal * dot(normal, p - m.a);
 	contact.squared_dist = squared(nearest - p);
 	if (contact.squared_dist > squared(ContactEpsilon))
 		return false;
@@ -225,7 +227,7 @@ bool is_vertex_triangle_contact(const dvec3& p, const triangle3& m, Contact& /*o
 }
 
 bool is_edge_edge_contact(const segment3& p, const segment3& q, Contact& /*out*/contact) {
-	dvec3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	real aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
 	constexpr real tiny = 1e-8;
 
@@ -235,8 +237,8 @@ bool is_edge_edge_contact(const segment3& p, const segment3& q, Contact& /*out*/
 	// Note: [d >= tiny * aa * bb] is needed to make parallelness test indepent of line lengths
 	if ((d >= tiny && d >= tiny * aa * bb && 0 <= s && s <= d && 0 <= t && t <= d)
 			|| (d <= -tiny && d <= -tiny * aa * bb && d <= s && s <= 0 && d <= t && t <= 0)) {
-		dvec3 P = p.a + A * (s / d);
-		dvec3 Q = q.a + B * (t / d);
+		double3 P = p.a + A * (s / d);
+		double3 Q = q.a + B * (t / d);
 		contact.squared_dist = squared(P - Q);
 		if (contact.squared_dist > squared(ContactEpsilon))
 			return false;
@@ -251,11 +253,11 @@ bool is_edge_edge_contact(const segment3& p, const segment3& q, Contact& /*out*/
 	return false;
 }
 
-bool all_less_equal(const dvec3& a, const dvec3& b) {
+bool all_less_equal(double3 a, double3 b) {
 	return a.x <= b.x && a.y <= b.y && a.z <= b.z;
 }
 
-bool approx_intersects(const dvec3& v, const Shape& shape) {
+bool approx_intersects(double3 v, const Shape& shape) {
 	return squared(v) <= squared(shape.sphere_radius()) && all_less_equal(shape.box().first, v) && all_less_equal(v, shape.box().second);
 }
 
@@ -265,13 +267,13 @@ bool approx_intersects(const segment3& v, const Shape& shape) {
 }
 
 // Assuming shares aren't intersecting, look for pairs of features that are within ContactEpsilon
-vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+vector<Contact> find_all_contacts(const Shape& shape_a, const pose3& pos_a, const Shape& shape_b, const pose3& pos_b) {
 	vector<Contact> contacts;
 	Contact contact;
 
 	// vertex vs face contacts
 	FOR_EACH(vertex_a, shape_a.convex_vertices()) {
-		dvec3 vertex_a_local = pos_b.to_local(pos_a.to_global(vertex_a));
+		double3 vertex_a_local = pos_b.to_local(pos_a.to_global(vertex_a));
 		// TODO this approx check needs to be a little loose to allow for contacts
 		if (!approx_intersects(vertex_a_local, shape_b))
 			continue;
@@ -283,7 +285,7 @@ vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a,
 			}
 	}
 	FOR_EACH(vertex_b, shape_b.convex_vertices()) {
-		dvec3 vertex_b_local = pos_a.to_local(pos_b.to_global(vertex_b));
+		double3 vertex_b_local = pos_a.to_local(pos_b.to_global(vertex_b));
 		// TODO this approx check needs to be a little loose to allow for contacts
 		if (!approx_intersects(vertex_b_local, shape_a))
 			continue;
@@ -312,19 +314,19 @@ vector<Contact> find_all_contacts(const Shape& shape_a, const transform3& pos_a,
 }
 
 // returns 0 if interecting
-real distance(const Shape& shape_a, const transform3& pos_a, const Shape& shape_b, const transform3& pos_b) {
+real distance(const Shape& shape_a, const pose3& pos_a, const Shape& shape_b, const pose3& pos_b) {
 	// Upper bound on distance
     real dist = max(distance(pos_a.position, pos_b.position), shape_a.sphere_radius(), shape_b.sphere_radius());
 
 	// vertex vs face
 	FOR_EACH(vertex_a, shape_a.convex_vertices()) {
-		dvec3 vertex_a_local = pos_b.to_local(pos_a.to_global(vertex_a));
+		double3 vertex_a_local = pos_b.to_local(pos_a.to_global(vertex_a));
 		// TODO skip if current dist is smaller than distance between vertex_a and bounding sphere of B
 		FOR_EACH(face_b, shape_b.faces())
             dist = std::min(dist, distance(face_b, vertex_a_local));
 	}
 	FOR_EACH(vertex_b, shape_b.convex_vertices()) {
-		dvec3 vertex_b_local = pos_a.to_local(pos_b.to_global(vertex_b));
+		double3 vertex_b_local = pos_a.to_local(pos_b.to_global(vertex_b));
 		// TODO skip if current dist is smaller than distance between vertex_b and bounding sphere of A
 		FOR_EACH(face_a, shape_a.faces())
             dist = std::min(dist, distance(face_a, vertex_b_local));

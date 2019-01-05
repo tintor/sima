@@ -16,7 +16,7 @@ segment2 Project(const segment3& s, int axis) {
 	THROW(invalid_argument);
 }
 
-double2 Project(double4 v, int axis) {
+double2 Project(double3 v, int axis) {
 	if (axis == 0)
 		return double2{v.y, v.z};
 	if (axis == 1)
@@ -56,7 +56,7 @@ xpolygon2 Project(const face& f, int axis) {
 }
 
 int ProjectionAxis(const face& f) {
-	double4 s = aabb4(f.vertices()).size();
+	double3 s = aabb3(f.vertices()).size();
 	if (s.x <= s.y && s.x <= s.z)
 		return 0;
 	if (s.y <= s.x && s.y <= s.z)

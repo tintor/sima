@@ -42,7 +42,7 @@ struct segment {
 };
 
 using segment2 = segment<double2>;
-using segment3 = segment<double4>;
+using segment3 = segment<double3>;
 
 // starts from a, and goes to infinity
 template<typename Vec>
@@ -68,7 +68,7 @@ struct ray {
 };
 
 using ray2 = ray<double2>;
-using ray3 = ray<double4>;
+using ray3 = ray<double3>;
 
 // TODO raw_line3: which just stores points A and B (no normalization)
 
@@ -108,7 +108,7 @@ struct line {
 };
 
 using line2 = line<double2>;
-using line3 = line<double4>;
+using line3 = line<double3>;
 
 bool relate(segment<double2> p, ray<double2> q);
 
@@ -155,7 +155,7 @@ inline double signed_double_area(double2 a, double2 b, double2 c) {
 	return signed_double_edge_area(a, b) + signed_double_edge_area(b, c) + signed_double_edge_area(c, a);
 }
 
-inline bool Colinear(line3 s, double4 v) {
+inline bool Colinear(line3 s, double3 v) {
 	auto va = v - s.origin;
     return squared(va - s.unit_dir * dot(va, s.unit_dir)) <= squared(Tolerance);
 }

@@ -1,20 +1,21 @@
 #include <geom/primitives.h>
 #include <catch.hpp>
 #include <geom/sphere.h>
+#include <core/exception.h>
 
 TEST_CASE("line_point_squared_distance") {
-    REQUIRE(squared_distance(line3(point(0,0,0), point(9,0,0)), point(1,2,0)) == 4);
+    REQUIRE(squared_distance(line3(d3(0,0,0), d3(9,0,0)), d3(1,2,0)) == 4);
 }
 
 TEST_CASE("segment::nearest") {
-    CHECK(equal(segment3(point(0,0,0), point(9,0,0)).nearest(point(1,2,0)), point(1,0,0)));
+	REQUIRE_NEAR(segment3(d3(0,0,0), d3(9,0,0)).nearest(d3(1,2,0)), d3(1,0,0), 0);
 }
 
 TEST_CASE("Angle") {
-	auto a = point(1, 0, 0);
-	auto b = point(1, 1, 0);
-	auto c = point(cos(PI / 6), sin(PI / 6), 0);
-	auto d = point(-1, 0, 0);
+	auto a = d3(1, 0, 0);
+	auto b = d3(1, 1, 0);
+	auto c = d3(cos(PI / 6), sin(PI / 6), 0);
+	auto d = d3(-1, 0, 0);
 	CHECK((angle(a, b) - 45_deg) <= 1e-20);
 	CHECK((angle(a, c) - 30_deg) <= 1e-20);
 	CHECK((angle(a, a) - 0_deg) <= 1e-20);
@@ -22,17 +23,17 @@ TEST_CASE("Angle") {
 }
 
 TEST_CASE("LineNearest - basic") {
-	segment3 p(point(0,0,0), point(0,0,0));
-	segment3 q(point(1,0,0), point(1,0,0));
-	segment3 r(point(1,0,0), point(1,1,0));
+	segment3 p(d3(0,0,0), d3(0,0,0));
+	segment3 q(d3(1,0,0), d3(1,0,0));
+	segment3 r(d3(1,0,0), d3(1,1,0));
 
 	segment3 pq = nearest(p, q).first;
-	REQUIRE(equal(pq.a, point(0,0,0)));
-	REQUIRE(equal(pq.b, point(1,0,0)));
+	REQUIRE(equal(pq.a, d3(0,0,0)));
+	REQUIRE(equal(pq.b, d3(1,0,0)));
 
 	segment3 pr = nearest(p, r).first;
-	REQUIRE(equal(pr.a, point(0,0,0)));
-	REQUIRE(equal(pr.b, point(1,0,0)));
+	REQUIRE(equal(pr.a, d3(0,0,0)));
+	REQUIRE(equal(pr.b, d3(1,0,0)));
 
 	segment3 rr = nearest(r, r).first;
 	REQUIRE(equal(rr.a, rr.b));
@@ -49,8 +50,8 @@ segment3 LineNearestNumeric(segment3 p, segment3 q, std::default_random_engine& 
 	for (auto j : range(1000000)) {
 		double s = clamp(snum + gauss(rnd));
 		double t = clamp(tnum + gauss(rnd));
-		const double4 A = p.linear(s);
-		const double4 B = q.linear(t);
+		const double3 A = p.linear(s);
+		const double3 B = q.linear(t);
 		if (length(A - B) < dnum) {
 			dnum = length(A-B);
 			snum = s;
@@ -77,12 +78,12 @@ TEST_CASE("LineNearest - random long and short") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<double> uni2(-6, 6);
 	for (auto i : range(20)) {
-		double4 pa = uniform3p(rnd, -1000, 1000);
-		double4 qa = uniform3p(rnd, -1000, 1000);
+		double3 pa = uniform3(rnd, -1000, 1000);
+		double3 qa = uniform3(rnd, -1000, 1000);
 		double r = static_cast<double>(pow(10, uni2(rnd)));
-		double4 pd = uniform3p(rnd, -1000 * r, 1000 * r);
+		double3 pd = uniform3(rnd, -1000 * r, 1000 * r);
 		r = static_cast<double>(pow(10, uni2(rnd)));
-		double4 qd = uniform3p(rnd, -1000 * r, 1000 * r);
+		double3 qd = uniform3(rnd, -1000 * r, 1000 * r);
 		segment3 p(pa, pa + pd);
 		segment3 q(qa, qa + qd);
 		TestLineNearest(p, q, rnd);
@@ -93,9 +94,9 @@ TEST_CASE("LineNearest - random parallel") {
 	std::default_random_engine rnd;
 	std::uniform_real_distribution<double> uni2(-1, 1);
 	for (auto i : range(20)) {
-		segment3 p(uniform3p(rnd, -1000, 1000), uniform3p(rnd, -1000, 1000));
-		double4 t = uniform3p(rnd, -1000, 1000);
-		double4 dir = p.b - p.a;
+		segment3 p(uniform3(rnd, -1000, 1000), uniform3(rnd, -1000, 1000));
+		double3 t = uniform3(rnd, -1000, 1000);
+		double3 dir = p.b - p.a;
 		segment3 q(p.a + t + uni2(rnd) * dir, p.b + t + uni2(rnd) * dir);
 		TestLineNearest(p, q, rnd);
 	}
@@ -104,14 +105,14 @@ TEST_CASE("LineNearest - random parallel") {
 TEST_CASE("distance(triangle3, triangle3)") {
     // Planar cases:
     // vertex-vertex
-    CHECK(distance(triangle3(point(0,0,0), point(2,0,0), point(0,2,0)),
-				   triangle3(point(5,0,0), point(7,0,0), point(5,2,0))) == 3);
+    CHECK(distance(triangle3(d3(0,0,0), d3(2,0,0), d3(0,2,0)),
+				   triangle3(d3(5,0,0), d3(7,0,0), d3(5,2,0))) == 3);
     // common edge
-    CHECK(distance(triangle3(point(0,0,0), point(2,0,0), point(0,2,0)),
-				   triangle3(point(0,0,0), point(2,0,0), point(0,-2,0))) == 0);
+    CHECK(distance(triangle3(d3(0,0,0), d3(2,0,0), d3(0,2,0)),
+				   triangle3(d3(0,0,0), d3(2,0,0), d3(0,-2,0))) == 0);
 
     // Parallel cases:
     // face-face overlap
-    CHECK(distance(triangle3(point(0,0,0), point(2,0,0), point(0,2,0)),
-				   triangle3(point(0,0,1), point(2,0,1), point(0,2,1))) == 1);
+    CHECK(distance(triangle3(d3(0,0,0), d3(2,0,0), d3(0,2,0)),
+				   triangle3(d3(0,0,1), d3(2,0,1), d3(0,2,1))) == 1);
 }

@@ -28,7 +28,7 @@ mesh3 load_stl(string_view filename) {
         if (file.readline() != "    outer loop\n")
             THROW(runtime_error, "expected [outer loop]");
 
-        double4 v[3];
+        double3 v[3];
         for (auto i : range(3)) {
 			line = file.readline();
             if (!match(line, vertex_regex, /*out*/m))
@@ -52,7 +52,7 @@ mesh3 load_ply(string_view filename) {
     FileReader file(filename);
     string_view line;
 
-    vector<double4> vertices;
+    vector<double3> vertices;
     mesh3 mesh;
     std::cmatch m;
 
@@ -82,7 +82,7 @@ mesh3 load_ply(string_view filename) {
         double a = parse<double>(m[1]);
         double b = parse<double>(m[3]);
 		double c = parse<double>(m[5]);
-        vertices.push_back(double4{a, b, c});
+        vertices.push_back(double3{a, b, c});
     }
 
     regex face_regex(R"(3 (\d+) (\d+) (\d+)\s*)");

@@ -1,9 +1,10 @@
 #include <Eigen/Dense>
 #include <geom/properties.h>
 #include <geom/aabb.h>
+#include <geom/matrix.h>
 #include <geom/primitives.h>
 
-double SignedTriangleVolume6(double4 a, double4 b, double4 c) {
+double SignedTriangleVolume6(double3 a, double3 b, double3 c) {
 	double z = a.z;
 	z += b.z;
 	z += c.z;
@@ -14,7 +15,7 @@ double SignedTriangleVolume6(double4 a, double4 b, double4 c) {
 	return s * z;
 }
 
-double SignedRingVolume6(cspan<point3> ring) {
+double SignedRingVolume6(cspan<double3> ring) {
 	double z = 0;
 	for (auto e : ring)
 		 z += e.z;
@@ -42,8 +43,8 @@ double SignedVolume(const xmesh3& mesh) {
 // TODO test with volume of cube (randomly rotated)
 
 // Center of mass of a valid polyhedron
-double4 CenterOfMass(const mesh3& mesh) {
-	double4 P = {0, 0, 0};
+double3 CenterOfMass(const mesh3& mesh) {
+	double3 P = {0, 0, 0};
 	double V = 0;
 	for (const triangle3& f : mesh) {
 		double v = dot(f.a, cross(f.b, f.c));
@@ -77,32 +78,28 @@ double2 CenterOfMass(const polygon2& poly) {
 	return P / (V * 3);
 }
 
-/*inline dmat3 full_mat3(double a) {
-    const double m[] = { a, a, a, a, a, a, a, a, a};
-    return glm::make_mat3(m);
+// Moment of inertia of a valid polyhedron with Center of Mass = 0 and Density = 1
+double33 moment_of_inertia(const mesh3& mesh) {
+	constexpr double a = 1 / 60., b = 1 / 120.;
+	const double33 canonical = {{a, b, b}, {b, a, b}, {b, b, a}};
+    auto C = double33::make(0); // covariance
+	for (const auto& f : mesh) {
+		double33 A;
+		// TODO setting rows or columns?
+		A.a = f[0];
+		A.b = f[1];
+		A.c = f[2];
+		C += transpose(A) * canonical * A * det(A);
+	}
+	return double33::make(trace(C)) - C; // C -> I
 }
 
-// Moment of inertia of a valid polyhedron with Center of Mass = 0 and Density = 1
-dmat3 moment_of_inertia(const imesh3& mesh) {
-	constexpr double a = 1 / 60., b = 1 / 120.;
-    constexpr double canon[] = { a, b, b, b, a, b, b, b, a};
-	const dmat3 canonical = glm::make_mat3(canon);
-    dmat3 C = dmat3(0); // covariance
-	for (const auto& f : mesh) {
-		dmat3 A;
-		for (auto i : range(3))
-			glm::row(A, i) = f[i]; // TODO: or column(i) = ?
-		C += (transpose(A) * canonical * A) * determinant(A);
-	}
-	return full_mat3(C[0][0] + C[1][1] + C[2][2]) - C; // C -> I
-}*/
-
 bool is_aabb(const mesh3& mesh) {
-	aabb4 box(mesh);
+	aabb3 box(mesh);
 
 	// All vertices must be made from extreme coordinates
 	for (auto f : mesh)
-		for (double4 v : f)
+		for (double3 v : f)
 			if (v.x != box.min[0] && v.x != box.max[0]
 			 && v.y != box.min[1] && v.y != box.max[1]
 			 && v.z != box.min[2] && v.z != box.max[2])
@@ -119,15 +116,15 @@ bool is_aabb(const mesh3& mesh) {
 	return true;
 }
 
-double4 eigen_vector(cspan<point3> points) {
+double3 eigen_vector(cspan<double3> points) {
 	// compute mean
-	double4 m = {0, 0, 0, 0};
-	for (point3 p : points)
+	double3 m = {0, 0, 0};
+	for (auto p : points)
 		m += p;
 	m /= points.size();
 
 	// compute matrix
-	double4 ss = {0, 0, 0, 0};
+	double3 ss = {0, 0, 0};
 	double xy = 0, xz = 0, yz = 0;
 	for (auto p : points) {
 		p -= m;
@@ -154,5 +151,5 @@ double4 eigen_vector(cspan<point3> points) {
 		i = 2;
 
 	auto vectors = es.eigenvectors();
-	return {vectors(0, i).real(), vectors(1, i).real(), vectors(2, i).real(), 0};
+	return {vectors(0, i).real(), vectors(1, i).real(), vectors(2, i).real()};
 }

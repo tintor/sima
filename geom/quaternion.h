@@ -10,14 +10,12 @@ constexpr quat IDENTITY_QUAT = {0, 0, 0, 1};
 
 // Creates quaternion that represents rotation around axis by angle (in radians).
 //  Right-hand rule is used for rotation direction.
-inline quat quat_from_axis_angle(double4 axis, double angle) {
-	auto q = axis * (sin(angle / 2) / length(axis));
-	q.w = cos(angle / 2);
-	return q;
+inline quat quat_from_axis_angle(double3 axis, double angle) {
+	return extend(axis * (sin(angle / 2) / length(axis)), cos(angle / 2));
 }
 
 // Creates quaternion that rotates vector a to vector b
-inline quat quat_from_to(double4 a, double4 b) {
+inline quat quat_from_to(double3 a, double3 b) {
 	auto axis = cross(a, b);
 	if (squared(axis) < 1e-12)
 		axis = any_normal(a);
@@ -51,7 +49,7 @@ inline quat quat_inv(quat a) {
 }
 
 // inv(a) * b
-inline double4 quat_ldiv(quat a, quat b) {
+inline quat quat_ldiv(quat a, quat b) {
 	double x = a.w * b.x - a.x * b.w - a.y * b.z + a.z * b.y;
 	double y = a.w * b.y + a.x * b.z - a.y * b.w - a.z * b.x;
 	double z = a.w * b.z - a.x * b.y + a.y * b.x - a.z * b.w;
@@ -69,8 +67,8 @@ inline quat quat_rdiv(quat a, quat b) {
 }
 
 // note: not normalized!
-inline double4 quat_axis(quat q) {
-	return {q.x, q.y, q.z, 0};
+inline double3 quat_axis(quat q) {
+	return {q.x, q.y, q.z};
 }
 
 // TODO is there a loss of precision due to acos?
@@ -88,28 +86,28 @@ inline double quat_dot(quat a, quat b) {
 }
 
 // first row of matrix
-inline double4 quat_dir_x(quat q) {
+inline double3 quat_dir_x(quat q) {
 	double x = q.x, y = q.y, z = q.z, w = q.w;
-	return double4{0.5 - (y * y + z * z), x * y - w * z, x * z + w * y, 0} * 2;
+	return double3{0.5 - (y * y + z * z), x * y - w * z, x * z + w * y} * 2;
 }
 
 // second row of matrix
-inline double4 quat_dir_y(quat q) {
+inline double3 quat_dir_y(quat q) {
 	double x = q.x, y = q.y, z = q.z, w = q.w;
-	return double4{x * y + w * z, 0.5 - (x * x + z * z), y * z - w * x, 0} * 2;
+	return double3{x * y + w * z, 0.5 - (x * x + z * z), y * z - w * x} * 2;
 }
 
 // third row of matrix
-inline double4 quat_dir_z(quat q) {
+inline double3 quat_dir_z(quat q) {
 	double x = q.x, y = q.y, z = q.z, w = q.w;
-	return double4{x * z - w * y, y * z + w * x, 0.5 - (x * x + y * y), 0} * 2;
+	return double3{x * z - w * y, y * z + w * x, 0.5 - (x * x + y * y)} * 2;
 }
 
 
 // first col of matrix (or first row of inv quat, assuming unit quat)
-inline double4 quat_idir_x(quat q) {
+inline double3 quat_idir_x(quat q) {
 	double x = q.x, y = q.y, z = q.z, w = q.w;
-	return double4{0.5 - (y * y + z * z), x * y + w * z, x * z - w * y, 0} * 2;
+	return double3{0.5 - (y * y + z * z), x * y + w * z, x * z - w * y} * 2;
 }
 
 /*
@@ -159,7 +157,7 @@ inline double33 quat_to_matrix(quat q) {
 }
 
 // rotate vector by inverse quaternion, returns inv(q) * quat(a, 0) * q
-inline double4 quat_irotate(quat q, double4 a) {
+inline double3 quat_irotate(quat q, double3 a) {
 	double iw = q.x * a.x + q.y * a.y + q.z * a.z;
 	double ix = q.w * a.x - q.y * a.z + q.z * a.y;
 	double iy = q.w * a.y + q.x * a.z - q.z * a.x;

@@ -232,9 +232,8 @@ bool relate(segment2 p, ray2 q) {
 }
 
 pair<segment3, NearestCase> nearest(segment3 p, segment3 q) {
-	double4 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	double aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
-	constexpr double inf = std::numeric_limits<double>::max();
 	constexpr double tiny = 1e-8;
 
 	// ray/ray
@@ -252,10 +251,10 @@ pair<segment3, NearestCase> nearest(segment3 p, segment3 q) {
 	double t0 = (bb >= tiny) ? bc / bb : -1;
 	double t1 = (bb >= tiny) ? (ab + bc) / bb : -1;
 
-	double d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : inf;
-	double d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : inf;
-	double d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : inf;
-	double d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : inf;
+	double d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : INF;
+	double d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : INF;
+	double d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : INF;
+	double d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : INF;
 
 	// endpoint/endpoint
 	double d5 = squared(C);
@@ -286,9 +285,8 @@ pair<segment3, NearestCase> nearest(segment3 p, segment3 q) {
 }
 
 double squared_distance(segment3 p, segment3 q) {
-	double4 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	double aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
-	constexpr double inf = std::numeric_limits<double>::max();
 	constexpr double tiny = 1e-8;
 
 	// ray/ray
@@ -306,10 +304,10 @@ double squared_distance(segment3 p, segment3 q) {
 	double t0 = (bb >= tiny) ? bc / bb : -1;
 	double t1 = (bb >= tiny) ? (ab + bc) / bb : -1;
 
-	double d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : inf;
-	double d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : inf;
-	double d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : inf;
-	double d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : inf;
+	double d1 = (0 <= s0 && s0 <= 1) ? squared(C + A*s0) : INF;
+	double d2 = (0 <= s1 && s1 <= 1) ? squared(C - B + A*s1) : INF;
+	double d3 = (0 <= t0 && t0 <= 1) ? squared(B*t0 - C) : INF;
+	double d4 = (0 <= t1 && t1 <= 1) ? squared(B*t1 - C - A) : INF;
 
 	// endpoint/endpoint
 	double d5 = squared(C);
@@ -320,15 +318,15 @@ double squared_distance(segment3 p, segment3 q) {
 	return min(d1, d2, d3, d4, d5, d6, d7, d8);
 }
 
-double squared_distance(line3 e, double4 p) {
-	double4 pa = p - e.origin;
+double squared_distance(line3 e, double3 p) {
+	double3 pa = p - e.origin;
     return squared(pa - e.unit_dir * dot(pa, e.unit_dir));
 }
 
-double distance(double4 a, double4 b) { return length(a - b); }
+double distance(double3 a, double3 b) { return length(a - b); }
 
-double distance(double4 a, segment3 b) { return distance(a, b.nearest(a)); }
-double distance(segment3 a, double4 b) { return distance(b, a); }
+double distance(double3 a, segment3 b) { return distance(a, b.nearest(a)); }
+double distance(segment3 a, double3 b) { return distance(b, a); }
 
 double distance(segment3 a, segment3 b) {
     return sqrt(squared_distance(a, b));

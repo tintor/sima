@@ -3,7 +3,7 @@
 #include <geom/segment.h>
 
 constexpr double2 ZERO2 = {0, 0};
-constexpr double4 ZERO3 = {0, 0, 0, 0};
+constexpr double3 ZERO3 = {0, 0, 0};
 
 // are P and Q of different sides of line AB?
 inline bool on_different_sides(double2 a, double2 b, double2 p, double2 q) {
@@ -48,26 +48,26 @@ bool gjk_simplex(static_vector<double2, 3>& simplex, double2& dir) {
 }
 
 // are P and Q on different sides of plane ABC?
-inline bool on_different_sides(double4 a, double4 b, double4 c, double4 p, double4 q) {
-	double4 n = cross(b - a, c - a);
+inline bool on_different_sides(double3 a, double3 b, double3 c, double3 p, double3 q) {
+	double3 n = cross(b - a, c - a);
 	return dot(n, p - a) * dot(n, q - a) < 0;
 }
 
-bool gjk_simplex(static_vector<double4, 4>& simplex, double4& dir) {
+bool gjk_simplex(static_vector<double3, 4>& simplex, double3& dir) {
 	if (simplex.size() == 1) {
-		double4 a = simplex[0];
+		double3 a = simplex[0];
 		dir = -a;
 		return false;
 	}
 	if (simplex.size() == 2) {
-		double4 b = simplex[0], a = simplex[1];
-		double4 ab = b - a;
+		double3 b = simplex[0], a = simplex[1];
+		double3 ab = b - a;
 		dir = (dot(ab, -a) > 0) ? cross(cross(ab, -a), ab) : -a;
 		return false;
 	}
 	if (simplex.size() == 3) {
-		double4 c = simplex[0], b = simplex[1], a = simplex[2];
-		double4 up = a + cross(c - a, b - a);
+		double3 c = simplex[0], b = simplex[1], a = simplex[2];
+		double3 up = a + cross(c - a, b - a);
 		if (on_different_sides(a, b, up, c, ZERO3)) {
 			simplex = {b, a};
 			return gjk_simplex(simplex, dir);
@@ -80,7 +80,7 @@ bool gjk_simplex(static_vector<double4, 4>& simplex, double4& dir) {
 		return false;
 	}
 	if (simplex.size() == 4) {
-		double4 d = simplex[0], c = simplex[1], b = simplex[2], a = simplex[3];
+		double3 d = simplex[0], c = simplex[1], b = simplex[2], a = simplex[3];
 		if (on_different_sides(a, b, c, d, ZERO3)) {
 			simplex = {c, b, a};
 			return gjk_simplex(simplex, dir);

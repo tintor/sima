@@ -4,7 +4,7 @@
 #include <core/exception.h>
 
 sphere minimal_sphere(sphere a, sphere b) {
-	double4 d = b.center() - a.center();
+	double3 d = b.center() - a.center();
 	double d2 = squared(d);
 
 	if (squared(a.radius() - b.radius()) >= d2)
@@ -13,12 +13,12 @@ sphere minimal_sphere(sphere a, sphere b) {
 	auto dist = sqrt(d2);
 	double c_radius = (a.radius() + a.radius() + dist) / 2;
 	// division is safe here for small d, as center will converge to a.center
-	point3 c_center = a.center() + ((c_radius - a.radius()) / dist) * d;
+	double3 c_center = a.center() + ((c_radius - a.radius()) / dist) * d;
 	return sphere(c_center, c_radius);
 }
 
-sphere minimal_sphere(sphere a, point3 b) {
-	double4 d = a.center() - b;
+sphere minimal_sphere(sphere a, double3 b) {
+	double3 d = a.center() - b;
 	double d2 = squared(d);
 
 	if (squared(a.radius()) >= d2)
@@ -27,36 +27,36 @@ sphere minimal_sphere(sphere a, point3 b) {
 	auto dist = sqrt(d2);
 	double c_radius = (a.radius() + dist) / 2;
 	// division is safe here for small d, as center will converge to a.center
-	point3 c_center = a.center() + ((c_radius - a.radius()) / dist) * d;
+	double3 c_center = a.center() + ((c_radius - a.radius()) / dist) * d;
 	return sphere(c_center, c_radius);
 }
 
-sphere correct_radius(sphere s, cspan<point3> points) {
+sphere correct_radius(sphere s, cspan<double3> points) {
 	double r = s.radius();
 	for (auto p : points)
 		while (!s.contains(p)) {
-			r = std::nexttoward(r, std::numeric_limits<double>::max());
+			r = std::nexttoward(r, INF);
 			s = sphere(s.center(), r);
 		}
 	return s;
 }
 
-sphere sphere_from(point3 a, point3 b) {
-	point3 center = avg(a, b);
+sphere sphere_from(double3 a, double3 b) {
+	double3 center = avg(a, b);
 	return sphere(center, length(a - center));
 }
 
-sphere minimal_sphere(point3 a, point3 b) {
+sphere minimal_sphere(double3 a, double3 b) {
 	return correct_radius(sphere_from(a, b), {a, b});
 }
 
-sphere sphere_from(point3 a, point3 b, point3 c) {
-    double4 A = a - c, B = b - c, X = cross(A, B);
-    point3 center = c + cross(squared(A) * B - squared(B) * A, X) / (2 * squared(X));
+sphere sphere_from(double3 a, double3 b, double3 c) {
+    double3 A = a - c, B = b - c, X = cross(A, B);
+    double3 center = c + cross(squared(A) * B - squared(B) * A, X) / (2 * squared(X));
 	return sphere(center, length(a - center));
 }
 
-sphere minimal_sphere(point3 a, point3 b, point3 c) {
+sphere minimal_sphere(double3 a, double3 b, double3 c) {
 	sphere s = minimal_sphere(a, b);
 	if (s.contains(c))
 		return s;
@@ -88,21 +88,17 @@ double3 solve_linear_row(double3 a, double3 b, double3 c, double3 w) {
 	return solve_linear_col(x, y, z, w);
 }
 
-// TODO temporary
-double3 d3(double4 e) { return e.xyz; }
-
-sphere sphere_from(point3 a, point3 b, point3 c, point3 d) {
+sphere sphere_from(double3 a, double3 b, double3 c, double3 d) {
 	// 2(x1 - x2) `dot` c = |x1|^2 - |x2|^2
 	// 2(x1 - x3) `dot` c = |x1|^2 - |x3|^2
 	// 2(x1 - x4) `dot` c = |x1|^2 - |x4|^2
 	double sa = squared(a), sb = squared(b), sc = squared(c), sd = squared(d);
    	double3 w = {sa - sb, sa - sc, sa - sd};
-	point3 center = cast4(solve_linear_row(d3(2 * (a - b)), d3(2 * (a - c)), d3(2 * (a - d)), w));
-	center.w = 1;
+	double3 center = solve_linear_row(2 * (a - b), 2 * (a - c), 2 * (a - d), w);
 	return sphere(center, length(a - center));
 }
 
-sphere minimal_sphere(point3 a, point3 b, point3 c, point3 d) {
+sphere minimal_sphere(double3 a, double3 b, double3 c, double3 d) {
 	sphere s = minimal_sphere(a, b, c);
 	if (s.contains(d))
 		return s;
@@ -119,8 +115,8 @@ sphere minimal_sphere(point3 a, point3 b, point3 c, point3 d) {
 	return correct_radius(sphere_from(a, b, c, d), {a, b, c, d});
 }
 
-sphere minimal_sphere_brute_force_x(cspan<point3> points) {
-	sphere minimal(double4{0, 0, 0, 1}, -1);
+sphere minimal_sphere_brute_force_x(cspan<double3> points) {
+	sphere minimal(double3{0, 0, 0}, -1);
 	for (auto a : range(points.size()))
 		for (auto b : range(a + 1, points.size()))
 			for (auto c : range(b + 1, points.size()))
@@ -132,7 +128,7 @@ sphere minimal_sphere_brute_force_x(cspan<point3> points) {
 	return minimal;
 }
 
-sphere minimal_sphere(cspan<point3> interior, array<point3, 4>& surface, int surface_size) {
+sphere minimal_sphere(cspan<double3> interior, array<double3, 4>& surface, int surface_size) {
 	if (surface_size == 4)
 		return sphere_from(surface[0], surface[1], surface[2], surface[3]);
 
@@ -165,26 +161,26 @@ sphere minimal_sphere(cspan<point3> interior, array<point3, 4>& surface, int sur
 	return s;
 }
 
-sphere minimal_sphere(cspan<point3> points) {
-	array<point3, 4> surface;
+sphere minimal_sphere(cspan<double3> points) {
+	array<double3, 4> surface;
 	return minimal_sphere(points, surface, 0);
 }
 
-sphere extermal_points_optimal_sphere(cspan<point3> points, cspan<float4> normals) {
+sphere extermal_points_optimal_sphere(cspan<double3> points, cspan<float4> normals) {
 	if (points.empty())
 		THROW(invalid_argument, "points must be non-empty");
 	if (points.size() <= normals.size() * 2)
 		return minimal_sphere(points);
 
-	aligned_vector<point3> extremal; // TODO since this is bounded, maybe use static_vector?
+	aligned_vector<double3> extremal; // TODO since this is bounded, maybe use static_vector?
 	// TODO maybe swap loops and compute two normals per point at once
 	for (auto n : normals) {
 		int imin = 0, imax = 0;
 		// use float4 dot product intrinsic (as there is no AVX double4
 		// dot product intrinsic and double precision is not needed)
-		auto zmin = dot(n, points[0]), zmax = zmin;
+		auto zmin = dot(n, vconvert(cast4(points[0]), float4)), zmax = zmin;
 		for (int i = 1; i < points.size(); i++) {
-			auto z = dot(n, points[i]);
+			auto z = dot(n, vconvert(cast4(points[i]), float4));
 			if (z < zmin) {
 				imin = i;
 				zmin = z;
@@ -206,12 +202,13 @@ sphere extermal_points_optimal_sphere(cspan<point3> points, cspan<float4> normal
 }
 
 // TODO: generate even number of normals and evenly spaced (using sphere generator)
+// using float4 to take advantage of AVX2 dot product intrinsic for floats
 array<float4, 13> g_normals = {
 	float4{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0},
 	{1, 1, 0, 0}, {1, 0, 1, 0}, {0, 1, 1, 0}, {1, -1, 0, 0}, {1, 0, -1, 0}, {0, 1, -1, 0},
 	{1, 1, 1, 0}, {1, 1, -1, 0}, {1, -1, 1, 0}, {-1, 1, 1, 0}
 };
 
-sphere bounding_sphere(cspan<point3> points) {
+sphere bounding_sphere(cspan<double3> points) {
 	return extermal_points_optimal_sphere(points, g_normals);
 }

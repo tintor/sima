@@ -12,7 +12,7 @@ public:
 	void getCandidates(sphere s, vector<int>& candidates) const;
 
 	void add(sphere s, int id) {
-		double4 c = floor(s.center() * _inv_cell);
+		double3 c = floor(s.center() * _inv_cell);
 		int x = c.x;
 		int y = c.y;
 		int z = c.z;

@@ -33,11 +33,11 @@ bool brute2_intersects(const ConvexA& a, const ConvexB& b, uint iterations = 100
 }
 
 template<typename RNG, typename ConvexA, typename ConvexB>
-optional<pair<double4, double4>> brute3(RNG& rnd, const ConvexA& a, const ConvexB& b, uint iterations = 1000000) {
-	optional<pair<double4, double4>> res;
+optional<pair<double3, double3>> brute3(RNG& rnd, const ConvexA& a, const ConvexB& b, uint iterations = 1000000) {
+	optional<pair<double3, double3>> res;
 	double m = -INF;
 	for (auto i : range(iterations)) {
-		double4 dir = uniform_dir3(rnd);
+		double3 dir = uniform_dir3(rnd);
 		auto sa = a(dir);
 		auto sb = b(-dir);
 		auto s = sa - sb;
@@ -65,7 +65,7 @@ bool eq(optional<pair<double2, double2>> a, optional<pair<double2, double2>> b) 
 	return (a.has_value() && b.has_value() && eq(*a, *b)) || (!a.has_value() && !b.has_value());
 }
 
-TEST_CASE("gjk2 point/triangle", "[gjk2]") {
+TEST_CASE("gjk2 point/triangle", "[.][gjk2]") {
 	double2 a = {1, 1};
 	double2 b = {5, 1};
 	double2 c = {1, 4};
@@ -109,7 +109,7 @@ TEST_CASE("gjk2 point/triangle", "[gjk2]") {
 	out((b + c) / 2);
 }
 
-TEST_CASE("gjk2 circle/circle", "[gjk]") {
+TEST_CASE("gjk2 circle/circle", "[.][gjk]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
 	int m = 0;

@@ -7,7 +7,7 @@ TEST_CASE("minimal_sphere(sphere, sphere)", "[sphere]") {
 	std::default_random_engine rnd;
 	double e = 1;
 	while (e > 1e-10) {
-		sphere a = sphere(uniform3p(rnd, -1, 1) * 1000.0, 1);
+		sphere a = sphere(uniform3(rnd, -1, 1) * 1000.0, 1);
 		sphere b = sphere(a.center() + e * uniform_dir3(rnd), 1);
 		sphere c = minimal_sphere(a, b);
 		REQUIRE(c.radius() >= a.radius());
@@ -18,7 +18,7 @@ TEST_CASE("minimal_sphere(sphere, sphere)", "[sphere]") {
 	}
 }
 
-sphere minimal_sphere_brute_force(cspan<point3> points) {
+sphere minimal_sphere_brute_force(cspan<double3> points) {
 	if (points.size() == 1)
 		return sphere(points[0], 0);
 	if (points.size() == 2)
@@ -26,7 +26,7 @@ sphere minimal_sphere_brute_force(cspan<point3> points) {
 	if (points.size() == 3)
 		return minimal_sphere(points[0], points[1], points[2]);
 
-	sphere minimal = sphere(double4{0, 0, 0, 1}, -1);
+	sphere minimal = sphere(double3{0, 0, 0}, -1);
 	for (auto a : range(points.size()))
 		for (auto b : range(a + 1, points.size()))
 			for (auto c : range(b + 1, points.size()))
@@ -38,30 +38,30 @@ sphere minimal_sphere_brute_force(cspan<point3> points) {
 	return minimal;
 }
 
-double max_distance(point3 center, cspan<point3> points) {
+double max_distance(double3 center, cspan<double3> points) {
 	double d2 = 0;
-	for (point3 p : points)
+	for (double3 p : points)
 		d2 = max(d2, squared(p - center));
 	return sqrt(d2);
 }
 
-bool contains(sphere s, cspan<point3> points) {
+bool contains(sphere s, cspan<double3> points) {
 	for (auto p : points)
 		if (!s.contains(p))
 			return false;
 	return true;
 }
 
-sphere bounding_sphere_iterative(cspan<point3> points, double eps) {
+sphere bounding_sphere_iterative(cspan<double3> points, double eps) {
 	// first approximation is center of aabb
-	aabb4 box(points);
-	point3 center = box.center();
+	aabb3 box(points);
+	double3 center = box.center();
 	double radius = max_distance(center, points);
 
 	double max_shift = radius * 0.5;
 	std::default_random_engine rnd;
 	while (max_shift > eps) {
-		point3 new_center = center + uniform3p(rnd, -max_shift, max_shift);
+		double3 new_center = center + uniform3(rnd, -max_shift, max_shift);
 		double new_radius = max_distance(new_center, points);
 		if (new_radius < radius) {
 			center = new_center;
@@ -73,21 +73,21 @@ sphere bounding_sphere_iterative(cspan<point3> points, double eps) {
 	}
 	sphere s = sphere(center, radius);
 	while (!contains(s, points)) {
-		radius = std::nexttoward(radius, std::numeric_limits<double>::max());
+		radius = std::nexttoward(radius, INF);
 		s = sphere(center, radius);
 	}
 	return s;
 }
 
-bool contains(sphere s, double4 a) { return s.contains(a); }
+bool contains(sphere s, double3 a) { return s.contains(a); }
 double radius(sphere s) { return s.radius(); }
 
-TEST_CASE("minimal_sphere(point3 x2)", "[sphere]") {
+TEST_CASE("minimal_sphere(double3 x2)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
 	for (auto i : range(20000)) {
-		point3 a = uniform3p(rnd, -1, 1);
-		point3 b = uniform3p(rnd, -1, 1);
+		double3 a = uniform3(rnd, -1, 1);
+		double3 b = uniform3(rnd, -1, 1);
 		sphere s1 = minimal_sphere(a, b);
 		sphere s2 = bounding_sphere_iterative({a, b}, 1e-10);
 
@@ -101,13 +101,13 @@ TEST_CASE("minimal_sphere(point3 x2)", "[sphere]") {
 	}
 }
 
-TEST_CASE("minimal_sphere(point3 x3)", "[sphere]") {
+TEST_CASE("minimal_sphere(double3 x3)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
 	for (auto i : range(20000)) {
-		point3 a = uniform3p(rnd, -1, 1);
-		point3 b = uniform3p(rnd, -1, 1);
-		point3 c = uniform3p(rnd, -1, 1);
+		double3 a = uniform3(rnd, -1, 1);
+		double3 b = uniform3(rnd, -1, 1);
+		double3 c = uniform3(rnd, -1, 1);
 		sphere s1 = minimal_sphere(a, b, c);
 		sphere s2 = bounding_sphere_iterative({a, b, c}, 1e-10);
 
@@ -123,14 +123,14 @@ TEST_CASE("minimal_sphere(point3 x3)", "[sphere]") {
 	}
 }
 
-TEST_CASE("minimal_sphere(point3 x4)", "[sphere]") {
+TEST_CASE("minimal_sphere(double3 x4)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
 	for (auto i : range(20000)) {
-		point3 a = uniform3p(rnd, -1, 1);
-		point3 b = uniform3p(rnd, -1, 1);
-		point3 c = uniform3p(rnd, -1, 1);
-		point3 d = uniform3p(rnd, -1, 1);
+		double3 a = uniform3(rnd, -1, 1);
+		double3 b = uniform3(rnd, -1, 1);
+		double3 c = uniform3(rnd, -1, 1);
+		double3 d = uniform3(rnd, -1, 1);
 		sphere s1 = minimal_sphere(a, b, c, d);
 		sphere s2 = bounding_sphere_iterative({a, b, c, d}, 1e-10);
 
@@ -148,17 +148,17 @@ TEST_CASE("minimal_sphere(point3 x4)", "[sphere]") {
 	}
 }
 
-TEST_CASE("minimal_sphere(span<point3>)", "[sphere]") {
+TEST_CASE("minimal_sphere(span<double3>)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<point3> points;
+	aligned_vector<double3> points;
 	for (auto i : range(5000)) {
 		std::uniform_int_distribution<int> dist(5, 16);
 		int size = dist(rnd);
 
 		points.resize(size);
 		for (auto j : range(size))
-			points[j] = uniform3p(rnd, -1.0, 1.0);
+			points[j] = uniform3(rnd, -1.0, 1.0);
 
 		sphere s2 = minimal_sphere_brute_force(points);
 		sphere s1 = minimal_sphere(points);
@@ -166,50 +166,50 @@ TEST_CASE("minimal_sphere(span<point3>)", "[sphere]") {
 	}
 }
 
-TEST_CASE("bounding_sphere(span<point3>)_bound", "[sphere][!hide]]") {
+TEST_CASE("bounding_sphere(span<double3>)_bound", "[sphere][!hide]]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<point3> points;
-	double4 e;
+	aligned_vector<double3> points;
+	double3 e;
 	for (auto i : range(50000)) {
 		int size = 1000;
 
 		points.resize(size);
 		for (auto j : range(size))
-			points[j] = uniform3p(rnd, -1.0, 1.0);
+			points[j] = uniform3(rnd, -1.0, 1.0);
 
 		e += bounding_sphere(points).center();
 	}
 	print("e=%s\n", e);
 }
 
-TEST_CASE("bounding_sphere(span<point3>)_min", "[sphere][!hide]") {
+TEST_CASE("bounding_sphere(span<double3>)_min", "[sphere][!hide]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<point3> points;
-	double4 e;
+	aligned_vector<double3> points;
+	double3 e;
 	for (auto i : range(50000)) {
 		int size = 1000;
 
 		points.resize(size);
 		for (auto j : range(size))
-			points[j] = uniform3p(rnd, -1.0, 1.0);
+			points[j] = uniform3(rnd, -1.0, 1.0);
 
 		e += minimal_sphere(points).center();
 	}
 	print("e=%s\n", e);
 }
 
-TEST_CASE("bounding_sphere(span<point3>)", "[sphere]") {
+TEST_CASE("bounding_sphere(span<double3>)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<point3> points;
+	aligned_vector<double3> points;
 	for (auto i : range(25000)) {
 		int size = 100;
 
 		points.resize(size);
 		for (auto j : range(size))
-			points[j] = uniform3p(rnd, -1.0, 1.0);
+			points[j] = uniform3(rnd, -1.0, 1.0);
 
 		sphere s1 = minimal_sphere(points);
 		sphere s2 = bounding_sphere(points);

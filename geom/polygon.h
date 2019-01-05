@@ -5,7 +5,7 @@
 // TODO move polygon and mesh stuff outside
 
 using polygon2 = vector<double2>;
-using polygon3 = aligned_vector<double4>;
+using polygon3 = aligned_vector<double3>;
 
 // polygon2 with holes
 template<typename Vec>
@@ -51,7 +51,7 @@ private:
 };
 
 using xpolygon2 = xpolygon<double2>;
-using xpolygon3 = xpolygon<double4>;
+using xpolygon3 = xpolygon<double3>;
 
 inline void format_e(string& s, string_view spec, const xpolygon2& p) {
 	s += "(";

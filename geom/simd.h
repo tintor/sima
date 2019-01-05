@@ -82,6 +82,7 @@ inline float8 vmin(float8 a, float8 b) { return _mm256_min_ps(a, b); }
 inline float4 vmin(float4 a, float4 b) { return _mm_min_ps(a, b); }
 
 inline double2 vmin(double2 a, double2 b) { return _mm_min_pd(a, b); }
+inline double3 vmin(double3 a, double3 b) { double4 e = _mm256_min_pd(cast4(a), cast4(b)); return e.xyz; }
 inline double4 vmin(double4 a, double4 b) { return _mm256_min_pd(a, b); }
 
 inline int8 vmax(int8 a, int8 b) { return _mm256_max_epi32(a, b); }
@@ -91,6 +92,7 @@ inline float8 vmax(float8 a, float8 b) { return _mm256_max_ps(a, b); }
 inline float4 vmax(float4 a, float4 b) { return _mm_max_ps(a, b); }
 
 inline double2 vmax(double2 a, double2 b) { return _mm_max_pd(a, b); }
+inline double3 vmax(double3 a, double3 b) { double4 e = _mm256_max_pd(cast4(a), cast4(b)); return e.xyz; }
 inline double4 vmax(double4 a, double4 b) { return _mm256_max_pd(a, b); }
 
 inline int hmin(int8 a) {

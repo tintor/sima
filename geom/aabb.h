@@ -111,6 +111,7 @@ bool Contains(aabb<T> a, aabb<T> b) { return a.contains(b); }
 
 // double only!
 using aabb2 = aabb<double2>;
+using aabb3 = aabb<double3>;
 using aabb4 = aabb<double4>;
 
 template<typename Vec>
@@ -136,11 +137,11 @@ double2 uniform2(RND& rnd, aabb2 box) {
 
 // uniform inside a box (not very efficient)
 template<typename RND>
-double4 uniform3(RND& rnd, aabb4 box) {
+double3 uniform3(RND& rnd, aabb3 box) {
 	auto s = box.size();
 	double m = max(s.x, s.y, s.z);
 	while (true) {
-		double4 v = uniform3v(rnd, 0, m) + box.min;
+		double3 v = uniform3(rnd, 0, m) + box.min;
 		if (box.intersects(v))
 			return v;
 	}

@@ -61,14 +61,14 @@ inline double angle(pose2 a, pose2 b) {
 }
 
 struct pose3 {
-	double4 position; // w = 1
+	double3 position;
 	quat orientation; // unit quaternion
 
 	pose3() { }
-	pose3(double4 p, quat o) : position(p), orientation(o) { }
+	pose3(double3 p, quat o) : position(p), orientation(o) { }
 
-	double4 rotate(double4 v) const { return extend(quat_rotate(orientation, v.xyz), 0); }
-	double4 apply(double4 p) const { return rotate(p) + position; }
+	double3 rotate(double3 v) const { return quat_rotate(orientation, v.xyz); }
+	double3 apply(double3 p) const { return rotate(p) + position; }
 };
 
 inline pose3 interpolate(pose3 a, pose3 b, double t) {
@@ -79,16 +79,16 @@ inline pose3 interpolate(pose3 a, pose3 b, double t) {
 
 inline pose3 mat_to_pose(const double44& m) {
 	double33 e = { m.a.xyz, m.b.xyz, m.c.xyz };
-	return pose3(m.d, quat_from_matrix(e));
+	return pose3(m.d.xyz, quat_from_matrix(e));
 }
 
 inline double44 pose_to_mat(pose3 p) {
 	double33 e = quat_to_matrix(p.orientation);
-	return { extend(e.a, 0), extend(e.b, 0), extend(e.c, 0), p.position };
+	return { extend(e.a, 0), extend(e.b, 0), extend(e.c, 0), extend(p.position, 1) };
 }
 
 inline pose3 mul(pose3 a, pose3 b) {
-	return mat_to_pose(mul(pose_to_mat(a), pose_to_mat(b)));
+	return mat_to_pose(pose_to_mat(a) * pose_to_mat(b));
 }
 
 inline pose3 inverse(pose3 a) {

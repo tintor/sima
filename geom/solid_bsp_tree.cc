@@ -87,7 +87,7 @@ pair<uint, float> SolidBSPTree::build_internal(
 		percent[i] = float(std::distance(samples_begin, samples_end)) / data.samples.size();
 		hist[i] = { 0, 0, 0, 0 };
 		hist[i].overlap = 1;
-		box_size[i] = aabb4(data.faces[mesh[0]]).size();
+		box_size[i] = aabb3(data.faces[mesh[0]]).size();
 		return pair<uint, double>(i, 1.0);
 	}
 
@@ -118,24 +118,24 @@ pair<uint, float> SolidBSPTree::build_internal(
 					best_heuristic, best_hist, best_candidate);
 		}
 		for (auto major_axis : range(3)) {
-			double4 normal{0, 0, 0};
+			double3 normal{0, 0, 0};
 			normal[major_axis] = 1;
 
 			// sort vertices along the major axis
-			const double4* vertex_list = &(data.vertices[0]);
+			const double3* vertex_list = &(data.vertices[0]);
 			std::sort(vertices.begin(), vertices.end(), [major_axis, vertex_list](uint16_t va, uint vb){
 				return vertex_list[va][major_axis] < vertex_list[vb][major_axis];
 			});
 
 			// sort samples along the major axis
-			const double4* sample_list = &(data.samples[0]);
+			const double3* sample_list = &(data.samples[0]);
 			std::sort(samples_begin, samples_end, [major_axis, sample_list](uint sa, uint sb){
 				return sample_list[sa][major_axis] < sample_list[sb][major_axis];
 			});
 
 			double v_prev = -1e100;
 			for (auto v : vertices) {
-				double4 vv = data.vertices[v];
+				double3 vv = data.vertices[v];
 				if (-vv[major_axis] == v_prev)
 					continue;
 				v_prev = vv[major_axis];
@@ -222,7 +222,7 @@ pair<uint, float> SolidBSPTree::build_internal(
 			nmesh.push_back(f);
 	}
 
-	aabb4 box;
+	aabb3 box;
 	for (auto iv : vertices)
 		box.add(data.vertices[iv]);
 
@@ -269,19 +269,19 @@ void SolidBSPTree::print_tree(uint n, int depth) {
 	print_tree(node[n].negative, depth + 1);
 }
 
-bool intersects_convex(double4 v, const mesh3& mesh) {
+bool intersects_convex(double3 v, const mesh3& mesh) {
 	for (auto face : mesh) {
-		double4 normal = compute_normal(face);
+		double3 normal = compute_normal(face);
 		if (dot(normal, v - face.a) > 0)
 			return false;
 	}
 	return true;
 }
 
-bool intersects(double4 v, const triangle3* mesh_begin, const triangle3* mesh_end) {
+bool intersects(double3 v, const triangle3* mesh_begin, const triangle3* mesh_end) {
 	// Can't just take the sdist sign of min_dist as two faces that share the edge
 	// can have the same dist but different sgn(sdist)
-	double min_dist = std::numeric_limits<double>::max(), max_sdist = 0;
+	double min_dist = INF, max_sdist = 0;
 	constexpr double eps = 1e-5; // ??? arbitrary, need to account for rounding errors
 	// when computing distance(vertex, face)
 	for (auto m = mesh_begin; m != mesh_end; m += 1) {
@@ -316,11 +316,11 @@ bool intersects(double4 v, const triangle3* mesh_begin, const triangle3* mesh_en
 	return max_sdist <= 0;
 }
 
-bool intersects(double4 v, const mesh3& mesh) {
+bool intersects(double3 v, const mesh3& mesh) {
 	return ::intersects(v, &mesh[0], &mesh[0] + mesh.size());
 }
 
-bool SolidBSPTree::intersects(double4 v) {
+bool SolidBSPTree::intersects(double3 v) {
 	const uint Inside = 0xFFFFFFFF;
 	const uint Outside = 0;
 
@@ -338,7 +338,7 @@ bool SolidBSPTree::intersects(double4 v) {
 SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_random_engine& rnd) {
 	BuildData data;
 	data.rnd = rnd;
-	aabb4 box(mesh);
+	aabb3 box(mesh);
 
 	// Init samples
 	data.samples.resize(num_samples);
@@ -349,7 +349,7 @@ SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_ran
 	}
 
 	// Init vertices and imesh
-	unordered_map<double4, uint16_t, hash_t<double4>, equal_t<double4>> vec_index;
+	unordered_map<double3, uint16_t, hash_t<double3>, equal_t<double3>> vec_index;
 	vector<uint> imesh;
 	for (const auto& face : mesh) {
 		const auto& a = face[0];
@@ -382,7 +382,7 @@ SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_ran
 
 	int ab = 0, aa = 0, bb = 0;
 	double n = num_samples;
-	vector<double4> tester;
+	vector<double3> tester;
 	tester.resize(n);
 	for (auto j : range(n))
 		tester[j] = uniform3(data.rnd, box);
@@ -399,7 +399,7 @@ SolidBSPTree::SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_ran
 			ab += 1;
 	}
 
-	double4 d = box.size();
+	double3 d = box.size();
 	double v = Volume(mesh) / (d.x * d.y * d.z);
 	print("Same %.05f, A %.05f, Tree %.05f Volume %.05f", ab / n, aa / n, bb / n, v);
 }

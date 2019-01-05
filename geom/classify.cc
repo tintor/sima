@@ -212,8 +212,8 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<IContact2>* contacts)
 int Classify(const xpolygon2& a, const xpolygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
 int Classify(const polygon2& a, const polygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
 
-int Classify(const face& f, double4 v, const aabb4& box) {
-	if (!Intersects(box, aabb4(v)))
+int Classify(const face& f, double3 v, const aabb3& box) {
+	if (!Intersects(box, aabb3(v)))
 		return +1;
 
 	plane p = f.plane();
@@ -226,8 +226,8 @@ int Classify(const face& f, double4 v, const aabb4& box) {
 	return (c == 1) ? 1 : 0;
 }
 
-int Classify(const face& f, const ray3& s, const aabb4& box, double* travel) {
-	if (!Intersects(box, aabb4(s.origin, s.infinity())))
+int Classify(const face& f, const ray3& s, const aabb3& box, double* travel) {
+	if (!Intersects(box, aabb3(s.origin, s.infinity())))
 		return +1;
 
 	plane p = f.plane();
@@ -254,8 +254,8 @@ pair<int, int> ClassifyDoubleSided(const xpolygon2& poly, const ray2& ray) {
 }
 
 // Computes Classify for both s and -s at once.
-pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box) {
-	if (!Intersects(box, aabb4(s.origin, s.infinity())) && !Intersects(box, aabb4(s.origin, -s.infinity())))
+pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb3& box) {
+	if (!Intersects(box, aabb3(s.origin, s.infinity())) && !Intersects(box, aabb3(s.origin, -s.infinity())))
 		return {1, 1};
 
 	plane p = f.plane();
@@ -293,7 +293,7 @@ int Classify(plane p, const segment3& s) {
 
 // [intersections] represent relative travels along segment S
 int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections, vector<IContact>* contacts) {
-	if (!Intersects(Box(f.vertices()), aabb4(s)))
+	if (!Intersects(Box(f.vertices()), aabb3(s)))
 		return +1;
 
 	plane p = f.plane();
@@ -387,7 +387,7 @@ int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* inte
 	return c;
 }
 
-int Classify(const xmesh3& m, double4 p, const aabb4& box) {
+int Classify(const xmesh3& m, double3 p, const aabb3& box) {
 	if (!box.intersects(p))
 		return +1;
 
@@ -401,10 +401,10 @@ int Classify(const xmesh3& m, double4 p, const aabb4& box) {
 	std::default_random_engine rnd;
 	std::uniform_int_distribution dist(0, 2);
 	rnd.seed(0);
-	double4 dirs[3] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+	double3 dirs[3] = {{1,0,0}, {0,1,0}, {0,0,1}};
 	for (size_t i = 0; ; i += 1) {
 		// ray direction vector will have 1 or 2 components zero to make its bounding box smaller
-		double4 d;
+		double3 d;
 		if (i < 3) {
 			d = dirs[i];
 		} else {
@@ -452,8 +452,8 @@ void Intervals::unionAll() {
 	_points.resize(w);
 }
 
-int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<IContact>* contacts) {
-	if (!Intersects(box, aabb4(s)))
+int Classify(const xmesh3& m, const segment3& s, const aabb3& box, bool reverse, vector<IContact>* contacts) {
+	if (!Intersects(box, aabb3(s)))
 		return +1;
 
 	Intervals intervals;
@@ -483,7 +483,7 @@ int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse,
 	return 0;
 }
 
-static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4& boxb, bool reverse, vector<IContact>* contacts) {
+static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb3& boxb, bool reverse, vector<IContact>* contacts) {
 	int result = 1;
 	for (const face& f : ma)
 		for (const segment3& e : Edges(f)) {
@@ -500,8 +500,8 @@ static int ClassifyFaceEdgePairs(const xmesh3& ma, const xmesh3& mb, const aabb4
 	return result;
 }
 
-bool InteriorIntersects(segment3 p, segment3 q, double4* common) {
-	double4 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
+bool InteriorIntersects(segment3 p, segment3 q, double3* common) {
+	double3 A = p.b - p.a, B = q.b - q.a, C = p.a - q.a;
 	double aa = dot(A, A), bb = dot(B, B), ab = dot(A, B), ac = dot(A, C), bc = dot(B, C);
 	constexpr double tiny = 1e-8;
 
@@ -511,8 +511,8 @@ bool InteriorIntersects(segment3 p, segment3 q, double4* common) {
 	// Note: [d >= tiny * aa * bb] is needed to make parallelness test indepent of line lengths
 	if ((d >= tiny && d >= tiny * aa * bb && 0 <= s && s <= d && 0 <= t && t <= d)
 			|| (d <= -tiny && d <= -tiny * aa * bb && d <= s && s <= 0 && d <= t && t <= 0)) {
-		double4 ma = p.a + A * (s / d);
-		double4 mb = q.a + B * (t / d);
+		double3 ma = p.a + A * (s / d);
+		double3 mb = q.a + B * (t / d);
 		if (Equals(ma, mb) && !Equals(ma, p.a) && !Equals(ma, p.b) && !Equals(mb, q.a) && !Equals(mb, q.b)) {
 			*common = (ma + mb) / 2;
 			return true;
@@ -544,7 +544,7 @@ int Classify(const xmesh3& ma, const xmesh3& mb, vector<IContact>* contacts) {
 
 	if (contacts && c == 0) {
 		// edge cross edge contacts
-		double4 common;
+		double3 common;
 		for (auto [ea, na] : ma.uniqueEdges())
 			for (auto [eb, nb] : mb.uniqueEdges())
 				if (InteriorIntersects(ea, eb, &common)) {

@@ -22,7 +22,7 @@ inline bool operator==(const poly_mesh3& a, const poly_mesh3& b) {
 
 #include <catch.hpp>
 
-bool less(double4 a, double4 b) {
+bool less(double3 a, double3 b) {
 	if (a.x != b.x)
 		return a.x < b.x;
 	if (a.y != b.y)
@@ -30,17 +30,17 @@ bool less(double4 a, double4 b) {
 	return a.z < b.z;
 }
 
-bool less(cspan<double4> v, size_t a, size_t b) {
+bool less(cspan<double3> v, size_t a, size_t b) {
 	for (auto i : range(v.size())) {
-		double4 aa = v[(a + i) % v.size()];
-		double4 bb = v[(b + i) % v.size()];
+		double3 aa = v[(a + i) % v.size()];
+		double3 bb = v[(b + i) % v.size()];
 		if (!equal(aa, bb))
 			return less(aa, bb);
 	}
 	return false;
 };
 
-bool less(cspan<double4> a, cspan<double4> b) {
+bool less(cspan<double3> a, cspan<double3> b) {
 	if (a.size() != b.size())
 		return a.size() < b.size();
 	for (auto [aa, bb] : czip(a, b))
@@ -49,20 +49,20 @@ bool less(cspan<double4> a, cspan<double4> b) {
 	return false;
 };
 
-static aligned_vector<double4> normalize(cspan<double4> v) {
+static aligned_vector<double3> normalize(cspan<double3> v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
 		if (less(v, i, m))
 			m = i;
-	aligned_vector<double4> w;
+	aligned_vector<double3> w;
 	w.resize(n);
 	for (auto i : range(n))
 		w[i] = v[(i + m) % n];
 	return w;
 }
 
-static poly_mesh3 hull(cspan<double4> a) {
+static poly_mesh3 hull(cspan<double3> a) {
 	mesh3 m = convex_hull(a);
 	// convert mesh3 to ipoly3 with triangles
 	poly_mesh3 p;
@@ -94,10 +94,10 @@ static poly_mesh3 hull(cspan<double4> a) {
 }*/
 
 TEST_CASE("convex_hull trivial", "[convex_hull]") {
-	double4 a = {0, 0, 0, 1};
-	double4 b = {1, 0, 0, 1};
-	double4 c = {0, 1, 0, 1};
-	double4 d = {0, 0, 1, 1};
+	double3 a = {0, 0, 0};
+	double3 b = {1, 0, 0};
+	double3 c = {0, 1, 0};
+	double3 d = {0, 0, 1};
 	REQUIRE(convex_hull({}).empty());
 	REQUIRE(convex_hull({a}) == mesh3());
 	REQUIRE(convex_hull({a, b}) == mesh3());
@@ -112,20 +112,20 @@ TEST_CASE("convex_hull trivial", "[convex_hull]") {
 }
 
 TEST_CASE("convex_hull simple", "[convex_hull]") {
-	double4 a = {0, 0, 0, 1};
-	double4 b = {1000, 0, 0, 1};
-	double4 c = {0, 1000, 0, 1};
-	double4 d = {0, 0, 1000, 1};
+	double3 a = {0, 0, 0};
+	double3 b = {1000, 0, 0};
+	double3 c = {0, 1000, 0};
+	double3 d = {0, 0, 1000};
 
 	auto m = hull({a, b, c, d});
 	REQUIRE(m.size() == 4);
 
-	REQUIRE(hull({a, b, c, d, double4{1, 1, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double4{0, 1, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double4{1, 0, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double4{1, 1, 0, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double3{1, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double3{0, 1, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double3{1, 0, 1}}) == m);
+	REQUIRE(hull({a, b, c, d, double3{1, 1, 0}}) == m);
 
-	REQUIRE(hull({a, b, c, d, double4{-1, 0, 0, 1}}).size() == 4);
+	REQUIRE(hull({a, b, c, d, double3{-1, 0, 0}}).size() == 4);
 }
 
 /*TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
@@ -176,7 +176,7 @@ TEST_CASE("convex_hull bunny benchmark", "[!hide][convex_hull]") {
 		try{
 	std::default_random_engine rnd(0);
 	mesh3 mm = MEASURE(load_stl("models/bunny.stl"));
-	/*vector<double4> vertices;
+	/*vector<double3> vertices;
 	for (const itriangle3& f : mm)
 		for (auto i : range(3))
 			vertices.push_back(f[i]);

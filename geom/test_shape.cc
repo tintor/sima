@@ -3,10 +3,10 @@
 
 TEST_CASE("is_valid") {
 /*	REQUIRE(is_valid(vector<triangle3>{}) == Validity::TooFewFaces);
-	dvec3 a(0, 0, 0);
-	dvec3 b(1, 0, 0);
-	dvec3 c(0, 1, 0);
-	dvec3 d(0, 0, 1);*/
+	double3 a(0, 0, 0);
+	double3 b(1, 0, 0);
+	double3 c(0, 1, 0);
+	double3 d(0, 0, 1);*/
 }
 
 TEST_CASE("SphereMesh - ConvexHull - IsConvex") {

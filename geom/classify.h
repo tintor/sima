@@ -7,7 +7,7 @@
 
 inline aabb2 Box(const polygon2& p) { return aabb2(p).buffer(Tolerance); }
 inline aabb2 Box(const xpolygon2& p) { return aabb2(p.vertices()).buffer(Tolerance); }
-inline aabb4 Box(cspan<double4> s) { return aabb4(s).buffer(Tolerance); }
+inline aabb3 Box(cspan<double3> s) { return aabb3(s).buffer(Tolerance); }
 
 // All Sign() functions return:
 // +1 above / positive side
@@ -29,7 +29,7 @@ inline int Sign(ray2 s, double2 v) {
 	return Sign(signed_double_area(s.origin, s.origin + s.unit_dir, v));
 }
 
-inline int Sign(plane p, double4 v) { return Sign(p.distance(v)); }
+inline int Sign(plane p, double3 v) { return Sign(p.distance(v)); }
 
 struct IContact2 {
 	double2 normal;
@@ -39,8 +39,8 @@ struct IContact2 {
 struct IContact {
 	enum class Type { Point, Segment, Polygon };
 	Type type;
-	double4 normal;  // from mb to ma
-	double4 sa, sb;
+	double3 normal;  // from mb to ma
+	double3 sa, sb;
 };
 
 // All Classify() functions return:
@@ -78,11 +78,11 @@ int Classify(const xpolygon2& f, ray2 s);
 // 3D
 // ==
 
-int Classify(const face& f, double4 v, const aabb4& box);
+int Classify(const face& f, double3 v, const aabb3& box);
 int Classify(const face& f, const ray3& s, double* travel = nullptr);
-pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb4& box);
+pair<int, int> ClassifyDoubleSided(const face& f, const ray3& s, const aabb3& box);
 int Classify(plane p, const segment3& s);
 int Classify(const face& f, const segment3& s, bool reverse, vector<dpair>* intersections = nullptr, vector<IContact>* contacts = nullptr);
-int Classify(const xmesh3& m, double4 p, const aabb4& box);
-int Classify(const xmesh3& m, const segment3& s, const aabb4& box, bool reverse, vector<IContact>* contacts = nullptr);
+int Classify(const xmesh3& m, double3 p, const aabb3& box);
+int Classify(const xmesh3& m, const segment3& s, const aabb3& box, bool reverse, vector<IContact>* contacts = nullptr);
 int Classify(const xmesh3& ma, const xmesh3& mb, vector<IContact>* contacts = nullptr);

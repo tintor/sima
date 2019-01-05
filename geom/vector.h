@@ -7,6 +7,8 @@
 
 #define REQUIRE_NEAR(A, B, T) do { auto aa = A; auto bb = B; auto tt = T; auto dd = length(aa - bb); ASSERT_ALWAYS(dd <= tt, "a = %s\nb = %s\nexpected <= %s, actual = %s", aa, bb, tt, dd); } while (false);
 
+#define REQUIRE_EQUAL(A, B) do { auto aa = A; auto bb = B; ASSERT_ALWAYS(all(aa == bb), "a = %s\nb = %s\n|a-b| = %g", aa, bb, abs(aa - bb)); } while (false);
+
 inline double2 d2(double x, double y) { return {x, y}; }
 inline double3 d3(double x, double y, double z) { return {x, y, z}; }
 inline double4 d4(double x, double y, double z, double w) { return {x, y, z, w}; }
@@ -15,17 +17,28 @@ inline double3 extend(double2 v, double z) { return {v.x, v.y, z}; }
 inline double4 extend(double3 v, double w) { return {v.x, v.y, v.z, w}; }
 
 inline long2 lbroad2(long a) { return {a, a}; }
-inline double2 broad2(double a) { return {a, a}; }
 inline long4 lbroad4(long a) { return {a, a, a, a}; }
+
+inline double2 broad2(double a) { return {a, a}; }
+inline double3 broad3(double a) { return {a, a, a}; }
 inline double4 broad4(double a) { return {a, a, a, a}; }
 
 inline void broadcast(double2& a, double b) { a = {b, b}; }
+inline void broadcast(double3& a, double b) { a = {b, b, b}; }
 inline void broadcast(double4& a, double b) { a = {b, b, b, b}; }
 
 inline bool lex_less(double2 a, double2 b) {
 	if (a.x < b.x) return true;
 	if (a.x > b.x) return false;
 	return a.y < b.y;
+}
+
+inline bool lex_less(double3 a, double3 b) {
+	if (a.x < b.x) return true;
+	if (a.x > b.x) return false;
+	if (a.y < b.y) return true;
+	if (a.y > b.y) return false;
+	return a.z < b.z;
 }
 
 inline bool lex_less(double4 a, double4 b) {
@@ -45,6 +58,9 @@ inline double4 sqrt(double4 a) { return _mm256_sqrt_pd(a); }
 // returns 1.0 or -1.0 for each component (depending if >= +0, or <= -0)
 inline double4 sign_no_zero(double4 d) {
 	return bit_and(bit_or(d, broad4(1.0)), broad4(-1.0));
+}
+inline double3 sign_no_zero(double3 d) {
+	return sign_no_zero(cast4(d)).xyz;
 }
 
 inline float4 vdot(float4 a, float4 b) { return _mm_dp_ps(a, b, 0b11111111); }
@@ -108,15 +124,6 @@ inline double3 any_normal(double3 v) {
 	return {-v.y, v.x, 0};
 }
 
-inline double4 any_normal(double4 v) {
-	double4 a = abs(v);
-	if (a.x <= a.y && a.x <= a.z)
-		return {0, -v.z, v.y, 0};
-	if (a.y <= a.z)
-		return {-v.z, 0, v.x, 0};
-	return {-v.y, v.x, 0, 0};
-}
-
 inline double cross(double2 a, double2 b) { return a.x * b.y - b.x * a.y; }
 
 inline double3 cross(double3 a, double3 b) {
@@ -125,27 +132,13 @@ inline double3 cross(double3 a, double3 b) {
             a.x * b.y - b.x * a.y};
 }
 
-inline double4 cross(double4 a, double4 b) {
-	assert(a.w == 0);
-	assert(b.w == 0);
-	return {a.y * b.z - b.y * a.z,
-            a.z * b.x - b.z * a.x,
-            a.x * b.y - b.x * a.y,
-			0};
-}
-
 // returns angle in range [0, PI]
 inline auto angle(double3 a, double3 b) {
 	return std::atan2(length(cross(a, b)), dot(a, b));
 }
 
-// returns angle in range [0, PI]
-inline auto angle(double4 a, double4 b) {
-	return std::atan2(length(cross(a, b)), dot(a, b));
-}
-
 // solid angle between triangle and origin
-inline double solid_angle(double4 A, double4 B, double4 C) {
+inline double solid_angle(double3 A, double3 B, double3 C) {
     double y = dot(A, cross(B, C));
     double a = length(A), b = length(B), c = length(C);
     double x = a * b * c + c * dot(A, B) + b * dot(A, C) + a * dot(B, C);
@@ -191,13 +184,8 @@ double3 uniform3(RND& rnd, double min, double max) {
 }
 
 template<typename RND>
-double4 uniform3p(RND& rnd, double min, double max) {
-	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), 1};
-}
-
-template<typename RND>
-double4 uniform3v(RND& rnd, double min, double max) {
-	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), 0};
+double4 uniform4(RND& rnd, double min, double max) {
+	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max)};
 }
 
 template<typename RND>
@@ -211,21 +199,13 @@ double2 normal2(RND& rnd, double mean, double stdev) {
 }
 
 template<typename RND>
-double4 normal3p(RND& rnd, double mean, double stdev) {
-	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), 1};
-}
-template<typename RND>
-double4 normal3v(RND& rnd, double mean, double stdev) {
-	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), 0};
+double3 normal3(RND& rnd, double mean, double stdev) {
+	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev)};
 }
 
 template<typename RND>
 double4 normal4(RND& rnd, double mean, double stdev) {
 	return {normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev), normal(rnd, mean, stdev)};
-}
-template<typename RND>
-double4 uniform4(RND& rnd, double min, double max) {
-	return {uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max), uniform(rnd, min, max)};
 }
 
 template<typename RND>
@@ -234,28 +214,22 @@ double2 uniform_dir2(RND& rnd) {
 	return {cos(a), sin(a)};
 }
 
-// uniform on the unit sphere surface
 template<typename RND>
-double4 uniform_dir3(RND& rnd) { return normalize(normal3v(rnd, 0, 1)); }
+double3 uniform_dir3(RND& rnd) { return normalize(normal3(rnd, 0, 1)); }
+
 template<typename RND>
 double4 uniform_dir4(RND& rnd) { return normalize(normal4(rnd, 0, 1)); }
 
-inline bool colinear(double4 a, double4 b, double4 c) {
+inline bool colinear(double3 a, double3 b, double3 c) {
 	return squared(cross(b - a, c - a)) <= squared(1e-6);
 }
 
-using point3 = double4;
+inline double3 avg(double3 a, double3 b) { return (a + b) / 2; }
 
-inline point3 avg(point3 a, point3 b) { return (a + b) / 2; }
-inline double dot(point3 a, float4 b) { return dot(a, vconvert(b, double4)); }
-inline double dot(float4 a, point3 b) { return dot(vconvert(a, double4), b); }
+inline double3 compute_normal(double3 a, double3 b, double3 c) { return cross(b - a, c - a); }
 
-inline double4 compute_normal(point3 a, point3 b, point3 c) { return cross(b - a, c - a); }
-
-inline void remove_dups(aligned_vector<double4>& vertices) {
+inline void remove_dups(aligned_vector<double3>& vertices) {
 	::remove_dups(vertices,
-		static_cast<bool(*)(double4, double4)>(&lex_less),
-		static_cast<bool(*)(double4, double4)>(&equal));
+		static_cast<bool(*)(double3, double3)>(&lex_less),
+		static_cast<bool(*)(double3, double3)>(&equal));
 }
-
-inline double4 point(double x, double y, double z) { return {x, y, z, 1}; }
