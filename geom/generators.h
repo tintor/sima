@@ -14,14 +14,14 @@ inline mesh3 generate_box(double sx, double sy, double sz) {
 template<typename RND>
 mesh3 generate_sphere(uint vertices, double radius, RND& rnd) {
 	// generate N random vertices on sphere
-	aligned_vector<double3> V;
+	vector<double3> V;
 	V.resize(vertices);
 	for (auto i : range(vertices))
 		V[i] = uniform_dir3(rnd);
 
 	// increase the distance between the closest two vertices
 	// (as random clumps vertices together)
-	aligned_vector<double3> delta;
+	vector<double3> delta;
 	delta.resize(vertices);
 	for (auto e : range(40)) {
 		for (double3& v : delta)
@@ -37,7 +37,7 @@ mesh3 generate_sphere(uint vertices, double radius, RND& rnd) {
 			V[i] = normalize(V[i] + delta[i]);
 	}
 
-	aligned_vector<double3> I;
+	vector<double3> I;
 	I.resize(vertices);
 	for (auto i : range(vertices))
 		I[i] = V[i] * radius;

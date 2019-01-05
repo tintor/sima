@@ -5,6 +5,15 @@
 #include <core/align_alloc.h>
 #include <random>
 
+namespace std {
+
+template<>
+class allocator<double3> : public AlignAlloc<double3> { };
+template<>
+class allocator<double4> : public AlignAlloc<double4> { };
+
+}
+
 #define REQUIRE_NEAR(A, B, T) do { auto aa = A; auto bb = B; auto tt = T; auto dd = length(aa - bb); ASSERT_ALWAYS(dd <= tt, "a = %s\nb = %s\nexpected <= %s, actual = %s", aa, bb, tt, dd); } while (false);
 
 #define REQUIRE_EQUAL(A, B) do { auto aa = A; auto bb = B; ASSERT_ALWAYS(all(aa == bb), "a = %s\nb = %s\n|a-b| = %g", aa, bb, abs(aa - bb)); } while (false);
@@ -228,7 +237,7 @@ inline double3 avg(double3 a, double3 b) { return (a + b) / 2; }
 
 inline double3 compute_normal(double3 a, double3 b, double3 c) { return cross(b - a, c - a); }
 
-inline void remove_dups(aligned_vector<double3>& vertices) {
+inline void remove_dups(vector<double3>& vertices) {
 	::remove_dups(vertices,
 		static_cast<bool(*)(double3, double3)>(&lex_less),
 		static_cast<bool(*)(double3, double3)>(&equal));

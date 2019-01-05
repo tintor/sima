@@ -1,7 +1,6 @@
 #pragma once
 #include <core/span.h>
 #include <geom/vector.h>
-#include <core/align_alloc.h>
 #include <geom/segment.h>
 #include <core/auto.h>
 #include <core/each.h>
@@ -9,7 +8,7 @@
 #include <core/exception.h>
 
 using mesh2 = vector<triangle2>;
-using mesh3 = aligned_vector<triangle3>;
+using mesh3 = vector<triangle3>;
 
 inline string wkt(const mesh2& mesh) {
 	string s;
@@ -139,12 +138,12 @@ public:
 	vector<pair<segment3, double3>> uniqueEdges() const { THROW(not_implemented); }
 
 private:
-	aligned_vector<double3> _vertices;
+	vector<double3> _vertices;
 	vector<uint> _offsets;
 	vector<uint> _ring_offsets;
 
-	aligned_vector<plane> _facePlanes;
-	aligned_vector<segment3> _uniqueEdges;
-	aligned_vector<double3> _edgeNormals;
-	aligned_vector<double3> _uniqueVertices;
+	vector<plane> _facePlanes;
+	vector<segment3> _uniqueEdges;
+	vector<double3> _edgeNormals;
+	vector<double3> _uniqueVertices;
 };

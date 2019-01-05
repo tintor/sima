@@ -1,11 +1,10 @@
 #include <geom/generators.h>
 #include <geom/tesselate.h>
-#include <core/align_alloc.h>
 #include <core/auto.h>
 #include <geom/properties.h>
 
 mesh3 generate_box(double3 size) {
-	aligned_vector<double3> vertices;
+	vector<double3> vertices;
 	vertices.reserve(8);
 	for (double x : {-1, 1})
 		for (double y : {-1, 1})
@@ -15,7 +14,7 @@ mesh3 generate_box(double3 size) {
 }
 
 mesh3 generate_cylinder(uint sides, double rmin, double rmax, double zmin, double zmax) {
-	aligned_vector<double3> vertices;
+	vector<double3> vertices;
 	for (auto [z, r] : {pair{zmin, rmin}, pair{zmax, rmax}})
 		if (r == 0)
 			vertices.push_back(double3{0, 0, z});
@@ -174,7 +173,7 @@ mesh3 generate_regular_polyhedra2(cspan<pair<int, int>> faces) {
 	for (auto p : faces)
 		count += p.first * p.second;
 
-	aligned_vector<double3> vertex(count), delta(count);
+	vector<double3> vertex(count), delta(count);
 
 	unordered_map<pair<int, int>, double, hash_t<pair<int, int>>> edges;
 	count = 0;

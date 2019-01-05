@@ -151,7 +151,7 @@ TEST_CASE("minimal_sphere(double3 x4)", "[sphere]") {
 TEST_CASE("minimal_sphere(span<double3>)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	vector<double3> points;
 	for (auto i : range(5000)) {
 		std::uniform_int_distribution<int> dist(5, 16);
 		int size = dist(rnd);
@@ -169,7 +169,7 @@ TEST_CASE("minimal_sphere(span<double3>)", "[sphere]") {
 TEST_CASE("bounding_sphere(span<double3>)_bound", "[sphere][!hide]]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	vector<double3> points;
 	double3 e;
 	for (auto i : range(50000)) {
 		int size = 1000;
@@ -186,7 +186,7 @@ TEST_CASE("bounding_sphere(span<double3>)_bound", "[sphere][!hide]]") {
 TEST_CASE("bounding_sphere(span<double3>)_min", "[sphere][!hide]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	vector<double3> points;
 	double3 e;
 	for (auto i : range(50000)) {
 		int size = 1000;
@@ -203,7 +203,7 @@ TEST_CASE("bounding_sphere(span<double3>)_min", "[sphere][!hide]") {
 TEST_CASE("bounding_sphere(span<double3>)", "[sphere]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	vector<double3> points;
 	for (auto i : range(25000)) {
 		int size = 100;
 

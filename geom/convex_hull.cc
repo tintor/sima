@@ -8,7 +8,7 @@
 
 bool is_convex(cspan<triangle3> mesh) {
 	// Extract all unique vertices
-	aligned_vector<double3> vertices;
+	vector<double3> vertices;
 	vertices.reserve(mesh.size() * 3);
 	for (auto face : mesh)
 		for (auto vertex : face)

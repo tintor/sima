@@ -66,22 +66,3 @@ public:
         return true;
     }
 };
-
-template<typename T>
-using aligned_vector = vector<T, AlignAlloc<T>>;
-
-template<typename T>
-void operator<<(aligned_vector<T>& v, cspan<T> e) {
-	v.resize(v.size() + e.size());
-	auto r = e.begin();
-	for (auto it = v.end() - e.size(); it != v.end(); it++)
-		*it = *r++;
-}
-
-template<typename T>
-void operator<<(vector<T>& v, cspan<T> e) {
-	v.resize(v.size() + e.size());
-	auto r = e.begin();
-	for (auto it = v.end() - e.size(); it != v.end(); it++)
-		*it = *r++;
-}

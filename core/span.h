@@ -100,3 +100,11 @@ private:
 
 template<typename T>
 using cspan = span<const T>;
+
+template<typename T, typename M>
+void operator<<(std::vector<T>& v, span<M> e) {
+	v.resize(v.size() + e.size());
+	auto r = e.begin();
+	for (auto it = v.end() - e.size(); it != v.end(); it++)
+		*it = *r++;
+}

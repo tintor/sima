@@ -2,7 +2,6 @@
 #include <geom/segment.h>
 #include <core/range.h>
 #include <geom/edges.h>
-#include <core/align_alloc.h>
 #include <core/auto.h>
 
 template<typename Vec>

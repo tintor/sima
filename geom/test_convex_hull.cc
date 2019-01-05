@@ -49,13 +49,13 @@ bool less(cspan<double3> a, cspan<double3> b) {
 	return false;
 };
 
-static aligned_vector<double3> normalize(cspan<double3> v) {
+static vector<double3> normalize(cspan<double3> v) {
 	const auto n = v.size();
 	size_t m = 0;
 	for (auto i : range<size_t>(1, n))
 		if (less(v, i, m))
 			m = i;
-	aligned_vector<double3> w;
+	vector<double3> w;
 	w.resize(n);
 	for (auto i : range(n))
 		w[i] = v[(i + m) % n];
@@ -131,7 +131,7 @@ TEST_CASE("convex_hull simple", "[convex_hull]") {
 /*TEST_CASE("convex_hull random points on cube", "[convex_hull]") {
 	std::default_random_engine rnd;
 	for (int vertices = 4; vertices <= 200; vertices++) {
-		aligned_vector<double4> V(vertices);
+		vector<double4> V(vertices);
 		for (auto i : range(vertices))
 			V[i] = uniform3(rnd, -100, 100);
 		mesh3 m = convex_hull(V);

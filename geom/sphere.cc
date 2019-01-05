@@ -172,7 +172,7 @@ sphere extermal_points_optimal_sphere(cspan<double3> points, cspan<float4> norma
 	if (points.size() <= normals.size() * 2)
 		return minimal_sphere(points);
 
-	aligned_vector<double3> extremal; // TODO since this is bounded, maybe use static_vector?
+	vector<double3> extremal; // TODO since this is bounded, maybe use static_vector?
 	// TODO maybe swap loops and compute two normals per point at once
 	for (auto n : normals) {
 		int imin = 0, imax = 0;

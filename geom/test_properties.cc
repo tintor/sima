@@ -1,7 +1,6 @@
 #include <geom/properties.h>
 #include <geom/generators.h>
 #include <catch.hpp>
-#include <core/align_alloc.h>
 
 // TODO center of mass
 // TODO translate mesh
@@ -41,7 +40,7 @@ double min_eigenvalue(double xx, double yy, double zz, double xy, double xz, dou
 TEST_CASE("eigen - plane normal", "[eigen]") {
 	std::default_random_engine rnd;
 	rnd.seed(0);
-	aligned_vector<double3> points;
+	vector<double3> points;
 	points.resize(20);
 	for (int j = 0; j < 200000; j++) {
 		double3 normal = uniform_dir3(rnd);

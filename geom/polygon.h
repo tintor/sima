@@ -5,7 +5,7 @@
 // TODO move polygon and mesh stuff outside
 
 using polygon2 = vector<double2>;
-using polygon3 = aligned_vector<double3>;
+using polygon3 = vector<double3>;
 
 // polygon2 with holes
 template<typename Vec>
@@ -46,7 +46,7 @@ public:
 	span<Vec> vertices() { return span<Vec>(_vertices); }
 
 private:
-	aligned_vector<Vec> _vertices;
+	vector<Vec> _vertices;
 	vector<uint> _offsets;
 };
 
