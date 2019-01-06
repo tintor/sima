@@ -57,6 +57,7 @@ set(test
 	core/test_span.cc
 	core/test_util.cc
 	core/test_zip.cc
+	core/test_bplustree.cc
 	sim/test_integration.cc
 	geom/test_aabb.cc
 	geom/test_buffer.cc

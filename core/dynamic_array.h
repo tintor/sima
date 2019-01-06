@@ -184,8 +184,10 @@ public:
 	}
 
 	uint size() const { return _size; }
+	T* data() { return _data; }
 	T* begin() { return _data; }
 	T* end() { return _data + _size; }
+	const T* data() const { return _data; }
 	const T* begin() const { return _data; }
 	const T* end() const { return _data + _size; }
 
