@@ -116,7 +116,7 @@ TEST_CASE("b+tree32 random inserts - benchmark", "[.][bplustree]") {
 	test<bplustree_map<int, int, 32>>();
 }
 
-TEST_CASE("ranked_set", "[ranked_set]") {
+/*TEST_CASE("ranked_set", "[ranked_set]") {
 	std::default_random_engine rnd;
 	std::array<uint, 1000> a;
 	for (auto i : range(a.size()))
@@ -127,4 +127,4 @@ TEST_CASE("ranked_set", "[ranked_set]") {
 		b.insert(e);
 	for (auto i : range(a.size()))
 		print("%s %s\n", i, b.findByRank(i));
-}
+}*/
