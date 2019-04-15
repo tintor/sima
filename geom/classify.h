@@ -43,6 +43,16 @@ struct IContact {
 	double3 sa, sb;
 };
 
+struct Feature2 {
+	double2 sa, sb;
+};
+
+struct XContact2 {
+	double2 common;
+	Feature2 fa, fb;
+};
+
+
 // All Classify() functions return:
 // +1 disjoint / separate
 //  0 touching

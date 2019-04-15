@@ -80,6 +80,7 @@ set(test
 	geom/test_broadphase.cc)
 
 add_executable(main main.cc ${prod} ${render})
+add_executable(collision collision.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})
 add_executable(test ${prod} ${test})
 add_executable(pid pid.cc ${prod} ${render})
@@ -120,5 +121,6 @@ else()
 endif()
 
 target_link_libraries(main ${RENDER_LIBS})
+target_link_libraries(collision ${RENDER_LIBS})
 target_link_libraries(run_gravity ${RENDER_LIBS})
 target_link_libraries(pid ${RENDER_LIBS})

@@ -504,11 +504,27 @@ TEST_CASE("Overlaps", "[classify2]") {
 	REQUIRE(t.y == 0.75);
 }
 
+TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
+}
+
+TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
+}
+
+TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
+}
+
 TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {
 	polygon2 a = MakeRect(-1, 1);
 	polygon2 b = MakeRect(-2, 2);
 	Translate(b, double2{5.14, 0});
-	double t = TranslateUntilContact(a, b, double2{1, 0});
+	//double t = TranslateUntilContact(a, b, double2{1, 0});
+	Translate(a, double2{2.14, 0});
+	/*for (double2 p : b)
+		print("AA %f\n", p);
+	for (double2 p : b)
+		print("BB %f\n", p);*/
+	/*Translate(b, double2{5.14, 0});
+	double t = TranslateUntilContact(a, b, double2{1, 0});*/
 	vector<IContact2> contacts;
 	Classify(a, b, &contacts);
 	for (const auto& c : contacts)

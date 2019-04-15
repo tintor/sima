@@ -1,5 +1,6 @@
 #pragma once
 #include <core/format.h>
+#include <core/std.h>
 
 // T can be any number-like type
 template <typename T> struct range {
@@ -15,6 +16,9 @@ template <typename T> struct range {
 		: _begin(begin), _end(end), _end_ptr(&_end), _inc(inc) {
 		assert((inc > 0 && begin <= end) || (inc < 0 && begin >= end));
 	}
+
+	template<typename V>
+	range(const vector<V>& v) : range(v.size()) { }
 
 	struct iterator {
 		iterator(T pos, const range& _range) : _pos(pos), _range(_range) {}

@@ -107,8 +107,13 @@ int TClassify(const Polygon2& f, segment2 s, aabb2 box, vector<pair<double, doub
 			t.x = 0;
 		if (c != 'D') {
 			double x = t.x, y = t.y;
-			if (intersections)
-				intersections->emplace_back(x, y);
+			if (intersections) {
+				pair<double, double> p(x, y);
+				if (intersections->empty() || (intersections->back() != p && intersections->front() != p)) {
+					//print("interval [%s %s] coming from [(%s) (%s)] vs [(%s) (%s)]\n", x, y, e.a, e.b, s.a, s.b);
+					intersections->push_back(p);
+				}
+			}
 			intervals.add(x, y);
 		}
 	}
@@ -154,13 +159,14 @@ int TClassifyWithContacts(const Polygon2& a, const Polygon2& b, aabb2 vb, vector
 				IContact2 c;
 				c.sa = ea.linear(p.first);
 				IContact2* v = (contacts.size() > 0) ? &contacts.back() : nullptr;
-				if (p.first == p.second && v && any(v->sa != v->sb) && (all(v->sb == c.sa) || all(v->sa == c.sa)))
-					continue;
+				//if (p.first == p.second && v && any(v->sa != v->sb) && (all(v->sb == c.sa) || all(v->sa == c.sa)))
+				//	continue;
 				c.sb = ea.linear(p.second);
 				c.normal = normalize(ea.b - ea.a); // TODO direction and reverse
 				if (p.first != p.second && v && all(v->sa == v->sb) && (all(c.sa == v->sb) || all(c.sb == v->sb)))
 					contacts.resize(contacts.size() - 1);
 				contacts.push_back(c);
+				print("edge (%s) (%s): sa %s, sb %s, normal %s, p %.8f %.8f\n", ea.a, ea.b, contacts.back().sa, contacts.back().sb, contacts.back().normal, p.first, p.second);
 			}
 		}
 	}
@@ -211,6 +217,73 @@ int TClassify(const Polygon2& a, const Polygon2& b, vector<IContact2>* contacts)
 
 int Classify(const xpolygon2& a, const xpolygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
 int Classify(const polygon2& a, const polygon2& b, vector<IContact2>* contacts) { return TClassify(a, b, contacts); }
+
+// TODO not complete
+optional<Feature2> FindFeatureAt(const polygon2& a, double2 p) {
+	for (auto i : range(a.size())) {
+		const auto& an = a[(i + 1) % a.size()];
+		if (Equals(p, a[i]))
+			return Feature2{ an, a[(i + a.size() - 1) % a.size()] };
+		//if (Sign(p, a[i], an) == 0 && Contains(Box(a[i], an), p))
+		//	return { an, a[i] };
+	}
+	return nullopt;
+}
+
+// assumes both polygons are counter-clockwise
+int Classify(const polygon2& a, const polygon2& b, vector<XContact2>& contacts) {
+	aabb2 va = Box(a), vb = Box(b);
+	if (!Intersects(va, vb))
+		return +1;
+
+	if (Contains(va, vb) && Classify(a, AnyVertex(b), va) < 0)
+		return -1;
+	if (Contains(vb, va) && Classify(b, AnyVertex(a), vb) < 0)
+		return -1;
+
+	int result = 1;
+	for (auto ea : Edges(a)) {
+		int c = Classify(b, ea, vb);
+		if (c == -1)
+			return -1;
+		if (c == 0)
+			result = 0;
+	}
+	for (auto eb : Edges(b)) {
+		int c = Classify(a, eb, va);
+		if (c == -1)
+			return -1;
+		if (c == 0)
+			result = 0;
+	}
+	if (result == 1)
+		return 1;
+
+	for (size_t i = 0; i < a.size(); i++) {
+		auto res = FindFeatureAt(b, a[i]);
+		if (res) {
+			XContact2 c;
+			c.common = a[i];
+			c.fa.sa = a[(i + 1) % a.size()];
+		   	c.fa.sb = a[(i + a.size() - 1) % a.size()];
+			c.fb = *res;
+			contacts.push_back(c);
+		}
+	}
+	for (size_t i = 0; i < b.size(); i++) {
+		auto res = FindFeatureAt(a, b[i]);
+		if (res) {
+			XContact2 c;
+			c.common = b[i];
+			c.fa = *res;
+			c.fb.sa = b[(i + 1) % b.size()];
+		   	c.fb.sb = b[(i + b.size() - 1) % b.size()];
+			contacts.push_back(c);
+		}
+	}
+	// TODO remove duplicate vertex / vertex contacts
+	return 0;
+}
 
 int Classify(const face& f, double3 v, const aabb3& box) {
 	if (!Intersects(box, aabb3(v)))

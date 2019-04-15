@@ -457,6 +457,7 @@ int main(int argc, char** argv) {
 				Advance(bodies, remaining_dt);
 				if (Classify(bodies, temp) >= 0)
 					break;
+				print("collision found!\n");
 
 				// find collision time
 				double min_dt = 0;
