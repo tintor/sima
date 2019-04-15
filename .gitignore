@@ -12,6 +12,7 @@ main
 run_gravity
 test
 pid
+collision
 compile_commands.json
 benchmark.cc
 temp/*
