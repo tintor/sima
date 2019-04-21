@@ -42,6 +42,10 @@ set(render
 	view/shader.cc
 	glad/src/glad.c)
 
+set(sokoban
+	sokoban/level.cc
+	sokoban/main.cc)
+
 set(test
 	test.cc
 	test_lisp.cc
@@ -84,6 +88,7 @@ add_executable(collision collision.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})
 add_executable(test ${prod} ${test})
 add_executable(pid pid.cc ${prod} ${render})
+add_executable(soko ${sokoban} ${prod})
 
 add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)

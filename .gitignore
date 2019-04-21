@@ -12,6 +12,7 @@ main
 run_gravity
 test
 pid
+soko
 collision
 compile_commands.json
 benchmark.cc
