@@ -507,12 +507,6 @@ TEST_CASE("Overlaps", "[classify2]") {
 TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
 }
 
-TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
-}
-
-TEST_CASE("Classify(polygon2, polygon2) basic boxes 1", "[classify2]") {
-}
-
 TEST_CASE("Classify(polygon2, polygon2) small box, large box", "[classify2]") {
 	polygon2 a = MakeRect(-1, 1);
 	polygon2 b = MakeRect(-2, 2);
