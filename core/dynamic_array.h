@@ -139,6 +139,11 @@ public:
 		std::swap(_size, o._size);
 	}
 
+	void fill(T value) {
+		for (uint i = 0; i < _size; i++)
+			_data[i] = value;
+	}
+
 	uint size() const { return _size; }
 	T* begin() { return _data; }
 	T* end() { return _data + _size; }

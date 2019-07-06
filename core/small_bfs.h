@@ -23,16 +23,16 @@ private:
 template<typename T>
 struct small_bfs : public each<small_bfs<T>> {
 	small_queue<T> queue;
-	vector<bool> visited;
+	dynamic_array<bool> visited;
 
 	small_bfs(uint capacity) : queue(capacity) {
-		visited.resize(capacity, false);
+		visited.resize(capacity);
+		memset(visited.begin(), 0, visited.size());
 	}
 
 	void clear() {
 		queue.clear();
-		for (uint i = 0; i < visited.size(); i++)
-			visited[i] = false;
+		memset(visited.begin(), 0, visited.size());
 	}
 
 	void add(T e, uint index) {
