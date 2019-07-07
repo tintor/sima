@@ -19,6 +19,15 @@ TEST_CASE("format - basic", "[format]") {
 	REQUIRE("1" == format("%s", int32_t(1)));
 	REQUIRE("123456789" == format("%s", int32_t(123456789)));
 
+	REQUIRE("00" == format("%02d", 0));
+	REQUIRE("67" == format("%02d", 67));
+	REQUIRE("000" == format("%03d", 0));
+	REQUIRE("003" == format("%03d", 3));
+	REQUIRE("034" == format("%03d", 34));
+
+	REQUIRE("2" == format("%d", 2.1));
+	REQUIRE("2.1" == format("%.1f", 2.1));
+
 	REQUIRE("3.00" == format("%.2f", 3.0f));
 	REQUIRE("3.000000" == format("%f", 3.0f));
 	REQUIRE("3" == format("%s", 3.0f));

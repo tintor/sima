@@ -113,7 +113,15 @@ inline void format_e(string& s, string_view spec, bool v) { s += v ? "true"sv : 
 
 template<typename Integer>
 void format_int(string& s, string_view spec, Integer v) {
+	int zero_pad = 0;
+	if (spec.size() >= 3 && spec[0] == '%' && spec[1] == '0' && '1' <= spec[2] && spec[2] <= '9')
+		zero_pad = spec[2] - '0';
+
 	if (v == 0) {
+		zero_pad -= 1;
+		for (int i = 0; i < zero_pad; i++)
+			s += '0';
+
 		s += '0';
 		return;
 	}
@@ -122,7 +130,7 @@ void format_int(string& s, string_view spec, Integer v) {
 	char* p = buffer.end();
 	const char* digits = "0123456789ABCDEF";
 
-	if (spec == "%x") {
+	if (spec.size() >= 2 && spec[0] == '%' && spec.back() == 'x') {
 		if (v < 0) {
 			while (v != 0) {
 				assert(buffer.begin() < p);
@@ -155,6 +163,9 @@ void format_int(string& s, string_view spec, Integer v) {
 			}
 		}
 	}
+	zero_pad -= buffer.end() - p;
+	for (int i = 0; i < zero_pad; i++)
+		s += '0';
 	s += string_view(p, buffer.end() - p);
 }
 
@@ -203,10 +214,6 @@ inline void format_fp(string& s, double fvalue, int min, int max, bool plus, boo
                                 signvalue = ' ';
                 }
         }
-
-#if 0
-         if (max == 0) ufvalue += 0.5; /* if max = 0 we must round */
-#endif
 
         /*
          * Sorry, we only support 16 digits past the decimal because of our
@@ -298,7 +305,23 @@ inline void format_fp(string& s, double fvalue, int min, int max, bool plus, boo
 	}
 }
 
+inline bool isIntSpec(string_view spec) {
+	return spec.size() >= 2 && spec[0] == '%' && (spec.back() == 'd' || spec.back() == 'b' || spec.back() == 'x' || spec.back() == 'b');
+}
+
+template<typename T>
+inline void formatFloatAsInt(string& s, string_view spec, T v) {
+	if (v < 0)
+			format_int(s, spec, long(std::round(v)));
+		else
+			format_int(s, spec, ulong(std::round(v)));
+}
+
 inline void format_e(string& s, string_view spec, float v) {
+	if (isIntSpec(spec)) {
+		formatFloatAsInt(s, spec, v);
+		return;
+	}
 	array<char, 30> buffer;
 	// TODO don't use string
 	// TODO reset spec to f if lf
@@ -310,6 +333,10 @@ inline void format_e(string& s, string_view spec, float v) {
 }
 
 inline void format_e(string& s, string_view spec, double v) {
+	if (isIntSpec(spec)) {
+		formatFloatAsInt(s, spec, v);
+		return;
+	}
 	array<char, 30> buffer;
 	string _spec(spec);
 	int length = std::snprintf(buffer.data(), buffer.size(), spec == "%s" ? "%g" : _spec.c_str(), v);
@@ -319,6 +346,10 @@ inline void format_e(string& s, string_view spec, double v) {
 }
 
 inline void format_e(string& s, string_view spec, long double v) {
+	if (isIntSpec(spec)) {
+		formatFloatAsInt(s, spec, v);
+		return;
+	}
 	array<char, 60> buffer;
 	string _spec(spec);
 	int length = std::snprintf(buffer.data(), buffer.size(), spec == "%s" ? "%Lg" : _spec.c_str(), v);
