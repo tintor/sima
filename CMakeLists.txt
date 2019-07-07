@@ -44,6 +44,7 @@ set(render
 
 set(sokoban
 	sokoban/level.cc
+	sokoban/util.cc
 	sokoban/main.cc)
 
 set(test

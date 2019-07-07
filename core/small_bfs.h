@@ -2,6 +2,7 @@
 #include "core/each.h"
 #include "core/exception.h"
 #include "core/dynamic_array.h"
+#include "core/format.h"
 
 // very simple and fast array queue (but number of pushes is limited)
 template<typename T>

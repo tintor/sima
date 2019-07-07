@@ -11,6 +11,8 @@ struct Timestamp {
 
 	static void init();
 
+	static double to_s(long ticks) { return ticks * _ms_per_tick * 1e-3; }
+
 private:
 	long _ticks;
 	static double _ms_per_tick;
