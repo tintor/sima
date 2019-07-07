@@ -6,6 +6,7 @@
 using Agent = uint;
 using Boxes = array_bool<32 * 3>;
 
+// sizeof 16 bytes
 struct State {
 	Boxes boxes;
 	Agent agent;
@@ -26,10 +27,10 @@ namespace std {
 	};
 }
 
+// sizeof 8 bytes
 struct StateInfo {
-	int dir = -1;
-	uint pushes = 0;
-	uint total_dist = 0;
-	int prev_agent = -1;
-	bool closed = false;
+	ushort distance = 0; // pushes so far
+	ushort heuristic = 0; // estimated pushes remaining
+	short dir = -1;
+	short prev_agent = -1;
 };

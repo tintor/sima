@@ -11,6 +11,7 @@
 #include "sokoban/hungarian.h"
 
 #include "phmap/phmap.h"
+using namespace std::chrono_literals;
 
 struct StateMap {
 	constexpr static int SHARDS = 32;
@@ -83,7 +84,7 @@ public:
 		queue.resize(256);
 	}
 
-	void push(const State& s, size_t priority) {
+	void push(const State& s, uint priority) {
 		Timestamp lock_ts;
 		queue_lock.lock();
 		_overhead += lock_ts.elapsed();
@@ -103,7 +104,7 @@ public:
 	optional<State> pop() {
 		Timestamp lock_ts;
 		std::unique_lock<mutex> lk(queue_lock);
-		_overhead += lock_ts.elapsed();
+		_overhead2 += lock_ts.elapsed();
 
 		if (queue_size == 0) {
 			blocked_on_queue += 1;
@@ -148,9 +149,15 @@ public:
 		return Timestamp::to_s(_overhead);
 	}
 
+	double overhead2() {
+		std::unique_lock<mutex> lk(queue_lock);
+		return Timestamp::to_s(_overhead2);
+	}
+
 private:
 	bool running = true;
 	long _overhead = 0;
+	long _overhead2 = 0;
 	uint min_queue = 0;
 	uint blocked_on_queue = 0;
 	uint queue_size = 0;
@@ -170,7 +177,7 @@ struct Solver {
 		: level(level)
 	{ }
 
-	optional<pair<State, StateInfo>> queue_pop_and_close() {
+	optional<pair<State, StateInfo>> queue_pop() {
 		while (true) {
 			optional<State> s = queue.pop();
 			if (!s)
@@ -179,23 +186,20 @@ struct Solver {
 			int shard = StateMap::shard(*s);
 			states.lock2(shard);
 			StateInfo* q = states.query(*s, shard);
-			if (!q || q->closed) {
+			if (!q) {
 				states.unlock(shard);
 				queue_pop_misses += 1;
 				continue;
 			}
 			StateInfo si = *q; // copy before unlock
-			q->closed = true;
 			states.unlock(shard);
-
 			return pair<State, StateInfo>{ *s, si };
 		}
 	}
 
 	void normalize(State& s, small_bfs<Cell*>& visitor) {
 		visitor.clear();
-		auto* x = level->cells[s.agent];
-		visitor.add(x, s.agent);
+		visitor.add(level->cells[s.agent], s.agent);
 		for (Cell* a : visitor)
 			for (auto [_, b] : a->moves)
 				if (!s.boxes[b->id]) {
@@ -234,34 +238,26 @@ struct Solver {
 		optional<pair<State, StateInfo>> result;
 		mutex result_lock;
 
-		atomic<int> id = 0;
-		mutex monitor_lock;
-		condition_variable monitor_cv;
-
-		parallel(thread::hardware_concurrency() + 1, [&]() {
-			if (id++ == 0) {
-				// monitoring thread
-				Timestamp start_ts;
-				while (verbosity > 0) {
-					using namespace std::chrono_literals;
-					if (!queue.wait_while_running_for(5s))
-						break;
-					long seconds = std::lround(start_ts.elapsed_s());
-					if (seconds < 4)
-						continue;
-					print("%s: states: %dk, elapsed %dm%ds, lock overhead (states1 %.0fs, states2 %.0fs, queue %.0fs), queue_pop_misses %s\n",
-						level->name, states.size() / 1000, seconds / 60, seconds % 60,
-						Timestamp::to_s(states.overhead.load()), Timestamp::to_s(states.overhead2.load()), queue.overhead(), queue_pop_misses.load());
-					//if (verbosity >= 2)
-					//	Print(level, s);
-				}
-				return;
+		thread monitor([verbosity, this]() {
+			Timestamp start_ts;
+			while (verbosity > 0) {
+				if (!queue.wait_while_running_for(5s))
+					break;
+				long seconds = std::lround(start_ts.elapsed_s());
+				if (seconds < 4)
+					continue;
+				print("%s: states %dM, elapsed %d:%s%d, lock overhead (states1 %.0fs, states2 %.0fs, queue1 %.0fs, queue2 %.0fs), queue_pop_misses %s\n",
+					level->name, states.size() / 1000000, seconds / 60, seconds < 10 ? "0" : "", seconds % 60,
+					Timestamp::to_s(states.overhead.load()), Timestamp::to_s(states.overhead2.load()), queue.overhead(), queue.overhead2(), queue_pop_misses.load());
+				//if (verbosity >= 2)
+				//	Print(level, s);
 			}
-
+		});
+		parallel([&]() {
 			small_bfs<Cell*> agent_visitor(level->cells.size());
 			small_bfs<Cell*> norm_visitor(level->cells.size());
 			while (true) {
-				auto p = queue_pop_and_close();
+				auto p = queue_pop();
 				if (!p)
 					return;
 				const State& s = p->first;
@@ -290,18 +286,28 @@ struct Solver {
 
 						int shard = StateMap::shard(ns);
 						states.lock(shard);
+
 						StateInfo* q = states.query(ns, shard);
-						if (q && q->closed) {
+						if (q) {
+							// existing state
+							if (si.distance + 1 >= q->distance) {
+								states.unlock(shard);
+								continue;
+							}
+							q->dir = d;
+							q->distance = si.distance + 1;
+							// no need to update heuristic
+							q->prev_agent = a->id;
 							states.unlock(shard);
+							queue.push(ns, uint(q->distance) + uint(q->heuristic));
 							continue;
 						}
-						// TODO if !q then add node and unlock before computing heuristic (and update total_dist later safely)
-
+						// new state
 						StateInfo nsi;
 						nsi.dir = d;
-						nsi.pushes = si.pushes + 1;
+						nsi.distance = si.distance + 1;
 						// TODO holding lock while computing heuristic!
-						nsi.total_dist = nsi.pushes + heuristic(ns);
+						nsi.heuristic = heuristic(ns);
 						nsi.prev_agent = a->id;
 
 						if (ns.boxes == goals) {
@@ -313,21 +319,14 @@ struct Solver {
 							return;
 						}
 
-						if (!q) {
-							states.add(ns, nsi, shard);
-							states.unlock(shard);
-							queue.push(ns, nsi.total_dist);
-						} else if (nsi.total_dist < q->total_dist) {
-							*q = nsi;
-							states.unlock(shard);
-							queue.push(ns, nsi.total_dist);
-						} else {
-							states.unlock(shard);
-						}
+						states.add(ns, nsi, shard);
+						states.unlock(shard);
+						queue.push(ns, int(nsi.distance) + int(nsi.heuristic));
 					}
 				}
 			}
 		});
+		monitor.join();
 		return result;
 	}
 };
@@ -354,7 +353,7 @@ int main(int argc, char** argv) {
 	Timestamp::init();
 	Timestamp start_ts;
 	constexpr string_view prefix = "sokoban/levels/";
-	constexpr string_view file = "microban4";
+	constexpr string_view file = "microban2";
 
 	atomic<int> total = 0;
 	atomic<int> completed = 0;
@@ -369,12 +368,8 @@ int main(int argc, char** argv) {
 			return;
 		if (name == "microban2:105" || name == "microban2:109") // >1 hour
 			return;
-
-		/// slow solves 130 and 115
-		//if (name != "original:2")
-		//	return;
-		//if (name == "microban2:130" || name == "microban2:115")
-		//	return;
+		if (name == "microban2:130" || name == "microban2:115") // slow solves
+			return;
 
 		// microban 130:
 		// baseline no locks:        closed 33865k, open 21668k, elapsed 5m0s
@@ -412,12 +407,12 @@ int main(int argc, char** argv) {
 		auto solved = solver.solve(2);
 		if (solved) {
 			completed += 1;
-			print("%s: solved in %d pushes!\n", level->name, solved->second.pushes);
+			print("%s: solved in %d pushes!\n", level->name, solved->second.distance);
 			if (false) {
 				small_bfs<Cell*> visitor(level->cells.size());
 				State s = solved->first;
 				StateInfo si = solved->second;
-				while (si.pushes > 0) {
+				while (si.distance > 0) {
 					Print(level, s);
 					State ps;
 					ps.agent = si.prev_agent;
