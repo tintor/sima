@@ -186,12 +186,13 @@ struct Solver {
 			int shard = StateMap::shard(*s);
 			states.lock2(shard);
 			StateInfo* q = states.query(*s, shard);
-			if (!q) {
+			if (!q && q->closed)  {
 				states.unlock(shard);
 				queue_pop_misses += 1;
 				continue;
 			}
 			StateInfo si = *q; // copy before unlock
+			q->closed = true;
 			states.unlock(shard);
 			return pair<State, StateInfo>{ *s, si };
 		}
@@ -246,11 +247,13 @@ struct Solver {
 				long seconds = std::lround(start_ts.elapsed_s());
 				if (seconds < 4)
 					continue;
-				print("%s: states %dM, elapsed %d:%s%d, lock overhead (states1 %.0fs, states2 %.0fs, queue1 %.0fs, queue2 %.0fs), queue_pop_misses %s\n",
-					level->name, states.size() / 1000000, seconds / 60, seconds < 10 ? "0" : "", seconds % 60,
-					Timestamp::to_s(states.overhead.load()), Timestamp::to_s(states.overhead2.load()), queue.overhead(), queue.overhead2(), queue_pop_misses.load());
-				//if (verbosity >= 2)
-				//	Print(level, s);
+				print("%s: states %dM, elapsed %d:%02d", level->name, states.size() / 1000000, seconds / 60, seconds % 60);
+				print(", lock overhead (states1 %ds, states2 %ds", Timestamp::to_s(states.overhead.load()), Timestamp::to_s(states.overhead2.load()));
+				print(", queue1 %ds, queue2 %ds)", queue.overhead(), queue.overhead2());
+				print(", queue_pop_misses %s\n", queue_pop_misses.load());
+				if (verbosity >= 2) {
+					// TODO print level at the top of queue Print(level, s);
+				}
 			}
 		});
 		parallel([&]() {
@@ -335,6 +338,18 @@ inline string cat(string_view s, const string& a) {
 	return format("%s%s", s, a);
 }
 
+// Big improvements:
+// - hungarian heuristic and over-estimation
+// - frozen boxes deadlock and reversible pushes
+// - deadlock pattern database
+// - pi-corrals
+// - tunnel macros
+
+// Engineering:
+// - parallel solve will be much more effective with more extensive deadlock checking AND more expensive heuristic
+// - after certain size switch to dense compressed hash-map
+// - restart search, but reuse deadlock pattern database from before -> results in smaller state hash-table
+
 // - simple trick for symmetrical levels: expand only non-symmetrical nodes from root AND mark original root as closed AND mark all other non-symmetrical modes as closed
 // - try it by manually modifying level
 
@@ -353,7 +368,7 @@ int main(int argc, char** argv) {
 	Timestamp::init();
 	Timestamp start_ts;
 	constexpr string_view prefix = "sokoban/levels/";
-	constexpr string_view file = "microban2";
+	constexpr string_view file = "original";
 
 	atomic<int> total = 0;
 	atomic<int> completed = 0;
@@ -364,6 +379,8 @@ int main(int argc, char** argv) {
 
 	parallel_for(num, 1, [&](size_t task) {
 		string name = format("%s:%s%s%d", file, (task + 1) < 10 ? "0" : "", (task + 1) < 100 ? "0" : "", task + 1);
+		if (name == "original:24") // syntax?
+			return;
 		if (name == "microban2:132") // large maze with one block
 			return;
 		if (name == "microban2:105" || name == "microban2:109") // >1 hour

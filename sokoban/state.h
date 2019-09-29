@@ -6,6 +6,10 @@
 using Agent = uint;
 using Boxes = array_bool<32 * 3>;
 
+// TODO save space by combining State and StateInfo into one struct
+
+// TODO save space by allocating minimal space for agent and boxes
+
 // sizeof 16 bytes
 struct State {
 	Boxes boxes;
@@ -14,6 +18,7 @@ struct State {
 	State() {}
 	State(Agent agent, const Boxes& boxes) : agent(agent), boxes(boxes) {}
 };
+static_assert(sizeof(State) == 16);
 
 inline bool operator==(const State& a, const State& b) {
 	return a.agent == b.agent && a.boxes == b.boxes;
@@ -27,10 +32,27 @@ namespace std {
 	};
 }
 
+// TODO save space by not storing heuristic
+// TODO save space by not storing distance (can be recomputed by backtracking)
+// TODO remaining are:
+//      - 1 bit - closed
+//      - 2 bit - dir
+//      - 7-8 bit - prev_agent
+
+// original2 level with 70 cells, and 46 alive
+// agent 7bit
+// boxes 46bit
+// closed 1bit
+// dir 2bit
+// prev_agent 7bit
+// TOTAL 63 -> 8bytes!
+
 // sizeof 8 bytes
 struct StateInfo {
 	ushort distance = 0; // pushes so far
 	ushort heuristic = 0; // estimated pushes remaining
-	short dir = -1;
+	char dir = -1;
+	bool closed = false;
 	short prev_agent = -1;
 };
+static_assert(sizeof(StateInfo) == 8);
