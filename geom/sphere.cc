@@ -70,24 +70,6 @@ sphere minimal_sphere(double3 a, double3 b, double3 c) {
 	return correct_radius(sphere_from(a, b, c), {a, b, c});
 }
 
-// Finds E such that:
-// x[i] * e.x + y[i] * e.y + z[i] * e.z = w[i]
-double3 solve_linear_col(double3 x, double3 y, double3 z, double3 w) {
-	double3 e = {det(w, y, z), det(x, w, z), det(x, y, w)};
-	return e / det(x, y, z);
-}
-
-// Finds E such that:
-// dot(a, e) = w[0]
-// dot(b, e) = w[1]
-// dot(c, e) = w[2]
-double3 solve_linear_row(double3 a, double3 b, double3 c, double3 w) {
-	double3 x = {a.x, b.x, c.x};
-	double3 y = {a.y, b.y, c.y};
-	double3 z = {a.z, b.z, c.z};
-	return solve_linear_col(x, y, z, w);
-}
-
 sphere sphere_from(double3 a, double3 b, double3 c, double3 d) {
 	// 2(x1 - x2) `dot` c = |x1|^2 - |x2|^2
 	// 2(x1 - x3) `dot` c = |x1|^2 - |x3|^2

@@ -242,3 +242,21 @@ inline void remove_dups(vector<double3>& vertices) {
 		static_cast<bool(*)(double3, double3)>(&lex_less),
 		static_cast<bool(*)(double3, double3)>(&equal));
 }
+
+// Finds E such that:
+// x[i] * e.x + y[i] * e.y + z[i] * e.z = w[i]
+inline double3 solve_linear_col(double3 x, double3 y, double3 z, double3 w) {
+	double3 e = {det(w, y, z), det(x, w, z), det(x, y, w)};
+	return e / det(x, y, z);
+}
+
+// Finds E such that:
+// dot(a, e) = w[0]
+// dot(b, e) = w[1]
+// dot(c, e) = w[2]
+inline double3 solve_linear_row(double3 a, double3 b, double3 c, double3 w) {
+	double3 x = {a.x, b.x, c.x};
+	double3 y = {a.y, b.y, c.y};
+	double3 z = {a.z, b.z, c.z};
+	return solve_linear_col(x, y, z, w);
+}
