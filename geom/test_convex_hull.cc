@@ -146,23 +146,6 @@ TEST_CASE("convex_hull cube", "[convex_hull]") {
 	REQUIRE(is_aabb(m));
 }
 
-class AutoTimestamp {
-public:
-	AutoTimestamp(string_view name) : _name(name) {}
-	~AutoTimestamp() { print("%s took %s ms\n", _begin.elapsed_ms()); }
-private:
-	string_view _name;
-	Timestamp _begin;
-};
-
-template<typename Func>
-auto measure(string_view name, Func func) {
-	AutoTimestamp mm(name);
-	return func();
-}
-
-#define MEASURE(X) measure(#X, [&](){ return X; } )
-
 template<typename T, typename std::enable_if<std::is_enum<T>::value>::type>
 inline void format_e(string& s, string_view spec, T v) {
 	format_s(s, "%s(%s)", typeid(T).name(), reinterpret_cast<long>(v));
