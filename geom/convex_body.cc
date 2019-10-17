@@ -71,6 +71,8 @@ cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
 	convex_hull(vertices, m.mesh);
 	m.vertices = vertices;
 
+	// TODO need representation which merges triangles into polygonal faces
+
 	// TODO sort faceAxis by face area in decreasing order
 	unordered_map<segment3, double3, hash_t<segment3>> edges;
 	for (const auto& f : m.mesh) {
@@ -81,15 +83,22 @@ cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
 			edges.insert({e, a});
 	}
 
-	// TODO sort edgeAxis by edge length in decreasing order
+	vector<segment3> edge_list;
 	for (const auto& p : edges) {
 		segment3 e = p.first;
 		// ignore opposite edge and edges between coplanar faces
-		if (!lex_less(e.a, e.b) && angle(edges.at(segment3{e.b, e.a}), p.second) > Tolerance) {
-			double3 a = normalize(e.a - e.b);
-			if (!ContainsSimilarAxis(m.edgeAxis, a))
-				m.edgeAxis.push_back(a);
-		}
+		if (!lex_less(e.a, e.b) && angle(edges.at(segment3{e.b, e.a}), p.second) > Tolerance)
+			edge_list.push_back(e);
+	}
+	// order by edge length, longest to shortestt
+	sort(edge_list, [](segment3 p, segment3 q) {
+		return squared(p.a - p.b) > squared(q.a - q.b);
+	});
+
+	for (segment3 e : edge_list) {
+		double3 a = normalize(e.a - e.b);
+		if (!ContainsSimilarAxis(m.edgeAxis, a))
+			m.edgeAxis.push_back(a);
 	}
 	return m;
 }
