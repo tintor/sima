@@ -16,6 +16,7 @@ set(prod
 	geom/aabb.cc
 	geom/classify.cc
 	geom/convex_hull.cc
+	geom/convex_body.cc
 	geom/csg.cc
 	geom/distance.cc
 	geom/is_valid.cc
@@ -68,6 +69,7 @@ set(test
 	geom/test_buffer.cc
 	geom/test_classify.cc
 	geom/test_convex_hull.cc
+	geom/test_convex_body.cc
 	geom/test_gjk.cc
 	geom/test_is_valid.cc
 	geom/test_quaternion.cc
