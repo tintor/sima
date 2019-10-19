@@ -44,7 +44,7 @@ void format_e(string& s, string_view spec, const array<char, S>& m) {
 
 template<typename T, size_t S>
 void format_e(string& s, string_view spec, const array<T, S>& m) {
-	format_span(s, spec, m);
+	format_span(s, spec, span<const T>(m));
 }
 
 template<typename Map>
