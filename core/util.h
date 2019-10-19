@@ -44,8 +44,8 @@ T min(T a, T b) {
 }
 
 template<typename T, typename... Args>
-T min(T a, Args... args) {
-	return min(a, min(args...));
+T min(T a, T b, Args... args) {
+	return min(a, min(b, args...));
 }
 
 template<typename T>
@@ -54,8 +54,8 @@ T max(T a, T b) {
 }
 
 template<typename T, typename... Args>
-T max(T a, Args... args) {
-	return max(a, max(args...));
+T max(T a, T b, Args... args) {
+	return max(a, max(b, args...));
 }
 
 template<typename T>

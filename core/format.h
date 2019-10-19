@@ -8,6 +8,7 @@
 #include <core/int.h>
 #include <core/std.h>
 #include <core/span.h>
+#include <core/interval.h>
 #include <complex>
 
 template<typename... Args>
@@ -396,6 +397,15 @@ FORMAT_VECN(long);
 FORMAT_VECN(cent);
 FORMAT_VECN(float);
 FORMAT_VECN(double);
+
+template<typename T>
+void format_e(string& s, string_view spec, interval<T> m) {
+	s += '[';
+	format_e(s, spec, m.min);
+	s += ' ';
+	format_e(s, spec, m.max);
+	s += ']';
+}
 
 inline void format_a(string& s, int skip, string_view spec) {
 	throw std::runtime_error("format: not enough arguments");
