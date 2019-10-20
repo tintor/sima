@@ -27,19 +27,19 @@ inline m128 bit_xor(m128 a, m128 b) { return _mm_xor_pd(a, b); }
 inline m256 bit_xor(m256 a, m256 b) { return _mm256_xor_pd(a, b); }
 
 inline bool all(int2 v) { return v.x != 0 && v.y != 0; }
-inline bool all(int3 v) { return _mm_movemask_ps(cast4(v)) == 0xF; }
+inline bool all(int3 v) { return _mm_movemask_ps(vshuffle(v, v, 0, 1, 2, 0)) == 0xF; }
 inline bool all(int4 v) { return _mm_movemask_ps(v) == 0xF; }
 
 inline bool all(long2 v) { return _mm_movemask_pd(v) == 0x3; }
-inline bool all(long3 v) { return _mm256_movemask_pd(cast4(v)) == 0xF; }
+inline bool all(long3 v) { return _mm256_movemask_pd(vshuffle(v, v, 0, 1, 2, 0)) == 0xF; }
 inline bool all(long4 v) { return _mm256_movemask_pd(v) == 0xF; }
 
 inline bool any(int2 v) { return v.x != 0 || v.y != 0; }
-inline bool any(int3 v) { return _mm_movemask_ps(cast4(v)) != 0; }
+inline bool any(int3 v) { return _mm_movemask_ps(vshuffle(v, v, 0, 1, 2, 0)) != 0; }
 inline bool any(int4 v) { return _mm_movemask_ps(v) != 0; }
 
 inline bool any(long2 v) { return _mm_movemask_pd(v) != 0; }
-inline bool any(long3 v) { return _mm256_movemask_pd(cast4(v)) != 0; }
+inline bool any(long3 v) { return _mm256_movemask_pd(vshuffle(v, v, 0, 1, 2, 0)) != 0; }
 inline bool any(long4 v) { return _mm256_movemask_pd(v) != 0; }
 
 inline bool equal(int2 a, int2 b) { return all(a == b); }
@@ -51,7 +51,7 @@ inline bool equal(int4 a, int4 b) { return all(a == b); }
 //inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
 
 inline bool equal(double2 a, double2 b) { return all(a == b); }
-inline bool equal(double3 a, double3 b) { return all(a == b); }
+inline bool equal(double3 a, double3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
 inline bool equal(double4 a, double4 b) { return all(a == b); }
 
 inline double2 floor(double2 a) { return _mm_floor_pd(a); }
