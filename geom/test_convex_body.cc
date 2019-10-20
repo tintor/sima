@@ -37,14 +37,14 @@ static double vdist(const vector<double3>& a, const vector<double3>& b, int shif
 
 void CheckPoly(const vector<double3>& expected, const vector<double3>& actual) {
 	CHECK(expected.size() == actual.size());
-	if (expected.size() != actual.size())
+	if (expected.size() != actual.size() || expected.size() == 0)
 		return;
 
 	double dist = std::numeric_limits<double>::infinity();
 	for (int shift : range<int>(0, expected.size()))
 		for (bool flip : {false,  true})
 			minimize(dist, vdist(expected, actual, shift, flip));
-	CHECK(dist <= 1e-5);
+	REQUIRE(dist <= 1e-5);
 }
 
 void Check(double3 expected, double3 actual) {
@@ -110,10 +110,6 @@ vector<double3> rotate(const vector<double3>& v, double3 axis, double angle) {
 }
 
 TEST_CASE("convex_body basic", "[convex_body]") {
-	double3 normal;
-	vector<double3> contacts;
-	double overlap;
-
 	vector<double3> ca;
 	for (double x : {0, 1})
 		for (double y : {0, 1})
@@ -176,6 +172,132 @@ TEST_CASE("convex_body basic", "[convex_body]") {
 	test(ca, translate(ca, double3{1, 1, 0.5}), 0, double3{0, 0, 0}, "1 1 0.5, 1 1 1"_vd3, 0);
 }
 
+TEST_CASE("convex_body transition", "[convex_body]") {
+	vector<double3> ca;
+	for (double x : {0, 1})
+		for (double y : {0, 1})
+			for (double z : {0, 1})
+				ca.push_back(double3{x, y, z});
+
+	print("two identical cubes\n");
+	test(ca, ca, -1, double3{0, 0, 0}, {}, 1);
+	//
+}
+
+template<typename T, typename RND>
+T uniform_int(RND& rnd, T min, T max) {
+	std::uniform_int_distribution dist(min, max);
+	return dist(rnd);
+}
+
+struct Result {
+	int type;
+	double3 normal;
+	double overlap;
+	vector<double3> contacts;
+};
+
+template<typename T>
+Result Run(const T& ma, const T& mb) {
+	vector<double3> work1, work2;
+	Result result;
+	result.type = ClassifyConvexConvex(ma, mb, false, result.normal, result.contacts, result.overlap, work1, work2);
+	return result;
+}
+
+constexpr bool VERBOSE = false;
+
+template<typename T>
+Result VerifyInvariants(const T& ma, const T& mb) {
+	auto result = Run(ma, mb);
+	if (VERBOSE) {
+		print("\nA %s, B %s, result %s, normal %s, contacts %s, overlap %s\n",
+			ma.vertices.size(), mb.vertices.size(), result.type, result.normal, result.contacts, result.overlap);
+		print("A %s\n", ma.vertices);
+		print("B %s\n", mb.vertices);
+	}
+	REQUIRE(length(result.normal) == Approx(1).margin(1e-4));
+	if (result.type == 0)
+		REQUIRE(result.contacts.size() > 0);
+	// TODO if type == 1 then all vertices of one shape are outside of other shape
+	// TODO if any vertex of one shape is inside (or touching) other shape when type == -1
+	// TODO check that contacts have no duplicate points!
+	// TODO check that all contact points are on boundary of both bodies
+	// TODO check that all contact points are in the same plane
+	// TODO check that all contact points are forming convex polygon (if >=3 points)
+	// TODO check that every contact point is either original OR intersection of two edges
+
+	// TODO if type == 0 then translation of B in normal direction by Tolerance will result in type=1
+	// TODO if type == 0 then translation of B in -normal direction by Tolerance will result in type=-1
+	// TODO if type == -1 then translation of B in normal direction by overlap will result in type=0
+
+	auto result2 = Run(mb, ma);
+	if (VERBOSE) {
+		print("\nA %s, B %s, result %s, normal %s, contacts %s, overlap %s\n",
+			ma.vertices.size(), mb.vertices.size(), result2.type, result2.normal, result2.contacts, result2.overlap);
+		print("C1 %s\n", result.contacts);
+		print("C2 %s\n", result2.contacts);
+	}
+	REQUIRE(result.type == result2.type);
+	CheckPoly(result.contacts, result2.contacts);
+	return result;
+}
+
+TEST_CASE("convex_body random face/face", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	array<int, 20> contacts_count = {0};
+	for (auto test : range(0, 1000000)) {
+		vector<double3> ca;
+		for (auto i : range(0, uniform_int<int>(rnd, 3, 6)))
+			ca.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), 0});
+		for (auto i : range(0, uniform_int<int>(rnd, 1, 4)))
+			ca.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), uniform(rnd, 1e-3, 1)});
+
+		vector<double3> cb;
+		for (auto i : range(0, uniform_int<int>(rnd, 3, 6)))
+			cb.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), 0});
+		for (auto i : range(0, uniform_int<int>(rnd, 1, 4)))
+			cb.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), uniform(rnd, -1, -1e-3)});
+
+		auto ma = GenerateConvexMesh(ca);
+		auto mb = GenerateConvexMesh(cb);
+
+		auto result = VerifyInvariants(ma, mb);
+		count[result.type + 1] += 1;
+		contacts_count[result.contacts.size()] += 1;
+		REQUIRE(result.type >= 0);
+
+		// TODO for every point in contacts, determine its source (A, B, both, or computed (which pair of edges))
+
+		// TODO print area and length (minimal bounding circle radius) of contact manifold
+
+		// TODO move them closer if disjoint
+		// TODO move them away if penetrating
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
+	print("contacts %s\n", contacts_count);
+}
+
+TEST_CASE("convex_body random face/edge", "[convex_body]") {
+}
+
+TEST_CASE("convex_body random face/vertex", "[convex_body]") {
+}
+
+// TODO general edge/edge and parallel edge
+TEST_CASE("convex_body random edge/edge", "[convex_body]") {
+}
+
+TEST_CASE("convex_body random edge/edge 1d", "[convex_body]") {
+}
+
+TEST_CASE("convex_body random edge/vertex", "[convex_body]") {
+}
+
+TEST_CASE("convex_body random vertex/vertex", "[convex_body]") {
+}
+
 // TODO transform contact cases into disjoint by moving away in normal direction, and into penetration by moving closer
 
 // TODO generate two sphere-like meshes and collide them
@@ -188,12 +310,7 @@ TEST_CASE("convex_body basic", "[convex_body]") {
 // TODO transformation invariants and swap args invariant
 
 // TODO randomized stress test with two random point clouds
-// TODO randomized stress test with face/face contact
-// TODO randomized stress test with face/vertex contact
 // TODO randomized stress test with edge/edge contact (2 variants)
-// TODO randomized stress test with vertex/edge contact
-// TODO randomized stress test with vertex/vertex contact
-// TODO randomized stress test with face/edge contact
 
 // TODO randomized tests with forced normal along which intervals are in contact, but objects are disjoint!
 

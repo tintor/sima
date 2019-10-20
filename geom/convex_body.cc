@@ -76,7 +76,7 @@ cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
 	// TODO sort faceAxis by face area in decreasing order
 	unordered_map<segment3, double3, hash_t<segment3>> edges;
 	for (const auto& f : m.mesh) {
-		double3 a = compute_normal(f.a, f.b, f.c);
+		double3 a = normalize(compute_normal(f.a, f.b, f.c));
 		if (!ContainsSimilarAxis(m.faceAxis, a))
 			m.faceAxis.push_back(a);
 		for (auto e : Edges(f))
@@ -368,7 +368,7 @@ int ClassifyConvexConvex(
 	vector<double3>& workA,
 	vector<double3>& workB) {
 
-	int result = 0;
+	int result = -1;
 	overlap = std::numeric_limits<double>::infinity();
 	double3 initialNormal = normal;
 
@@ -395,7 +395,13 @@ int ClassifyConvexConvex(
 		}
 
 		normal = axis;
-		return ProcessContacts(ia, ib, ca, cb, normal, contacts, workA, workB);
+		if (!ProcessContacts(ia, ib, ca, cb, normal, contacts, workA, workB)) {
+			result = 1;
+			// TODO can we exit early in this case? and set correct normal
+			return false;
+		}
+		result = 0;
+		return true;
 	};
 
 	if (hasNormal && check(normal))
@@ -420,5 +426,5 @@ int ClassifyConvexConvex(
 					return result;
 		}
 
-	return -1;
+	return result;
 }
