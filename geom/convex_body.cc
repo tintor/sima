@@ -300,6 +300,17 @@ static void ConvexIntersect2(vector<double3>& a, vector<double3>& b, vector<doub
 
 	// TODO this is just for ordering points, so a little cheaper algorithms could be used maybe?
 	ConvexHullInPlace2(c);
+
+	// Remove close points
+	for (size_t i = 0; i < c.size(); i++)
+		for (size_t j = 0; j < i; j++) {
+			if (abs(c[i].x - c[j].x) <= Tolerance * 2 && abs(c[i].y - c[j].y) <= Tolerance * 2) {
+				c[i] = c.back();
+				c.pop_back();
+				i--;
+				break;
+			}
+		}
 }
 
 static bool ProcessContacts(
@@ -334,6 +345,8 @@ static bool ProcessContacts(
 	// TODO if normal comes from one of the edges then pull out its vertices without filtering
 	FilterVertices(ca.vertices, normal, m, workA);
 	FilterVertices(cb.vertices, normal, m, workB);
+	//print("work %s vs %s\n", workA.size(), workB.size());
+	//print("work [%s] vs [%s]\n", workA, workB);
 
 	double3 j = normalize(any_normal(normal));
 	double3 k = cross(j, normal);
@@ -379,6 +392,7 @@ int ClassifyConvexConvex(
 		// TODO maybe it helps to deduplicate axis list
 		auto ia = ProjectToAxis(ca.vertices4, axis);
 		auto ib = ProjectToAxis(cb.vertices4, axis);
+		// print("axis %s, ia %s, ib %s\n", axis, ia, ib);
 		if (ia.max < ib.min - Tolerance || ib.max < ia.min - Tolerance) {
 			normal = axis;
 			result = 1;
@@ -417,7 +431,7 @@ int ClassifyConvexConvex(
 			return result;
 
 	// TODO better join iteration order (join longer edges before shorter edges)
-	for (double3 axisA : cb.edgeAxis)
+	for (double3 axisA : ca.edgeAxis)
 		for (double3 axisB : cb.edgeAxis) {
 			double3 axis = cross(axisA, axisB);
 			double axisLen = length(axis);

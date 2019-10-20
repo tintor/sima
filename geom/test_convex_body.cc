@@ -6,6 +6,9 @@
 #include <geom/convex_body.h>
 #include <geom/quaternion.h>
 
+constexpr bool VERBOSE = false;
+constexpr int TEST_CASES = 300000;
+
 double3 operator"" _d3(const char* s, size_t n) {
 	auto e = split(string_view(s, n), ' ');
 	double3 v;
@@ -36,8 +39,8 @@ static double vdist(const vector<double3>& a, const vector<double3>& b, int shif
 }
 
 void CheckPoly(const vector<double3>& expected, const vector<double3>& actual) {
-	CHECK(expected.size() == actual.size());
-	if (expected.size() != actual.size() || expected.size() == 0)
+	REQUIRE(expected.size() == actual.size());
+	if (expected.size() == 0)
 		return;
 
 	double dist = std::numeric_limits<double>::infinity();
@@ -48,7 +51,8 @@ void CheckPoly(const vector<double3>& expected, const vector<double3>& actual) {
 }
 
 void Check(double3 expected, double3 actual) {
-	print("expected %s, actual %s\n", expected, actual);
+	if (VERBOSE)
+		print("expected %s, actual %s\n", expected, actual);
 	CHECK(length(expected - actual) <= 1e-6);
 }
 
@@ -71,20 +75,19 @@ void test(
 	work1.reserve(ma.vertices.size() / 2);
 	vector<double3> work2;
 	work2.reserve(mb.vertices.size() / 2);
-	int result = MEASURE(ClassifyConvexConvex(ma, mb, false, normal, contacts, overlap, work1, work2));
-	print("result %s, normal %s, contacts %s, overlap %s\n", result, normal, contacts, overlap);
+	int result = ClassifyConvexConvex(ma, mb, false, normal, contacts, overlap, work1, work2);
+	if (VERBOSE)
+		print("result %s, normal %s, contacts %s, overlap %s\n", result, normal, contacts, overlap);
 
 	CHECK(expectedResult == result);
-	if (result <= 0 && !equal(expectedNormal, double3{0, 0, 0})) {
+	if (result <= 0 && !equal(expectedNormal, double3{0, 0, 0}))
 		Check(expectedNormal, normal);
-	}
-	if (result == 0) {
+	if (result == 0)
 		CheckPoly(expectedContacts, contacts);
-	}
-	if (result < 0) {
+	if (result < 0)
 		CHECK(Approx(expectedOverlap).epsilon(1e-6) == overlap);
-	}
-	print("\n");
+	if (VERBOSE)
+		print("\n");
 }
 
 vector<double3> translate(const vector<double3>& v, double3 delta) {
@@ -172,18 +175,6 @@ TEST_CASE("convex_body basic", "[convex_body]") {
 	test(ca, translate(ca, double3{1, 1, 0.5}), 0, double3{0, 0, 0}, "1 1 0.5, 1 1 1"_vd3, 0);
 }
 
-TEST_CASE("convex_body transition", "[convex_body]") {
-	vector<double3> ca;
-	for (double x : {0, 1})
-		for (double y : {0, 1})
-			for (double z : {0, 1})
-				ca.push_back(double3{x, y, z});
-
-	print("two identical cubes\n");
-	test(ca, ca, -1, double3{0, 0, 0}, {}, 1);
-	//
-}
-
 template<typename T, typename RND>
 T uniform_int(RND& rnd, T min, T max) {
 	std::uniform_int_distribution dist(min, max);
@@ -205,10 +196,10 @@ Result Run(const T& ma, const T& mb) {
 	return result;
 }
 
-constexpr bool VERBOSE = false;
+Result VerifyInvariants(const vector<double3>& ca, const vector<double3>& cb) {
+	auto ma = GenerateConvexMesh(ca);
+	auto mb = GenerateConvexMesh(cb);
 
-template<typename T>
-Result VerifyInvariants(const T& ma, const T& mb) {
 	auto result = Run(ma, mb);
 	if (VERBOSE) {
 		print("\nA %s, B %s, result %s, normal %s, contacts %s, overlap %s\n",
@@ -243,59 +234,134 @@ Result VerifyInvariants(const T& ma, const T& mb) {
 	return result;
 }
 
+template<typename RND>
+void Generate(RND& rnd, int pos, int zero, int neg, vector<double3>& ca, int mode = 0) {
+	REQUIRE(pos + zero + neg >= 4);
+	ca.clear();
+	for (auto i : range(0, pos))
+		ca.push_back(double3{uniform(rnd, -1, 1), uniform(rnd, -1, 1), uniform(rnd, 1e-3, 1)});
+	for (auto i : range(0, zero)) {
+		if (mode == 0)
+			ca.push_back(double3{uniform(rnd, -1, 1), uniform(rnd, -1, 1), 0});
+		if (mode == 1)
+			ca.push_back(double3{uniform(rnd, -1, 1), 0, 0});
+		if (mode == 2)
+			ca.push_back(double3{0, 0, 0});
+	}
+	for (auto i : range(0, neg))
+		ca.push_back(double3{uniform(rnd, -1, 1), uniform(rnd, -1, 1), uniform(rnd, -1, -1e-3)});
+	REQUIRE(ca.size() >= 4);
+}
+
 TEST_CASE("convex_body random face/face", "[.][convex_body]") {
 	std::default_random_engine rnd;
 	int count[3] = {0, 0, 0};
 	array<int, 20> contacts_count = {0};
-	for (auto test : range(0, 1000000)) {
-		vector<double3> ca;
-		for (auto i : range(0, uniform_int<int>(rnd, 3, 6)))
-			ca.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), 0});
-		for (auto i : range(0, uniform_int<int>(rnd, 1, 4)))
-			ca.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), uniform(rnd, 1e-3, 1)});
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 1, 4), uniform_int<int>(rnd, 3, 5), 0, ca);
+		Generate(rnd, 0, uniform_int<int>(rnd, 3, 5), uniform_int<int>(rnd, 1, 4), cb);
 
-		vector<double3> cb;
-		for (auto i : range(0, uniform_int<int>(rnd, 3, 6)))
-			cb.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), 0});
-		for (auto i : range(0, uniform_int<int>(rnd, 1, 4)))
-			cb.push_back(double3{uniform(rnd, -10, 10), uniform(rnd, -10, 10), uniform(rnd, -1, -1e-3)});
-
-		auto ma = GenerateConvexMesh(ca);
-		auto mb = GenerateConvexMesh(cb);
-
-		auto result = VerifyInvariants(ma, mb);
+		auto result = VerifyInvariants(ca, cb);
 		count[result.type + 1] += 1;
 		contacts_count[result.contacts.size()] += 1;
 		REQUIRE(result.type >= 0);
 
-		// TODO for every point in contacts, determine its source (A, B, both, or computed (which pair of edges))
-
-		// TODO print area and length (minimal bounding circle radius) of contact manifold
-
-		// TODO move them closer if disjoint
+		// TODO move them closer if disjoint (TODO change "overlap" parameter to distance)
 		// TODO move them away if penetrating
 	}
 	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 	print("contacts %s\n", contacts_count);
 }
 
-TEST_CASE("convex_body random face/edge", "[convex_body]") {
+TEST_CASE("convex_body random face/edge", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 1, 4), uniform_int<int>(rnd, 3, 5), 0, ca);
+		Generate(rnd, 0, 2, uniform_int<int>(rnd, 2, 5), cb);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-TEST_CASE("convex_body random face/vertex", "[convex_body]") {
+TEST_CASE("convex_body random face/vertex", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 1, 4), uniform_int<int>(rnd, 3, 5), 0, ca);
+		Generate(rnd, 0, 1, uniform_int<int>(rnd, 3, 5), cb);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-// TODO general edge/edge and parallel edge
-TEST_CASE("convex_body random edge/edge", "[convex_body]") {
+TEST_CASE("convex_body random edge/edge", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 2, 5), 2, 0, ca);
+		Generate(rnd, 0, 2, uniform_int<int>(rnd, 2, 5), cb);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-TEST_CASE("convex_body random edge/edge 1d", "[convex_body]") {
+TEST_CASE("convex_body random edge/edge 1d", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 2, 5), 2, 0, ca, 1);
+		Generate(rnd, 0, 2, uniform_int<int>(rnd, 2, 5), cb, 1);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-TEST_CASE("convex_body random edge/vertex", "[convex_body]") {
+TEST_CASE("convex_body random edge/vertex", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 2, 5), 2, 0, ca, 1);
+		Generate(rnd, 0, 1, uniform_int<int>(rnd, 3, 5), cb, 1);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-TEST_CASE("convex_body random vertex/vertex", "[convex_body]") {
+TEST_CASE("convex_body random vertex/vertex", "[.][convex_body]") {
+	std::default_random_engine rnd;
+	int count[3] = {0, 0, 0};
+	vector<double3> ca, cb;
+	for (auto test : range(0, TEST_CASES)) {
+		Generate(rnd, uniform_int<int>(rnd, 3, 3), 1, 0, ca, 2);
+		Generate(rnd, 0, 1, uniform_int<int>(rnd, 3, 3), cb, 2);
+
+		auto result = VerifyInvariants(ca, cb);
+		count[result.type + 1] += 1;
+		REQUIRE(result.type >= 0);
+	}
+	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
 // TODO transform contact cases into disjoint by moving away in normal direction, and into penetration by moving closer
