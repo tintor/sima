@@ -85,8 +85,8 @@ public:
 		return span(_data + begin * stride(), new_size, stride() * new_stride);
 	}
 
-	constexpr span pop_front() const { return subspan(1, size() - 1); }
-	constexpr span pop_back() const { return subspan(0, size() - 1); }
+	constexpr span pop_front(size_t n = 1) const { return subspan(n, size() - n); }
+	constexpr span pop_back(size_t n = 1) const { return subspan(0, size() - n); }
 
 	constexpr span first(size_t count) const { return subspan(0, count); }
 	constexpr span last(size_t count) const { assert(count <= size()); return subspan(size() - count, count); }
