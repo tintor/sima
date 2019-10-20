@@ -86,15 +86,20 @@ bool face_cuts_into_other_face(const mesh3& mesh) {
 		double3 sub_cb = m.c - m.b;
 		double3 sub_ac = m.a - m.c;
 
+
 		for (triangle3 n : mesh)
 			if (Intersects(aabb3(n), box))
 				for (segment3 e : Edges(n)) {
+					if (equal(e.a, m.a) || equal(e.a, m.b) || equal(e.a, m.c) || equal(e.b, m.a) || equal(e.b, m.b) || equal(e.b, m.c))
+						continue;
 					double3 d = e.b - e.a;
-					double3 n = cross(d, e.b);
-					long s = dot(n, sub_cb);
-					long t = dot(n, sub_ac);
-					if (dot(d, cross_cb) > -s && dot(d, cross_ac) > -t && dot(d, cross_ba) > s + t)
+					double3 norm = cross(d, e.b);
+					double s = dot(norm, sub_cb);
+					double t = dot(norm, sub_ac);
+					if (dot(d, cross_cb) > -s && dot(d, cross_ac) > -t && dot(d, cross_ba) > s + t) {
+						print("face %s intersects face %s with edge %s\n", m, n, e);
 						return true;
+					}
 				}
 	}
 	return false;
@@ -248,6 +253,27 @@ bool contains_overlapping_faces(const mesh3& mesh) {
 	return false;
 }
 
+bool AreAllEdgesConnected(const mesh3& mesh) {
+	unordered_set<segment3, hash_t<segment3>> edges;
+	for (const auto& f : mesh)
+		for (segment3 e : Edges(f)) {
+			if (edges.count(e) > 0)
+				return false;
+			edges.insert(e);
+		}
+
+	for (segment3 e : edges)
+		print("edge %s\n", e);
+
+	for (const auto& f : mesh)
+		for (segment3 e : Edges(f))
+			if (edges.count(segment3{e.b, e.a}) == 0) {
+				print("edge %s is not connected\n", e);
+				return false;
+			}
+	return true;
+}
+
 Validity IsValid(const mesh3& mesh) {
 	if (mesh.size() < 4)
 		return Validity::TooFewFaces;
@@ -266,7 +292,8 @@ Validity IsValid(const mesh3& mesh) {
 	if (contains_overlapping_faces(mesh))
 		return Validity::OverlappingFaces;
 
-	if (!IsSealed(mesh))
+	if (!AreAllEdgesConnected(mesh))
+	//if (!IsSealed(mesh))
 		return Validity::NotSealed;
 
 	// check if all faces are oriented outside

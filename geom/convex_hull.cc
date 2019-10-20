@@ -19,7 +19,7 @@ bool is_convex(cspan<triangle3> mesh) {
 		double3 n = compute_normal(face);
 		double d = dot(n, face.a);
 		for (auto v : vertices)
-			if (dot(n, v) > d)
+			if (dot(n, v) > d && !equal(v, face.b) && !equal(v, face.c))
 				return false;
 	}
 	return true;
@@ -224,7 +224,4 @@ void convex_hull(cspan<double3> points, mesh3& hull) {
 		for (auto e : open_edges)
 			hull.emplace_back(e.a, e.b, p);
 	}
-
-	assert(is_valid(hull) == Validity::OK);
-	assert(is_convex(hull));
 }

@@ -25,3 +25,5 @@ Validity IsValid(const xmesh3& mesh);
 
 void MakeValid(mesh3& m);
 void MakeValid(xmesh3& m);
+
+bool AreAllEdgesConnected(const mesh3& mesh);
