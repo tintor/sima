@@ -285,8 +285,8 @@ static bool ProcessContacts(
 	double m = (iaMax + ibMin) / 2;
 	// TODO if normal comes from one of the faces then pull out its vertices without filtering
 	// TODO if normal comes from one of the edges then pull out its vertices without filtering
-	FilterVertices(ca.vertices, normal, m - pa, ca.position, workA);
-	FilterVertices(cb.vertices, normal, m - pb, cb.position, workB);
+	FilterVertices(ca.vertices, ca.orientation_inv * normal, m - pa, ca.position, workA);
+	FilterVertices(cb.vertices, cb.orientation_inv * normal, m - pb, cb.position, workB);
 
 	double3 j = normalize(any_normal(normal));
 	double3 k = cross(j, normal);
@@ -337,8 +337,8 @@ int ClassifyConvexConvex(
 			pb = -pb;
 		}
 
-		double iaMax = pa + Support(ca.vertices4, axis);
-		double ibMin = pb - Support(cb.vertices4, -axis);
+		double iaMax = pa + Support(ca.vertices4, ca.orientation_inv * axis);
+		double ibMin = pb - Support(cb.vertices4, cb.orientation_inv * -axis);
 
 		double dist = ibMin - iaMax;
 		if (dist > Tolerance) {

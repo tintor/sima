@@ -1,7 +1,7 @@
 #pragma once
 #include <core/std.h>
 #include <geom/mesh.h>
-#include <geom/quaternion.h>
+#include <geom/matrix.h>
 
 struct xyz4 {
 	double4 x, y, z;
@@ -10,7 +10,7 @@ struct xyz4 {
 // mesh3 with extra precomputed fields for faster ClassifyConvexConvex!
 struct cmesh3 {
 	double3 position;
-	quat orientation;
+	double33 orientation_inv = double33_identity;
 
 	mesh3 mesh;
 	vector<double3> vertices;
