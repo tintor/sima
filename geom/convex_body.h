@@ -8,6 +8,8 @@ struct xyz4 {
 
 // mesh3 with extra precomputed fields for faster ClassifyConvexConvex!
 struct cmesh3 {
+	double3 position;
+
 	mesh3 mesh;
 	vector<double3> vertices;
 	vector<xyz4> vertices4;

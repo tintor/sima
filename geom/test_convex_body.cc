@@ -204,8 +204,14 @@ Result VerifyInvariants(const vector<double3>& ca, const vector<double3>& cb) {
 	if (VERBOSE) {
 		print("\nA %s, B %s, result %s, normal %s, contacts %s, overlap %s\n",
 			ma.vertices.size(), mb.vertices.size(), result.type, result.normal, result.contacts, result.overlap);
-		print("A %s\n", ma.vertices);
-		print("B %s\n", mb.vertices);
+		auto va = ma.vertices;
+		for (double3& v : va)
+			v += ma.position;
+		auto vb = mb.vertices;
+		for (double3& v : vb)
+			v += mb.position;
+		print("A %s\n", va);
+		print("B %s\n", vb);
 	}
 	REQUIRE(length(result.normal) == Approx(1).margin(1e-4));
 	if (result.type == 0)
@@ -319,7 +325,7 @@ TEST_CASE("convex_body random edge/edge", "[.][convex_body]") {
 	print("disjoint %s, contact %s, overlap %s\n", count[2], count[1], count[0]);
 }
 
-TEST_CASE("convex_body random edge/edge 1d", "[.][convex_body]") {
+TEST_CASE("convex_body random edge/edge 1d", "[.][convex_body_disabled]") {
 	std::default_random_engine rnd;
 	int count[3] = {0, 0, 0};
 	vector<double3> ca, cb;
@@ -354,8 +360,8 @@ TEST_CASE("convex_body random vertex/vertex", "[.][convex_body]") {
 	int count[3] = {0, 0, 0};
 	vector<double3> ca, cb;
 	for (auto test : range(0, TEST_CASES)) {
-		Generate(rnd, uniform_int<int>(rnd, 3, 3), 1, 0, ca, 2);
-		Generate(rnd, 0, 1, uniform_int<int>(rnd, 3, 3), cb, 2);
+		Generate(rnd, uniform_int<int>(rnd, 3, 5), 1, 0, ca, 2);
+		Generate(rnd, 0, 1, uniform_int<int>(rnd, 3, 5), cb, 2);
 
 		auto result = VerifyInvariants(ca, cb);
 		count[result.type + 1] += 1;
@@ -381,3 +387,4 @@ TEST_CASE("convex_body random vertex/vertex", "[.][convex_body]") {
 // TODO randomized tests with forced normal along which intervals are in contact, but objects are disjoint!
 
 // TODO benchmarks!
+//

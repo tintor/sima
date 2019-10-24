@@ -7,6 +7,7 @@
 #include <geom/pose.h>
 #include <geom/sphere.h>
 #include <geom/segment.h>
+#include <geom/properties.h>
 
 inline double hmin(double4 a) {
 	// TODO auto b = vmin(a, vshuffle(a, a, 2, 3, 0, 1));
@@ -67,9 +68,17 @@ inline bool ContainsSimilarAxis(const vector<double3>& v, double3 a) {
 
 cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
 	cmesh3 m;
-	Convert(vertices, m.vertices4);
 	convex_hull(vertices, m.mesh);
 	m.vertices = vertices;
+
+	m.position = CenterOfMass(m.mesh);
+	for (double3& v : m.vertices)
+		v -= m.position;
+	for (auto& f : m.mesh)
+		for (auto& v : f)
+			v -= m.position;
+
+	Convert(m.vertices, m.vertices4);
 
 	// TODO need representation which merges triangles into polygonal faces
 
@@ -132,17 +141,22 @@ inline double3 AxisBetweenConvexMeshes(const cmesh3& ca, const cmesh3& cb) {
 	return axisBest;
 }
 
-inline void FilterVertices(const vector<double3>& vertices, double3 axis, double dist, vector<double3>& out) {
+inline void FilterVertices(
+		const vector<double3>& vertices,
+		double3 axis,
+		double dist,
+		double3 position,
+		vector<double3>& out) {
 	out.clear();
 	for (double3 v : vertices) {
 		double d = dot(v, axis);
 		if (dist - Tolerance <= d && d <= dist + Tolerance)
-			out.push_back(v);
+			out.push_back(v + position);
 	}
 }
 
 inline void ConvexHullInPlace2(vector<double3>& points) {
-    if (points.size() <= 1)
+    if (points.size() <= 2)
 		return;
 
     size_t leastY = 0;
@@ -163,30 +177,17 @@ inline void ConvexHullInPlace2(vector<double3>& points) {
 	    return order < 0;
 	});
 
-	// remove dups after sorting
-	points.erase(
-		std::unique(points.begin(), points.end(), static_cast<bool(*)(double3, double3)>(&equal)),
-		points.end());
-    if (points.size() <= 3)
-		return;
-
 	size_t hull = 3;
-	//print("start hull %s, points %s\n", hull, points);
     for (size_t i = 3; i < points.size(); i++) {
         auto top = points[hull - 1];
         hull -= 1;
-		//print("A hull %s, points %s\n", hull, points);
         while (ccw(points[hull - 1], top, points[i]) >= 0) {
             top = points[hull - 1];
             hull -= 1;
-			//print("B hull %s, points %s\n", hull, points);
         }
 		points[hull++] = top;
-		//print("C hull %s, points %s\n", hull, points);
 		points[hull++] = points[i];
-		//print("D hull %s, points %s\n", hull, points);
     }
-	//print("end hull %s, points %s\n", hull, points);
 	points.resize(hull);
 }
 
@@ -277,29 +278,14 @@ static void ConvexIntersect2(vector<double3>& a, vector<double3>& b, vector<doub
 			if (StrictIntersect2(ea.a, ea.b, eb.a, eb.b, v))
 				c.push_back(v);
 
-/*	if (c.size() == 0) {
+	if (b.size() >= 3)
 		for (double3 v : a)
-			if (PointInPolygon2(v, b)) {
-				c = a;
-				return;
-			}
+			if (PointInPolygon2(v, b))
+				c.push_back(v);
+	if (a.size() >= 3)
 		for (double3 v : b)
-			if (PointInPolygon2(v, a)) {
-				c = b;
-				return;
-			}
-		return;
-	}*/
-
-	for (double3 v : a)
-		if (PointInPolygon2(v, b))
-			c.push_back(v);
-	for (double3 v : b)
-		if (PointInPolygon2(v, a))
-			c.push_back(v);
-
-	// TODO this is just for ordering points, so a little cheaper algorithms could be used maybe?
-	ConvexHullInPlace2(c);
+			if (PointInPolygon2(v, a))
+				c.push_back(v);
 
 	// Remove close points
 	for (size_t i = 0; i < c.size(); i++)
@@ -311,27 +297,22 @@ static void ConvexIntersect2(vector<double3>& a, vector<double3>& b, vector<doub
 				break;
 			}
 		}
+
+	// TODO this is just for ordering points, so a little cheaper algorithms could be used maybe?
+	ConvexHullInPlace2(c);
 }
 
 static bool ProcessContacts(
 	interval<double> ia,
 	interval<double> ib,
+	double pa,
+	double pb,
 	const cmesh3& ca,
 	const cmesh3& cb,
 	double3& normal,
 	vector<double3>& contacts,
 	vector<double3>& workA,
 	vector<double3>& workB) {
-	if ((ia.min + ia.max) > (ib.min + ib.max)) {
-		normal = -normal;
-		swap(ia.min, ia.max);
-		swap(ib.min, ib.max);
-		ia.min = -ia.min;
-		ia.max = -ia.max;
-		ib.min = -ib.min;
-		ib.max = -ib.max;
-	}
-
 	// TODO find smallest abs component of normal and project cheaply by dropping it! (there will be some distortion)
 
 	// TODO fast path for v/f: maybe just precompute edge planes and check them against 3d vertex without projection
@@ -343,10 +324,8 @@ static bool ProcessContacts(
 	double m = (ia.max + ib.min) / 2;
 	// TODO if normal comes from one of the faces then pull out its vertices without filtering
 	// TODO if normal comes from one of the edges then pull out its vertices without filtering
-	FilterVertices(ca.vertices, normal, m, workA);
-	FilterVertices(cb.vertices, normal, m, workB);
-	//print("work %s vs %s\n", workA.size(), workB.size());
-	//print("work [%s] vs [%s]\n", workA, workB);
+	FilterVertices(ca.vertices, normal, m - pa, ca.position, workA);
+	FilterVertices(cb.vertices, normal, m - pb, cb.position, workB);
 
 	double3 j = normalize(any_normal(normal));
 	double3 k = cross(j, normal);
@@ -355,7 +334,7 @@ static bool ProcessContacts(
 	for (double3& v : workB)
 		v = {dot(v, j), dot(v, k), 0};
 
-	// TODO instead of convex hull, check first three vertices and flip if clockwise
+	// TODO [perf] instead of convex hull, check first three vertices and flip if clockwise
 	ConvexHullInPlace2(workA);
 	ConvexHullInPlace2(workB);
 
@@ -380,7 +359,6 @@ int ClassifyConvexConvex(
 	double& overlap,
 	vector<double3>& workA,
 	vector<double3>& workB) {
-
 	int result = -1;
 	overlap = std::numeric_limits<double>::infinity();
 	double3 initialNormal = normal;
@@ -390,26 +368,35 @@ int ClassifyConvexConvex(
 			return false;
 		// TODO it is possible to pre-compute lower and upper bounds for an object for all axises to speed up disjoint check?
 		// TODO maybe it helps to deduplicate axis list
-		auto ia = ProjectToAxis(ca.vertices4, axis);
-		auto ib = ProjectToAxis(cb.vertices4, axis);
-		// print("axis %s, ia %s, ib %s\n", axis, ia, ib);
-		if (ia.max < ib.min - Tolerance || ib.max < ia.min - Tolerance) {
+		double pa = dot(ca.position, axis);
+		double pb = dot(cb.position, axis);
+		if (pa > pb) {
+			axis = -axis;
+			pa = -pa;
+			pb = -pb;
+		}
+
+		auto ia = ProjectToAxis(ca.vertices4, axis) + pa;
+		auto ib = ProjectToAxis(cb.vertices4, axis) + pb;
+
+		double dist = ib.min - ia.max;
+		if (dist > Tolerance) {
 			normal = axis;
 			result = 1;
 			return true;
 		}
 
-		double axisOverlap = min(ia.max - ib.min, ib.max - ia.min);
-		if (axisOverlap > Tolerance) {
-			if (axisOverlap < overlap) {
-				overlap = axisOverlap;
+		double axisOverlap = abs(dist);
+		if (dist < -Tolerance) {
+			if (-dist < overlap) {
+				overlap = -dist;
 				normal = axis;
 			}
 			return false;
 		}
 
 		normal = axis;
-		if (!ProcessContacts(ia, ib, ca, cb, normal, contacts, workA, workB)) {
+		if (!ProcessContacts(ia, ib, pa, pb, ca, cb, normal, contacts, workA, workB)) {
 			result = 1;
 			// TODO can we exit early in this case? and set correct normal
 			return false;
