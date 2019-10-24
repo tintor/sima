@@ -34,26 +34,16 @@ static void Convert(const vector<double3>& a, vector<xyz4>& b) {
 	}
 }
 
-inline interval<double> ProjectToAxis(const vector<xyz4>& convex, double3 axis) {
+inline double Support(const vector<xyz4>& convex, double3 axis) {
 	const xyz4& e0 = convex[0];
-	double4 smin = e0.x * axis.x + e0.y * axis.y + e0.z * axis.z;
-	double4 smax = smin;
+	double4 smax = e0.x * axis.x + e0.y * axis.y + e0.z * axis.z;
 
 	for (size_t i = 1; i < convex.size(); i++) {
 		const xyz4& e = convex[i];
 		double4 s = e.x * axis.x + e.y * axis.y + e.z * axis.z;
-		smin = vmin(smin, s);
 		smax = vmax(smax, s);
 	}
-	return {hmin(smin), hmax(smax)};
-}
-
-inline interval<double> ProjectToAxis(const vector<double3>& convex, double3 axis) {
-	interval<double> result;
-	for (double3 p : convex) {
-		result.add(dot(p, axis));
-	}
-	return result;
+	return hmax(smax);
 }
 
 // direction is ignored
@@ -110,35 +100,6 @@ cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
 			m.edgeAxis.push_back(a);
 	}
 	return m;
-}
-
-inline double3 AxisBetweenConvexMeshes(const cmesh3& ca, const cmesh3& cb) {
-	double3 axisBest;
-	double distBest = -std::numeric_limits<double>::infinity();
-
-	auto check = [&](double3 axis) {
-		auto ia = ProjectToAxis(ca.vertices4, axis);
-		auto ib = ProjectToAxis(cb.vertices4, axis);
-		double dist = max(ia.min - ib.max, ib.min - ia.max);
-		if (dist > distBest) {
-			distBest = dist;
-			axisBest = axis;
-		}
-	};
-
-	for (double3 axis : ca.faceAxis)
-		check(axis);
-	for (double3 axis : cb.faceAxis)
-		check(axis);
-	for (double3 axisA : cb.edgeAxis)
-		for (double3 axisB : cb.edgeAxis) {
-			double3 axis = cross(axisA, axisB);
-			double axisLen = length(axis);
-			if (axisLen >= Tolerance)
-				check(axis / axisLen);
-		}
-
-	return axisBest;
 }
 
 inline void FilterVertices(
@@ -303,8 +264,8 @@ static void ConvexIntersect2(vector<double3>& a, vector<double3>& b, vector<doub
 }
 
 static bool ProcessContacts(
-	interval<double> ia,
-	interval<double> ib,
+	double iaMax,
+	double ibMin,
 	double pa,
 	double pb,
 	const cmesh3& ca,
@@ -320,8 +281,8 @@ static bool ProcessContacts(
 	// TODO fast path for f/e: if all vertices of edge are inside edge planes just return the edge
 	// TODO fast path for e/e: run nearest(segment, segment) and return intersection (if only one point)
 
-	assert(abs(ia.max - ib.min) <= Tolerance);
-	double m = (ia.max + ib.min) / 2;
+	assert(abs(iaMax - ibMin) <= Tolerance);
+	double m = (iaMax + ibMin) / 2;
 	// TODO if normal comes from one of the faces then pull out its vertices without filtering
 	// TODO if normal comes from one of the edges then pull out its vertices without filtering
 	FilterVertices(ca.vertices, normal, m - pa, ca.position, workA);
@@ -376,10 +337,10 @@ int ClassifyConvexConvex(
 			pb = -pb;
 		}
 
-		auto ia = ProjectToAxis(ca.vertices4, axis) + pa;
-		auto ib = ProjectToAxis(cb.vertices4, axis) + pb;
+		double iaMax = pa + Support(ca.vertices4, axis);
+		double ibMin = pb - Support(cb.vertices4, -axis);
 
-		double dist = ib.min - ia.max;
+		double dist = ibMin - iaMax;
 		if (dist > Tolerance) {
 			normal = axis;
 			result = 1;
@@ -396,7 +357,7 @@ int ClassifyConvexConvex(
 		}
 
 		normal = axis;
-		if (!ProcessContacts(ia, ib, pa, pb, ca, cb, normal, contacts, workA, workB)) {
+		if (!ProcessContacts(iaMax, ibMin, pa, pb, ca, cb, normal, contacts, workA, workB)) {
 			result = 1;
 			// TODO can we exit early in this case? and set correct normal
 			return false;
