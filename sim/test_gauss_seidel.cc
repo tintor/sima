@@ -1,4 +1,5 @@
 #include <sim/gauss_seidel.h>
+#include <sim/newton.h>
 #include <catch.hpp>
 
 TEST_CASE("gauss seidel basic", "[gauss_seidel]") {
@@ -17,4 +18,11 @@ TEST_CASE("gauss seidel basic", "[gauss_seidel]") {
 
 	REQUIRE(b[0] == Approx(y[0]).margin(1e-10));
 	REQUIRE(b[1] == Approx(y[1]).margin(1e-10));
+}
+
+TEST_CASE("newton sqrt()", "[newton]") {
+	for (double e : { 2, 3, 4, 5, 6, 7, 8, 9, 10 }) {
+		double a = NewtonMethod(1, 5, [e](double x) { return x * x - e; }, [](double x) { return 2 * x; });
+		REQUIRE(abs(sqrt(e) - a) < 1e-8);
+	}
 }
