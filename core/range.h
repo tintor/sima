@@ -1,6 +1,7 @@
 #pragma once
 #include <core/format.h>
 #include <core/std.h>
+#include <core/span.h>
 
 // T can be any number-like type
 template <typename T> struct range {
@@ -18,7 +19,7 @@ template <typename T> struct range {
 	}
 
 	template<typename V>
-	range(const vector<V>& v) : range(v.size()) { }
+	range(const span<V>& v) : range(v.size()) { }
 
 	struct iterator {
 		iterator(T pos, const range& _range) : _pos(pos), _range(_range) {}

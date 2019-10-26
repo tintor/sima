@@ -34,6 +34,7 @@ set(prod
 	geom/segment.cc
 	geom/project.cc
 	geom/broadphase.cc
+	sim/system.cc
 	lodepng/lodepng.cc)
 
 set(render
@@ -93,7 +94,7 @@ add_executable(test ${prod} ${test})
 add_executable(pid pid.cc ${prod} ${render})
 add_executable(soko ${sokoban} ${prod})
 
-add_definitions(-O3 -mavx2 -mfma -DNDEBUG)
+add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
 #add_definitions(-O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
 

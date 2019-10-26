@@ -21,6 +21,8 @@ struct cmesh3 {
 
 cmesh3 GenerateConvexMesh(const vector<double3>& vertices);
 
+// TODO move pose outside of cmesh3 and pass it directly to classify
+
 // in case of penetration return axis with min
 // returns:
 // 1 if disjoint

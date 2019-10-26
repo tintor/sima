@@ -45,6 +45,7 @@ using std::numeric_limits;
 
 using std::optional;
 using std::nullopt;
+using std::unique_ptr;
 
 using namespace std::literals;
 
