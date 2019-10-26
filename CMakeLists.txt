@@ -66,6 +66,7 @@ set(test
 	core/test_zip.cc
 	core/test_bplustree.cc
 	sim/test_integration.cc
+	sim/test_gauss_seidel.cc
 	geom/test_aabb.cc
 	geom/test_buffer.cc
 	geom/test_classify.cc
