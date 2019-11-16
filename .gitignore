@@ -8,6 +8,8 @@ Makefile
 *.cmake
 */*.cmake
 */*/*.a
+arena
+santorini
 main
 run_gravity
 test

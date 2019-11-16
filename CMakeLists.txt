@@ -88,12 +88,14 @@ set(test
 	geom/test_primitives.cc
 	geom/test_broadphase.cc)
 
+add_executable(arena arena.cc ${prod} ${render})
 add_executable(main main.cc ${prod} ${render})
 add_executable(collision collision.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})
 add_executable(test ${prod} ${test})
 add_executable(pid pid.cc ${prod} ${render})
 add_executable(soko ${sokoban} ${prod})
+add_executable(santorini santorini.cc ${prod})
 
 add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
@@ -130,6 +132,7 @@ else()
 	#target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
 endif()
 
+target_link_libraries(arena ${RENDER_LIBS})
 target_link_libraries(main ${RENDER_LIBS})
 target_link_libraries(collision ${RENDER_LIBS})
 target_link_libraries(run_gravity ${RENDER_LIBS})
