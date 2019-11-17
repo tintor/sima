@@ -71,7 +71,7 @@ auto CellsAround(int a) {
 }
 
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented: Apollo, Athena
+// Gods implemented: Apollo, Athena, Atlas
 
 void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 	const int p = state.player;
@@ -97,15 +97,40 @@ void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 				else if (god[p] == God::Athena)
 					s.canMoveUp = d.tower - c.tower < 1;
 
+				/*if (god[s.player] == God::Artemis) {
+					// perform second optional move
+					for (int ie : CellsAround(id)) {
+						Cell e = s[ie];
+						bool no_builder2 = d.builder == ' ';
+						if (no_builder2 && !d.dome && d.tower - c.tower <= (state.canMoveUp ? 1 : 0)) {
+							State s2 = s;
+							swap(s2[ic].builder, s[id].builder);
+							if (e.tower == 3) {
+								s2.victory = true;
+								moves.clear();
+								moves.push_back(s2);
+								return;
+							}
+
+							// TODO perform all possible builds
+						}
+					}
+				}*/
+
 				// perform all possible builds
 				for (int ie : CellsAround(id)) {
 					Cell e = s[ie];
-					if (!e.dome && e.builder == ' ') {
+					if (e.dome || e.builder != ' ')
+						continue;
+
+					if (e.tower == 3 || god[p] == God::Atlas) {
 						State s2 = s;
-						if (e.tower == 3)
-							s2[ie].dome = true;
-						else
-							s2[ie].tower += 1;
+						s2[ie].dome = true;
+						moves.push_back(s2);
+					}
+					if (e.tower < 3) {
+						State s2 = s;
+						s2[ie].tower += 1;
 						moves.push_back(s2);
 					}
 				}
@@ -304,8 +329,10 @@ void SingleMatch(vector<God> players, Strategy a, Strategy b) {
 
 int main(int argc, char* argv[]) {
 	srand(time(0));
-	vector<God> players = { God::Apollo, God::None };
-	SingleMatch(players, Human, GreedyBot);
+	vector<God> players = { God::Athena, God::Apollo };
+	//SingleMatch(players, Human, GreedyBot);
+	print("Greedy2 - Greedy2 %s\n", RelativeSkill(10000, players, GreedyBot2, GreedyBot2));
+
 	/*print("Greedy - Rand %s\n", RelativeSkill(10000, players, GreedyBot, RandBot));
 	print("Greedy2 - Rand %s\n", RelativeSkill(10000, players, GreedyBot2, RandBot));
 	print("Greedy - Greedy2 %s\n", RelativeSkill(10000, players, GreedyBot, GreedyBot2));*/
