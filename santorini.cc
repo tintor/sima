@@ -90,7 +90,7 @@ void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 					moves.push_back(s);
 					return;
 				}
-				if (d.tower == 3) {
+				if (d.tower == 3 && s.tower < 3) {
 					s.victory = true;
 					moves.clear();
 					moves.push_back(s);
