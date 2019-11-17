@@ -90,7 +90,7 @@ auto CellsAround(int a, bool includeCenter = false) {
 
 enum class God { None,
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
-	Chronus, Hera, Limus, Poseidon, Zeus };
+	Chronus, Hera, Limus, Medusa, Poseidon, Zeus };
 
 int CellInDirection(int a, int b) {
 	int row = b / 5 + b / 5 - a / 5;
@@ -167,6 +167,15 @@ int CompleteTowerCount(const State& s) {
 	for (int row = 0; row < 5; row++)
 		for (int col = 0; col < 5; col++)
 			if (s.cell[row][col].dome && s.cell[row][col].tower == 3)
+				count += 1;
+	return count;
+}
+
+int BuilderCount(const State& s, int player) {
+	int count = 0;
+	for (int row = 0; row < 5; row++)
+		for (int col = 0; col < 5; col++)
+			if (player == Player(s.cell[row][col]))
 				count += 1;
 	return count;
 }
@@ -310,6 +319,29 @@ void GenerateTurns(cspan<God> gods, State state, vector<State>& turns) {
 			if (FilterVictory(turns))
 				return;
 		}
+	}
+
+	// perform medusa's build
+	if (god == God::Medusa) {
+		for (State& m : turns) {
+			for (int ia : PlayerCells(m))
+				for (int ib : CellsAround(ia)) {
+					Cell a = m[ia];
+					Cell& b = m[ib];
+					int pb = Player(b);
+					if (a.tower > b.tower && pb != -1 && pb != p) {
+						b.tower += 1;
+						b.builder = ' ';
+						m.lastBuild = ib;
+						if (BuilderCount(m, pb) == 0) {
+							// TODO 2 player assumption
+							m.victory = true;
+						}
+					}
+				}
+		}
+		if (FilterVictory(turns))
+			return;
 	}
 
 	// end turn
