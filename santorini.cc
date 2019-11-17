@@ -61,23 +61,24 @@ auto PlayerCells(const State& state) {
 	return data;
 }
 
-auto CellsAround(int a) {
+auto CellsAround(int a, bool includeCenter = false) {
 	static_vector<int, 8> data;
 	int row = a / 5;
 	int col = a % 5;
 	for (int dr = -1; dr <= 1; dr++)
-		for (int dc = -1; dc <= 1; dc++)
-			if (dr != 0 || dc != 0) {
-				int r = row + dr;
-				int c = col + dc;
-				if (0 <= r && r < 5 && 0 <= c && c < 5)
-					data.push_back(r * 5 + c);
-			}
+		for (int dc = -1; dc <= 1; dc++) {
+			if (dr == 0 && dc == 0 && !includeCenter)
+				continue;
+			int r = row + dr;
+			int c = col + dc;
+			if (0 <= r && r < 5 && 0 <= c && c < 5)
+				data.push_back(r * 5 + c);
+		}
 	return data;
 }
 
-enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented:   Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, (partially) Hermes, Minotaur, Pan, Prometheus
+enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur,
+		Pan, Prometheus, Zeus };
 
 int CellInDirection(int a, int b) {
 	int row = b / 5 + b / 5 - a / 5;
@@ -151,7 +152,7 @@ void GenerateOneBuild(God god, const State& state, vector<State>& builds, int fo
 		builders.push_back(state.lastMove);
 
 	for (int builder : builders)
-		for (int ie : CellsAround(builder)) {
+		for (int ie : CellsAround(builder, god == God::Zeus)) {
 			Cell e = state[ie];
 			if (e.dome || e.builder != ' ' || ie == forbidden)
 				continue;
