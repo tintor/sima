@@ -77,9 +77,13 @@ auto CellsAround(int a) {
 }
 
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented:   Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Pan
+// Gods implemented:   Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, (partially) Hermes, Pan, Prometheus
 
-void GenerateOneMove(God god, const State& state, vector<State>& moves, const State* forbidden = nullptr) {
+void GenerateOneMove(God god, const State& state, vector<State>& moves, bool allowMoveUp, const State* forbidden) {
+	if (god == God::Hermes) {
+		// TODO find all possible moves for all builders
+	}
+
 	for (int ic : PlayerCells(state))
 		for (int id : CellsAround(ic)) {
 			Cell c = state[ic];
@@ -91,6 +95,13 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, const St
 				continue;
 
 			if (d.dome)
+				continue;
+
+			// horizontal case is covered separately
+			if (god == God::Hermes && d.tower == c.tower)
+				continue;
+
+			if (!allowMoveUp && d.tower > c.tower)
 				continue;
 
 			int maxJump = 1;
@@ -116,32 +127,42 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, const St
 		}
 }
 
+constexpr int MAX_BUILDERS = 4;
+
 // build in one cell (hephaestus can build twice in one cell)
 void GenerateOneBuild(God god, const State& state, vector<State>& builds, int forbidden = -1) {
-	for (int ie : CellsAround(state.lastMove)) {
-		Cell e = state[ie];
-		if (e.dome || e.builder != ' ' || ie == forbidden)
-			continue;
+	static_vector<int, MAX_BUILDERS> builders;
+	if (god == God::Hermes)
+		for (int ie : PlayerCells(state))
+			builders.push_back(ie);
+	else
+		builders.push_back(state.lastMove);
 
-		if (e.tower == 3 || god == God::Atlas) {
-			State s = state;
-			s[ie].dome = true;
-			s.lastBuild = ie;
-			builds.push_back(s);
-		}
+	for (int builder : builders)
+		for (int ie : CellsAround(builder)) {
+			Cell e = state[ie];
+			if (e.dome || e.builder != ' ' || ie == forbidden)
+				continue;
 
-		if (e.tower < 3) {
-			State s = state;
-			s[ie].tower += 1;
-			s.lastBuild = ie;
-			builds.push_back(s);
-
-			if (e.tower < 2 && god == God::Hephaestus) {
-				s[ie].tower += 1;
+			if (e.tower == 3 || god == God::Atlas) {
+				State s = state;
+				s[ie].dome = true;
+				s.lastBuild = ie;
 				builds.push_back(s);
 			}
+
+			if (e.tower < 3) {
+				State s = state;
+				s[ie].tower += 1;
+				s.lastBuild = ie;
+				builds.push_back(s);
+
+				if (e.tower < 2 && god == God::Hephaestus) {
+					s[ie].tower += 1;
+					builds.push_back(s);
+				}
+			}
 		}
-	}
 }
 
 bool FilterVictory(vector<State>& states) {
@@ -153,49 +174,59 @@ bool FilterVictory(vector<State>& states) {
 	return false;
 }
 
-void GenerateTurns(cspan<God> god, State state, vector<State>& turns) {
+void GenerateTurns(God god, State state, vector<State>& turns) {
 	const int p = state.player;
-	if (god[p] == God::Athena)
+	if (god == God::Athena)
 		state.athenaMovedUp = false;
+	state.lastMove = -1;
+	state.lastBuild = -1;
+	turns.push_back(state);
+
+	// perform optional build if prometheus
+	if (god == God::Prometheus)
+		GenerateOneBuild(god, state, turns);
 
 	// perform one move
-	GenerateOneMove(god[p], state, turns);
-	if (turns.size() == 0)
+	vector<State> temp;
+	swap(temp, turns);
+	for (const State& m : temp)
+		GenerateOneMove(god, m, turns, god != God::Prometheus || m.lastBuild == -1, nullptr);
+	if (turns.size() == 0 && god != God::Hermes)
 		return;
 	if (FilterVictory(turns))
 		return;
 
 	// perform second optional move if artemis
-	if (god[p] == God::Artemis) {
-		vector<State> temp;
+	if (god == God::Artemis) {
+		temp.clear();
 	    swap(temp, turns);
 		for (const State& m : temp)
-			GenerateOneMove(god[p], m, turns, &state);
+			GenerateOneMove(god, m, turns, true, &state);
 		if (FilterVictory(turns))
 			return;
 	}
 
 	// perform one build
-	vector<State> temp;
+	temp.clear();
 	swap(temp, turns);
 	for (const State& m : temp)
-		GenerateOneBuild(god[p], m, turns);
+		GenerateOneBuild(god, m, turns);
 	if (turns.size() == 0)
 		return;
 
 	// perform second optional build if demeter
-	if (god[p] == God::Demeter) {
+	if (god == God::Demeter) {
 		temp.clear();
 		swap(temp, turns);
 		for (const State& m : temp) {
 			turns.push_back(m); // second build is optional
-			GenerateOneBuild(god[p], m, turns, m.lastBuild);
+			GenerateOneBuild(god, m, turns, m.lastBuild);
 		}
 	}
 
 	// end turn
 	for (State& s : turns)
-		s.player = (s.player + 1) % god.size();
+		s.player = 1 - s.player; // TODO 2 player assumption
 }
 
 void Print(const State& state) {
@@ -236,7 +267,7 @@ void PlaceBuilder(State& state, char builder) {
 
 optional<State> Human(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateTurns(players, state, moves);
+	GenerateTurns(players[state.player], state, moves);
 	print("total posible moves %s\n", moves.size());
 	if (moves.size() == 0)
 		return nullopt;
@@ -254,7 +285,7 @@ optional<State> Human(cspan<God> players, const State& state) {
 
 optional<State> RandBot(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateTurns(players, state, moves);
+	GenerateTurns(players[state.player], state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 	return moves[rand() % moves.size()];
@@ -277,7 +308,7 @@ T bestElement(cspan<T> data, const E& func) {
 
 optional<State> GreedyBot(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateTurns(players, state, moves);
+	GenerateTurns(players[state.player], state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 
@@ -298,7 +329,7 @@ optional<State> GreedyBot(cspan<God> players, const State& state) {
 
 optional<State> GreedyBot2(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateTurns(players, state, moves);
+	GenerateTurns(players[state.player], state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 
