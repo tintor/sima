@@ -90,7 +90,7 @@ auto CellsAround(int a, bool includeCenter = false) {
 
 enum class God { None,
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
-	Chronus, Poseidon, Zeus };
+	Chronus, Hera, Poseidon, Zeus };
 
 int CellInDirection(int a, int b) {
 	int row = b / 5 + b / 5 - a / 5;
@@ -98,7 +98,14 @@ int CellInDirection(int a, int b) {
 	return (0 <= row && row < 5 && 0 <= col && col < 5) ? row * 5 + col : -1;
 }
 
-void GenerateOneMove(God god, const State& state, vector<State>& moves, bool allowMoveUp, const State* forbidden) {
+bool OnPerimeter(int a) {
+	int row = a / 5;
+	int col = a % 5;
+	return row == 0 || row == 4 || col == 0 || col == 4;
+}
+
+void GenerateOneMove(cspan<God> gods, const State& state, vector<State>& moves, bool allowMoveUp, const State* forbidden) {
+	God god = gods[state.player];
 	if (god == God::Hermes) {
 		// TODO find all possible moves for all builders
 	}
@@ -139,8 +146,9 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, bool all
 				s.athenaMovedUp = true;
 			if (god == God::Pan && d.tower - c.tower <= -2)
 				s.victory = true;
-			if (d.tower == 3 && c.tower < 3)
-				s.victory = true;
+			if (c.tower < 3 && d.tower == 3)
+				if (!contains(gods, God::Hera) || !OnPerimeter(id))
+					s.victory = true;
 
 			if (god == God::Minotaur)
 				swap(s[ie].builder, s[id].builder);
@@ -226,7 +234,7 @@ void GenerateTurns(cspan<God> gods, State state, vector<State>& turns) {
 	vector<State> temp;
 	swap(temp, turns);
 	for (const State& m : temp)
-		GenerateOneMove(god, m, turns, god != God::Prometheus || m.lastBuild == -1, nullptr);
+		GenerateOneMove(gods, m, turns, god != God::Prometheus || m.lastBuild == -1, nullptr);
 	if (turns.size() == 0 && god != God::Hermes)
 		return;
 	if (FilterVictory(turns))
@@ -237,7 +245,7 @@ void GenerateTurns(cspan<God> gods, State state, vector<State>& turns) {
 		temp.clear();
 	    swap(temp, turns);
 		for (const State& m : temp)
-			GenerateOneMove(god, m, turns, true, &state);
+			GenerateOneMove(gods, m, turns, true, &state);
 		if (FilterVictory(turns))
 			return;
 	}
