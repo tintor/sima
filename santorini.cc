@@ -77,7 +77,13 @@ auto CellsAround(int a) {
 }
 
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented:   Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, (partially) Hermes, Pan, Prometheus
+// Gods implemented:   Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, (partially) Hermes, Minotaur, Pan, Prometheus
+
+int CellInDirection(int a, int b) {
+	int row = b / 5 + b / 5 - a / 5;
+	int col = b % 5 + b % 5 - a % 5;
+	return (0 <= row && row < 5 && 0 <= col && col < 5) ? row * 5 + col : -1;
+}
 
 void GenerateOneMove(God god, const State& state, vector<State>& moves, bool allowMoveUp, const State* forbidden) {
 	if (god == God::Hermes) {
@@ -91,9 +97,6 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, bool all
 
 			if (Player(d) == state.player)
 				continue;
-			if (d.builder != ' ' && god != God::Apollo)
-				continue;
-
 			if (d.dome)
 				continue;
 
@@ -105,9 +108,16 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, bool all
 				continue;
 
 			int maxJump = 1;
+			// TODO move this into allowMoveUp
 			if (state.athenaMovedUp && god != God::Athena)
 				maxJump = 0;
 			if (d.tower - c.tower > maxJump)
+				continue;
+
+			int ie = CellInDirection(ic, id);
+			if (god == God::Minotaur && d.builder != ' ' && (ie == -1 || state[ie].builder != ' '))
+				continue;
+			if (god != God::Apollo && god != God::Minotaur && d.builder != ' ')
 				continue;
 
 			State s = state;
@@ -118,7 +128,9 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, bool all
 				s.victory = true;
 			if (d.tower == 3 && c.tower < 3)
 				s.victory = true;
-			// swap in case of Apollo
+
+			if (god == God::Minotaur)
+				swap(s[ie].builder, s[id].builder);
 			swap(s[ic].builder, s[id].builder);
 
 			if (forbidden && s.cell == forbidden->cell)
