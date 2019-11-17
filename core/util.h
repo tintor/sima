@@ -97,6 +97,14 @@ void remove_dups(Vector& v, const Func& less, const Func& equal) {
        v.erase(std::unique(v.begin(), v.end(), equal), v.end());
 }
 
+template<typename T>
+bool contains(cspan<T> container, T element) {
+	for (const T& e : container)
+		if (e == element)
+			return true;
+	return false;
+}
+
 template<typename Container, typename Func>
 bool All(const Container& s, const Func& func) {
 	for (const auto& e : s)
