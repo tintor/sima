@@ -90,7 +90,7 @@ auto CellsAround(int a, bool includeCenter = false) {
 
 enum class God { None,
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
-	Chronus, Hera, Poseidon, Zeus };
+	Chronus, Hera, Limus, Poseidon, Zeus };
 
 int CellInDirection(int a, int b) {
 	int row = b / 5 + b / 5 - a / 5;
@@ -179,7 +179,17 @@ void GenerateOneBuild(cspan<God> gods, int builder, const State& state, vector<S
 		if (e.dome || e.builder != ' ' || ie == forbidden)
 			continue;
 
-		if (e.tower == 3 || god == God::Atlas) {
+		bool nearLimus = false;
+	    if (god != God::Limus && contains(gods, God::Limus))
+			for (int ia : CellsAround(ie)) {
+				int pa = Player(state[ia]);
+				if (pa != -1 && gods[pa] == God::Limus) {
+					nearLimus = true;
+					break;
+				}
+			}
+
+		if (e.tower == 3 || (god == God::Atlas && !nearLimus)) {
 			State s = state;
 			s[ie].dome = true;
 			s.lastBuild = ie;
@@ -193,7 +203,7 @@ void GenerateOneBuild(cspan<God> gods, int builder, const State& state, vector<S
 			builds.push_back(s);
 		}
 
-		if (e.tower < 3) {
+		if (e.tower < 3 && !nearLimus) {
 			State s = state;
 			s[ie].tower += 1;
 			s.lastBuild = ie;
