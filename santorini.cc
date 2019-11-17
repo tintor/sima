@@ -71,16 +71,17 @@ auto CellsAround(int a) {
 }
 
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented: Athena
+// Gods implemented: Apollo, Athena
 
-void GenerateMoves(cspan<God> players, const State& state, vector<State>& moves) {
+void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 	const int p = state.player;
 	for (int ic : PlayerCells(state)) {
 		Cell c = state[ic];
 		// perform all possible moves
 		for (int id : CellsAround(ic)) {
 			Cell d = state[id];
-			if (d.builder == ' ' && !d.dome && d.tower - c.tower <= (state.canMoveUp ? 1 : 0)) {
+			bool no_builder = d.builder == ' ' || (Player(d) != p && god[p] == God::Apollo);
+			if (no_builder && !d.dome && d.tower - c.tower <= (state.canMoveUp ? 1 : 0)) {
 				State s = state;
 				swap(s[ic].builder, s[id].builder);
 				if (d.tower == 3) {
@@ -90,10 +91,10 @@ void GenerateMoves(cspan<God> players, const State& state, vector<State>& moves)
 					return;
 				}
 
-				s.player = (s.player + 1) % players.size();
-				if (players[s.player] == God::Athena)
+				s.player = (s.player + 1) % god.size();
+				if (god[s.player] == God::Athena)
 					s.canMoveUp = true;
-				else if (players[p] == God::Athena)
+				else if (god[p] == God::Athena)
 					s.canMoveUp = d.tower - c.tower < 1;
 
 				// perform all possible builds
@@ -291,7 +292,7 @@ void SingleMatch(vector<God> players, Strategy a, Strategy b) {
 	PlaceBuilder(state, 'b');
 	Print(state);
 
-	vector<Strategy> strategy = { GreedyBot, RandBot };
+	vector<Strategy> strategy = { a, b };
 	while (!state.victory) {
 		auto s = strategy[state.player](players, state);
 		if (!s.has_value())
@@ -303,9 +304,10 @@ void SingleMatch(vector<God> players, Strategy a, Strategy b) {
 
 int main(int argc, char* argv[]) {
 	srand(time(0));
-	vector<God> players = { God::None, God::None };
-	print("Greedy - Rand %s\n", RelativeSkill(10000, players, GreedyBot, RandBot));
+	vector<God> players = { God::Apollo, God::None };
+	SingleMatch(players, Human, GreedyBot);
+	/*print("Greedy - Rand %s\n", RelativeSkill(10000, players, GreedyBot, RandBot));
 	print("Greedy2 - Rand %s\n", RelativeSkill(10000, players, GreedyBot2, RandBot));
-	print("Greedy - Greedy2 %s\n", RelativeSkill(10000, players, GreedyBot, GreedyBot2));
+	print("Greedy - Greedy2 %s\n", RelativeSkill(10000, players, GreedyBot, GreedyBot2));*/
 	return 0;
 }
