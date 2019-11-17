@@ -73,7 +73,7 @@ auto CellsAround(int a) {
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
 // Gods implemented: Apollo, Athena, Atlas, Pan
 
-void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
+void GenerateTransitions(cspan<God> god, const State& state, vector<State>& moves) {
 	const int p = state.player;
 	for (int ic : PlayerCells(state)) {
 		Cell c = state[ic];
@@ -90,7 +90,7 @@ void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 					moves.push_back(s);
 					return;
 				}
-				if (d.tower == 3 && s.tower < 3) {
+				if (d.tower == 3 && c.tower < 3) {
 					s.victory = true;
 					moves.clear();
 					moves.push_back(s);
@@ -183,7 +183,7 @@ void PlaceBuilder(State& state, char builder) {
 
 optional<State> Human(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateMoves(players, state, moves);
+	GenerateTransitions(players, state, moves);
 	print("total posible moves %s\n", moves.size());
 	if (moves.size() == 0)
 		return nullopt;
@@ -201,7 +201,7 @@ optional<State> Human(cspan<God> players, const State& state) {
 
 optional<State> RandBot(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateMoves(players, state, moves);
+	GenerateTransitions(players, state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 	return moves[rand() % moves.size()];
@@ -224,7 +224,7 @@ T bestElement(cspan<T> data, const E& func) {
 
 optional<State> GreedyBot(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateMoves(players, state, moves);
+	GenerateTransitions(players, state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 
@@ -245,7 +245,7 @@ optional<State> GreedyBot(cspan<God> players, const State& state) {
 
 optional<State> GreedyBot2(cspan<God> players, const State& state) {
 	vector<State> moves;
-	GenerateMoves(players, state, moves);
+	GenerateTransitions(players, state, moves);
 	if (moves.size() == 0)
 		return nullopt;
 
