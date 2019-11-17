@@ -2,6 +2,7 @@
 #include <core/each.h>
 #include <core/dynamic_array.h>
 #include <core/exception.h>
+#include <core/util.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,9 +14,19 @@ struct Cell {
 	char builder = ' '; // Aa - first player, Bb - second player, ... (uppercase male, lowercase female)
 };
 
+bool operator<(Cell a, Cell b) {
+	if (a.dome != b.dome)
+		return !a.dome && b.dome;
+	if (a.tower != b.tower)
+		return a.tower < b.tower;
+	return a.builder < b.builder;
+}
+
 bool operator==(Cell a, Cell b) {
 	return a.dome == b.dome && a.tower == b.tower && a.builder == b.builder;
 }
+
+bool operator!=(Cell a, Cell b) { return !(a == b); }
 
 struct State {
 	bool athenaMovedUp = false;
@@ -77,8 +88,9 @@ auto CellsAround(int a, bool includeCenter = false) {
 	return data;
 }
 
-enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur,
-		Pan, Prometheus, Zeus };
+enum class God { None,
+	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
+	Poseidon, Zeus };
 
 int CellInDirection(int a, int b) {
 	int row = b / 5 + b / 5 - a / 5;
@@ -143,15 +155,7 @@ void GenerateOneMove(God god, const State& state, vector<State>& moves, bool all
 constexpr int MAX_BUILDERS = 4;
 
 // build in one cell (hephaestus can build twice in one cell)
-void GenerateOneBuild(God god, const State& state, vector<State>& builds, int forbidden = -1) {
-	static_vector<int, MAX_BUILDERS> builders;
-	if (god == God::Hermes)
-		for (int ie : PlayerCells(state))
-			builders.push_back(ie);
-	else
-		builders.push_back(state.lastMove);
-
-	for (int builder : builders)
+void GenerateOneBuild(God god, int builder, const State& state, vector<State>& builds, int forbidden = -1) {
 		for (int ie : CellsAround(builder, god == God::Zeus)) {
 			Cell e = state[ie];
 			if (e.dome || e.builder != ' ' || ie == forbidden)
@@ -197,7 +201,8 @@ void GenerateTurns(God god, State state, vector<State>& turns) {
 
 	// perform optional build if prometheus
 	if (god == God::Prometheus)
-		GenerateOneBuild(god, state, turns);
+		for (int ia : PlayerCells(state))
+			GenerateOneBuild(god, ia, state, turns);
 
 	// perform one move
 	vector<State> temp;
@@ -223,7 +228,11 @@ void GenerateTurns(God god, State state, vector<State>& turns) {
 	temp.clear();
 	swap(temp, turns);
 	for (const State& m : temp)
-		GenerateOneBuild(god, m, turns);
+		if (god == God::Hermes)
+			for (int builder : PlayerCells(state))
+				GenerateOneBuild(god, builder, m, turns);
+		else
+			GenerateOneBuild(god, m.lastMove, m, turns);
 	if (turns.size() == 0)
 		return;
 
@@ -233,7 +242,31 @@ void GenerateTurns(God god, State state, vector<State>& turns) {
 		swap(temp, turns);
 		for (const State& m : temp) {
 			turns.push_back(m); // second build is optional
-			GenerateOneBuild(god, m, turns, m.lastBuild);
+			GenerateOneBuild(god, m.lastMove, m, turns, m.lastBuild);
+		}
+	}
+
+	// perform three additional builds with unmoved builder on the ground level if poseidon
+	if (god == God::Poseidon) {
+		std::function<bool(const State&, const State&)> less = [](const State& a, const State& b) {
+			for (int i = 0; i < 25; i++)
+				if (a[i] != b[i])
+					return a[i] < b[i];
+			return false;
+		};
+		std::function<bool(const State&, const State&)> equal = [](const State& a, const State& b) {
+			return a.cell == b.cell;
+		};
+		for (int i = 0; i < 3; i++) {
+			temp.clear();
+			swap(temp, turns);
+			for (const State& m : temp) {
+				turns.push_back(m); // building is optional
+				for (int ia : PlayerCells(state))
+					if (ia != m.lastMove && m[ia].tower == 0)
+						GenerateOneBuild(god, ia, m, turns, -1);
+				remove_dups(turns, less, equal);
+			}
 		}
 	}
 
@@ -244,6 +277,10 @@ void GenerateTurns(God god, State state, vector<State>& turns) {
 
 void Print(const State& state) {
 	print("player %s", state.player);
+	if (state.lastMove != -1)
+		print(", last move (%s %s)", state.lastMove / 5, state.lastMove % 5);
+	if (state.lastBuild != -1)
+		print(", last build (%s %s)", state.lastBuild / 5, state.lastBuild % 5);
 	if (state.athenaMovedUp)
 		print(", athena moved up");
 	if (state.victory)
@@ -432,9 +469,9 @@ void SingleMatch(vector<God> players, Strategy a, Strategy b) {
 
 int main(int argc, char* argv[]) {
 	srand(time(0));
-	vector<God> players = { God::Athena, God::Apollo };
-	//SingleMatch(players, Human, GreedyBot);
-	print("Greedy2 - Greedy2 %s\n", RelativeSkill(10000, players, GreedyBot2, GreedyBot2));
+	vector<God> players = { God::Prometheus, God::None };
+	SingleMatch(players, Human, GreedyBot);
+	//print("Greedy2 - Greedy2 %s\n", RelativeSkill(20, players, GreedyBot2, GreedyBot2));
 
 	/*print("Greedy - Rand %s\n", RelativeSkill(10000, players, GreedyBot, RandBot));
 	print("Greedy2 - Rand %s\n", RelativeSkill(10000, players, GreedyBot2, RandBot));
