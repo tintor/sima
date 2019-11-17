@@ -71,7 +71,7 @@ auto CellsAround(int a) {
 }
 
 enum class God { None, Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, Hermes, Minotaur, Pan, Prometheus };
-// Gods implemented: Apollo, Athena, Atlas
+// Gods implemented: Apollo, Athena, Atlas, Pan
 
 void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 	const int p = state.player;
@@ -84,6 +84,12 @@ void GenerateMoves(cspan<God> god, const State& state, vector<State>& moves) {
 			if (no_builder && !d.dome && d.tower - c.tower <= (state.canMoveUp ? 1 : 0)) {
 				State s = state;
 				swap(s[ic].builder, s[id].builder);
+				if (god[p] == God::Pan && d.tower - c.tower <= -2) {
+					s.victory = true;
+					moves.clear();
+					moves.push_back(s);
+					return;
+				}
 				if (d.tower == 3) {
 					s.victory = true;
 					moves.clear();
