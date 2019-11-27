@@ -105,6 +105,11 @@ bool contains(cspan<T> container, T element) {
 	return false;
 }
 
+template<typename T, size_t M>
+bool contains(const array<T, M>& container, T element) {
+	return contains(cspan<T>(container), element);
+}
+
 template<typename Container, typename Func>
 bool All(const Container& s, const Func& func) {
 	for (const auto& e : s)
