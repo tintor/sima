@@ -259,6 +259,7 @@ bool FilterVictory(vector<State>& states) {
 	return false;
 }
 
+// TODO: initial figure placement should also be a turn!
 void GenerateTurns(State state, vector<State>& turns) {
 	God god = state.gods[state.player];
 	if (god == God::Athena)
@@ -460,53 +461,8 @@ optional<State> GreedyBot(const State& state) {
 	GenerateTurns(state, moves);
 	if (moves.size() == 0)
 		return nullopt;
-
-	return bestElement(cspan<State>(moves), [&state](const State& move){
-		double score = 0;
-		for (int ic : PrevPlayerCells(move)) {
-			Cell c = move[ic];
-			score += 100 * c.tower * c.tower;
-			for (int id : CellsAround(ic)) {
-				Cell d = state[id];
-				if (d.builder == ' ' && !d.dome)
-					score += d.tower * d.tower;
-			}
-		}
-		return score;
-	});
-}
-
-double Heuristic(const State& move) {
-	double score = 0;
-	for (int ic : PrevPlayerCells(move)) {
-		Cell c = move[ic];
-		score += 100 * c.tower * c.tower;
-		for (int id : CellsAround(ic)) {
-			Cell d = move[id];
-			if (d.builder == ' ' && !d.dome)
-				score += d.tower * d.tower;
-			// blocking with domes
-			/*Cell d2 = state[id];
-			if (d.dome && !d2.dome && d.tower == 3) {
-				bool blocking = false;
-				for (int ie : CellsAround(id)) {
-					Cell e = move[ie];
-					if (e.builder != ' ' && Player(e) != state.player)
-						blocking = true;
-				}
-				if (blocking)
-					score += 10000;
-			}*/
-		}
-	}
-	return score;
-}
-
-optional<State> GreedyBot2(const State& state) {
-	vector<State> moves;
-	GenerateTurns(state, moves);
-	if (moves.size() == 0)
-		return nullopt;
+	if (moves.size() == 1 && moves[0].victory)
+		return moves[0];
 
 	return bestElement(cspan<State>(moves), [&state](const State& move){
 		double score = 0;
@@ -523,11 +479,23 @@ optional<State> GreedyBot2(const State& state) {
 					bool blocking = false;
 					for (int ie : CellsAround(id)) {
 						Cell e = move[ie];
-						if (e.builder != ' ' && Player(e) != state.player)
+						if (e.builder != ' ' && e.tower == 2 && Player(e) != state.player)
 							blocking = true;
 					}
 					if (blocking)
-						score += 10000;
+						score += 100000;
+				}
+			}
+		}
+		for (int ic : PlayerCells(move)) {
+			Cell c = move[ic];
+			score -= 100 * c.tower * c.tower;
+			for (int id : CellsAround(ic)) {
+				Cell d = move[id];
+				if (d.builder == ' ' && !d.dome) {
+					if (d.tower == 3)
+						score = -INF;
+					score -= d.tower * d.tower;
 				}
 			}
 		}
@@ -535,21 +503,59 @@ optional<State> GreedyBot2(const State& state) {
 	});
 }
 
-double SubTreeScore(const State& state, int depth) {
+double Heuristic(const State& state, const State& move) {
+	double score = 0;
+	for (int ic : PrevPlayerCells(move)) {
+		Cell c = move[ic];
+		score += 100 * c.tower * c.tower;
+		for (int id : CellsAround(ic)) {
+			Cell d = move[id];
+			if (d.builder == ' ' && !d.dome)
+				score += d.tower * d.tower;
+			// blocking with domes
+			Cell d2 = state[id];
+			if (d.dome && !d2.dome && d.tower == 3) {
+				bool blocking = false;
+				for (int ie : CellsAround(id)) {
+					Cell e = move[ie];
+					if (e.builder != ' ' && e.tower == 2 && Player(e) != state.player)
+						blocking = true;
+				}
+				if (blocking)
+					score += 100000;
+			}
+		}
+	}
+	for (int ic : PlayerCells(move)) {
+		Cell c = move[ic];
+		score -= 100 * c.tower * c.tower;
+		for (int id : CellsAround(ic)) {
+			Cell d = move[id];
+			if (d.builder == ' ' && !d.dome) {
+				if (d.tower == 3)
+					score = -INF;
+				score -= d.tower * d.tower;
+			}
+		}
+	}
+	return score;
+}
+
+double SubTreeScore(const State& prev, const State& state, int depth, bool maxi) {
 	if (depth == 0)
-		return Heuristic(state);
+		return Heuristic(prev, state) * (maxi ? 1 : -1);
 
 	vector<State> moves;
 	GenerateTurns(state, moves);
 	if (moves.size() == 0)
-		return (depth % 2) ? INF : -INF;
+		return maxi ? -INF : INF;
 	if (moves.size() == 1 && moves[0].victory)
-		return (depth % 2) ? -INF : INF;
+		return maxi ? INF : -INF;
 
 	double best = (depth % 2) ? INF : -INF;
 	for (const State& m : moves) {
-		double s = SubTreeScore(m, depth - 1);
-		best = (depth % 2) ? min(best, s) : max(best, s);
+		double s = SubTreeScore(state, m, depth - 1, !maxi);
+		best = maxi ? max(best, s) : min(best, s);
 	}
 	return best;
 }
@@ -562,8 +568,8 @@ optional<State> BruteBot(const State& state) {
 	if (moves.size() == 1 && moves[0].victory)
 		return moves[0];
 
-	return bestElement(cspan<State>(moves), [](const State& m) {
-		return SubTreeScore(m, 1);
+	return bestElement(cspan<State>(moves), [&state](const State& m) {
+		return SubTreeScore(state, m, 2, false);
 	});
 }
 
@@ -626,10 +632,9 @@ void SingleMatch(vector<God> gods, Strategy a, Strategy b) {
 int main(int argc, char* argv[]) {
 	srand(time(0));
 	vector<God> gods = { God::None, God::None };
-	//SingleMatch(gods, BruteBot, RandBot);
 
 	print("Greedy - Rand %s\n", RelativeSkill(10000, gods, GreedyBot, RandBot));
-	print("Greedy2 - Rand %s\n", RelativeSkill(10000, gods, GreedyBot2, RandBot));
-	print("Greedy - Greedy2 %s\n", RelativeSkill(10000, gods, GreedyBot, GreedyBot2));
+	print("Brute - Rand %s\n", RelativeSkill(100, gods, BruteBot, RandBot));
+	print("Brute - Greedy %s\n", RelativeSkill(100, gods, BruteBot, GreedyBot));
 	return 0;
 }
