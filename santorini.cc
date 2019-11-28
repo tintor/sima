@@ -17,22 +17,21 @@ using Coord = char; // 0-24 or -1 if empty
 
 struct Cell {
 	// TODO merge dome and builder into figure
-	// TODO rename tower to level
 	bool dome = false;
-	char tower = 0; // 0-3 height of tower
+	char level = 0; // 0-3 height of level
 	char builder = ' '; // Aa - first player, Bb - second player, ... (uppercase male, lowercase female)
 };
 
 bool operator<(Cell a, Cell b) {
 	if (a.dome != b.dome)
 		return !a.dome && b.dome;
-	if (a.tower != b.tower)
-		return a.tower < b.tower;
+	if (a.level != b.level)
+		return a.level < b.level;
 	return a.builder < b.builder;
 }
 
 bool operator==(Cell a, Cell b) {
-	return a.dome == b.dome && a.tower == b.tower && a.builder == b.builder;
+	return a.dome == b.dome && a.level == b.level && a.builder == b.builder;
 }
 
 bool operator!=(Cell a, Cell b) { return !(a == b); }
@@ -155,7 +154,7 @@ bool OnPerimeter(Coord a) {
 State MoveBuilder(const State& state, Coord ia, Coord ib) {
 	State s = state;
 	s.lastMove = ib;
-	if (state[ib].tower == 3 && state[ia].tower < 3) {
+	if (state[ib].level == 3 && state[ia].level < 3) {
 		s.victory = true;
 		// Hera prevents others from winning by climbing on perimeter tower
 		if (state.gods[state.player] != God::Hera && contains(state.gods, God::Hera) && !OnPerimeter(ib))
@@ -210,8 +209,8 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 			for (int id : CellsAround(ic)) {
 				Cell d = state[id];
 
-				// Important to check bfs.visited last as some tower can only be reachable from certain direction
-				if (d.builder != ' ' || d.dome || d.tower - c.tower > maxJump || bfs.visited[id])
+				// Important to check bfs.visited last as some level can only be reachable from certain direction
+				if (d.builder != ' ' || d.dome || d.level - c.level > maxJump || bfs.visited[id])
 					continue;
 
 				bfs.add(id, id);
@@ -232,7 +231,7 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 
 			for (auto id : CellsAround(ic)) {
 				Cell d = state[id];
-				if (d.builder != ' ' || d.dome || d.tower - c.tower > maxJump)
+				if (d.builder != ' ' || d.dome || d.level - c.level > maxJump)
 					continue;
 
 				State s = MoveBuilder(state, ic, id);
@@ -243,7 +242,7 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 				if (ie == -1)
 					continue;
 				Cell e = state[ie];
-				if (e.builder != ' ' || e.dome || e.tower - d.tower > maxJump)
+				if (e.builder != ' ' || e.dome || e.level - d.level > maxJump)
 					continue;
 
 				moves.push_back(MoveBuilder(s, id, ie));
@@ -259,7 +258,7 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 
 				Coord ia = LMiddle1(ic, dr, dc);
 				Cell a = state[ia];
-				if (a.builder == ' ' && !a.dome && a.tower - c.tower <= maxJump && d.tower - a.tower <= maxJump) {
+				if (a.builder == ' ' && !a.dome && a.level - c.level <= maxJump && d.level - a.level <= maxJump) {
 					State s = MoveBuilder(state, ic, ia);
 					moves.push_back(MoveBuilder(s, ia, id));
 					continue;
@@ -267,7 +266,7 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 
 				Coord ib = LMiddle2(ic, dr, dc);
 				Cell b = state[ib];
-				if (b.builder == ' ' && !b.dome && b.tower - c.tower <= maxJump && d.tower - b.tower <= maxJump) {
+				if (b.builder == ' ' && !b.dome && b.level - c.level <= maxJump && d.level - b.level <= maxJump) {
 					State s = MoveBuilder(state, ic, ib);
 					moves.push_back(MoveBuilder(s, ib, id));
 				}
@@ -281,11 +280,11 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 			Cell c = state[ic];
 			Cell d = state[id];
 
-			if (Player(d) == state.player || d.dome || d.tower - c.tower > maxJump)
+			if (Player(d) == state.player || d.dome || d.level - c.level > maxJump)
 				continue;
 
 			// horizontal case is covered separately
-			if (god == God::Hermes && d.tower == c.tower)
+			if (god == God::Hermes && d.level == c.level)
 				continue;
 
 			int ie = -1;
@@ -298,19 +297,19 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 
 			State s = state;
 			s.lastMove = id;
-			if (god == God::Athena && d.tower > c.tower)
+			if (god == God::Athena && d.level > c.level)
 				s.athenaMovedUp = true;
-			if (god == God::Pan && d.tower - c.tower <= -2)
+			if (god == God::Pan && d.level - c.level <= -2)
 				s.victory = true;
-			if (d.tower == 3 && c.tower < 3) {
+			if (d.level == 3 && c.level < 3) {
 				s.victory = true;
-				// Hera prevents others from winning by climbing on perimeter tower
+				// Hera prevents others from winning by climbing on perimeter level
 				if (god != God::Hera && contains(state.gods, God::Hera) && !OnPerimeter(id))
 					s.victory = false;
 			}
-			if (god == God::Eros && d.tower == 1)
+			if (god == God::Eros && d.level == 1)
 				for (Coord ie : CellsAround(id))
-					if (state[ie].tower == 1 && Player(state[ie]) == state.player)
+					if (state[ie].level == 1 && Player(state[ie]) == state.player)
 						s.victory = true;
 
 			if (god == God::Minotaur)
@@ -328,7 +327,7 @@ int CompleteTowerCount(const State& s) {
 	int count = 0;
 	for (int row = 0; row < 5; row++)
 		for (int col = 0; col < 5; col++)
-			if (s.cell[row][col].dome && s.cell[row][col].tower == 3)
+			if (s.cell[row][col].dome && s.cell[row][col].level == 3)
 				count += 1;
 	return count;
 }
@@ -350,7 +349,7 @@ void GenerateOneBuild(int builder, const State& state, vector<State>& builds, bo
 		if (e.dome || e.builder != ' ' || (state.lastBuild == ie && god == God::Demeter))
 			continue;
 
-		if (e.tower == 3) {
+		if (e.level == 3) {
 			if (seleneDome)
 				continue;
 			// build complete tower
@@ -391,12 +390,12 @@ void GenerateOneBuild(int builder, const State& state, vector<State>& builds, bo
 		if (!seleneDome) {
 			// build floor
 			State s = state;
-			s[ie].tower += 1;
+			s[ie].level += 1;
 			s.lastBuild = ie;
 			builds.push_back(s);
 
-			if (e.tower < 2 && god == God::Hephaestus) {
-				s[ie].tower += 1;
+			if (e.level < 2 && god == God::Hephaestus) {
+				s[ie].level += 1;
 				builds.push_back(s);
 			}
 		}
@@ -552,7 +551,7 @@ void GenerateTurns(State state, vector<State>& turns) {
 			for (const State& m : temp) {
 				turns.push_back(m); // building is optional
 				for (auto ia : PlayerCells(state))
-					if (ia != m.lastMove && m[ia].tower == 0)
+					if (ia != m.lastMove && m[ia].level == 0)
 						GenerateOneBuild(ia, m, turns);
 			}
 			if (FilterVictory(turns))
@@ -569,8 +568,8 @@ void GenerateTurns(State state, vector<State>& turns) {
 					Cell a = m[ia];
 					Cell& b = m[ib];
 					auto pb = Player(b);
-					if (a.tower > b.tower && pb != -1 && pb != state.player) {
-						b.tower += 1;
+					if (a.level > b.level && pb != -1 && pb != state.player) {
+						b.level += 1;
 						b.builder = ' ';
 						m.lastBuild = ib;
 						if (BuilderCount(m, pb) == 0) {
@@ -608,7 +607,7 @@ void Print(const State& state) {
 		for (auto& c : row) {
 			char code[] = {' ', ' ', ' ', ' ', ' ', '\0'};
 			char* p = code;
-			for (int i = 0; i < c.tower; i++)
+			for (int i = 0; i < c.level; i++)
 				*p++ = ']';
 			if (c.dome)
 				*p++ = ')';
@@ -686,18 +685,18 @@ optional<State> GreedyBot(const State& state) {
 		double score = 0;
 		for (int ic : PrevPlayerCells(move)) {
 			Cell c = move[ic];
-			score += 100 * c.tower * c.tower;
+			score += 100 * c.level * c.level;
 			for (int id : CellsAround(ic)) {
 				Cell d = move[id];
 				if (d.builder == ' ' && !d.dome)
-					score += d.tower * d.tower;
+					score += d.level * d.level;
 				// blocking with domes
 				Cell d2 = state[id];
-				if (d.dome && !d2.dome && d.tower == 3) {
+				if (d.dome && !d2.dome && d.level == 3) {
 					bool blocking = false;
 					for (int ie : CellsAround(id)) {
 						Cell e = move[ie];
-						if (e.builder != ' ' && e.tower == 2 && Player(e) != state.player)
+						if (e.builder != ' ' && e.level == 2 && Player(e) != state.player)
 							blocking = true;
 					}
 					if (blocking)
@@ -707,13 +706,13 @@ optional<State> GreedyBot(const State& state) {
 		}
 		for (int ic : PlayerCells(move)) {
 			Cell c = move[ic];
-			score -= 100 * c.tower * c.tower;
+			score -= 100 * c.level * c.level;
 			for (int id : CellsAround(ic)) {
 				Cell d = move[id];
 				if (d.builder == ' ' && !d.dome) {
-					if (d.tower == 3)
+					if (d.level == 3)
 						score = -INF;
-					score -= d.tower * d.tower;
+					score -= d.level * d.level;
 				}
 			}
 		}
@@ -725,18 +724,18 @@ double Heuristic(const State& state, const State& move) {
 	double score = 0;
 	for (int ic : PrevPlayerCells(move)) {
 		Cell c = move[ic];
-		score += 100 * c.tower * c.tower;
+		score += 100 * c.level * c.level;
 		for (int id : CellsAround(ic)) {
 			Cell d = move[id];
 			if (d.builder == ' ' && !d.dome)
-				score += d.tower * d.tower;
+				score += d.level * d.level;
 			// blocking with domes
 			Cell d2 = state[id];
-			if (d.dome && !d2.dome && d.tower == 3) {
+			if (d.dome && !d2.dome && d.level == 3) {
 				bool blocking = false;
 				for (int ie : CellsAround(id)) {
 					Cell e = move[ie];
-					if (e.builder != ' ' && e.tower == 2 && Player(e) != state.player)
+					if (e.builder != ' ' && e.level == 2 && Player(e) != state.player)
 						blocking = true;
 				}
 				if (blocking)
@@ -746,13 +745,13 @@ double Heuristic(const State& state, const State& move) {
 	}
 	for (int ic : PlayerCells(move)) {
 		Cell c = move[ic];
-		score -= 100 * c.tower * c.tower;
+		score -= 100 * c.level * c.level;
 		for (int id : CellsAround(ic)) {
 			Cell d = move[id];
 			if (d.builder == ' ' && !d.dome) {
-				if (d.tower == 3)
+				if (d.level == 3)
 					score = -INF;
-				score -= d.tower * d.tower;
+				score -= d.level * d.level;
 			}
 		}
 	}
