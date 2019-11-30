@@ -97,8 +97,7 @@ add_executable(pid pid.cc ${prod} ${render})
 add_executable(soko ${sokoban} ${prod})
 add_executable(santorini santorini.cc ${prod})
 
-add_definitions(-O1 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
-#add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
+add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
 #add_definitions(-O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
 

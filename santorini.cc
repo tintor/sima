@@ -19,7 +19,8 @@ enum class God : char { Dead, None,
 	Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus,
 // - Aphrodite!, Ares*, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
 // Golden Fleece
-// - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Hades*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
+	Hades,
+// - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
 // - Tartarus*, Terpsichore, Urania*
 // Heroes
 // - Achilles*, Adonis*, Atalanta, Bellerophon*, Heracles*, Jason*, Medea*, Odysseus, Polyphemus*, Theseus*
@@ -267,7 +268,11 @@ void GenerateHermesFastMoves(const State& state, vector<State>& states) {
 	}
 }
 
-void GenerateTritonMove(const State& state, int maxJump, vector<State>& states) {
+bool InOrder(int a, int b, int c) {
+	return a <= b && b <= c;
+}
+
+void GenerateTritonMove(const State& state, int minJump, int maxJump, vector<State>& states) {
 	for (int ic : PlayerCells(state)) {
 		// TODO Triton can move back to initial cell if it jumps to perimeter first (it can also win this way)
 		small_bfs<int> bfs(25);
@@ -276,7 +281,7 @@ void GenerateTritonMove(const State& state, int maxJump, vector<State>& states) 
 			Cell d = state[id];
 
 			// Important to check bfs.visited last as some level can only be reachable from certain direction
-			if (!Empty(d) || d.level - c.level > maxJump || bfs.visited[id])
+			if (!Empty(d) || !InOrder(minJump, d.level - c.level, maxJump) || bfs.visited[id])
 				continue;
 
 			bfs.add(id, id);
@@ -288,7 +293,7 @@ void GenerateTritonMove(const State& state, int maxJump, vector<State>& states) 
 			for (int ie : bfs)
 				if (Cell e = state[ie]; OnPerimeter(ie))
 					for (int ib : CellsAround(ie))
-						if (Cell b = state[ib]; Empty(b) && b.level - e.level <= maxJump) {
+						if (Cell b = state[ib]; Empty(b) && InOrder(minJump, b.level - e.level, maxJump)) {
 							bfs.add(ib, ib);
 							s = state;
 							// TODO check winning condition (and Hera)
@@ -299,14 +304,14 @@ void GenerateTritonMove(const State& state, int maxJump, vector<State>& states) 
 	}
 }
 
-void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states) {
+void GenerateArtemisMoves(const State& state, int minJump, int maxJump, vector<State>& states) {
 	// perform one or two moves with a single builder, but not back to initial cell
 	for (auto ic : PlayerCells(state)) {
 		Cell c = state[ic];
 
 		for (auto id : CellsAround(ic)) {
 			Cell d = state[id];
-			if (!Empty(d) || d.level - c.level > maxJump)
+			if (!Empty(d) || !InOrder(minJump, d.level - c.level, maxJump))
 				continue;
 
 			State s = MoveBuilder(state, ic, id);
@@ -317,7 +322,7 @@ void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states
 			if (ie == -1)
 				continue;
 			Cell e = state[ie];
-			if (!Empty(e) || e.level - d.level > maxJump)
+			if (!Empty(e) || !InOrder(minJump, e.level - d.level, maxJump))
 				continue;
 
 			State u = MoveBuilder(s, id, ie);
@@ -334,7 +339,7 @@ void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states
 
 			Coord ia = LMiddle1(ic, dr, dc);
 			Cell a = state[ia];
-			if (Empty(a) && a.level - c.level <= maxJump && d.level - a.level <= maxJump) {
+			if (Empty(a) && InOrder(minJump, a.level - c.level, maxJump) && InOrder(minJump, d.level - a.level, maxJump)) {
 				State s = MoveBuilder(state, ic, ia);
 				s = MoveBuilder(s, ia, id);
 				ADD_STATE(s);
@@ -343,7 +348,7 @@ void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states
 
 			Coord ib = LMiddle2(ic, dr, dc);
 			Cell b = state[ib];
-			if (Empty(b) && b.level - c.level <= maxJump && d.level - b.level <= maxJump) {
+			if (Empty(b) && InOrder(minJump, b.level - c.level, maxJump) && InOrder(minJump, d.level - b.level, maxJump)) {
 				State s = MoveBuilder(state, ic, ib);
 				s = MoveBuilder(s, ib, id);
 				ADD_STATE(s);
@@ -354,6 +359,10 @@ void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states
 
 void GenerateOneMove(const State& state, vector<State>& states) {
 	God god = state.gods[state.player];
+
+	int minJump = -3;
+	if (god != God::Hades && contains(state.gods, God::Hades))
+		minJump = 0;
 
 	int maxJump = 1;
 	if (god == God::Pegasus)
@@ -367,12 +376,12 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 		GenerateHermesFastMoves(state, states);
 
 	if (god == God::Triton) {
-		GenerateTritonMove(state, maxJump, states);
+		GenerateTritonMove(state, minJump, maxJump, states);
 		return;
 	}
 
 	if (god == God::Artemis) {
-		GenerateArtemisMoves(state, maxJump, states);
+		GenerateArtemisMoves(state, minJump, maxJump, states);
 		return;
 	}
 
@@ -381,7 +390,7 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 			Cell c = state[ic];
 			Cell d = state[id];
 
-			if (Player(d) == state.player || Dome(d) || d.level - c.level > maxJump)
+			if (Player(d) == state.player || Dome(d) || !InOrder(minJump, d.level - c.level, maxJump))
 				continue;
 
 			// horizontal case is covered separately
@@ -680,8 +689,12 @@ void GenerateTurns(State state, vector<State>& turns) {
 		s.player = next;
 }
 
+// TODO print possible moves side by side to save space
+// TODO print last build and last move in different color
 void Print(const State& state) {
 	print("player %s", int(state.player));
+	for (God a : state.gods)
+		print(" %s", magic_enum::enum_name(a));
 	if (state.lastMove != -1)
 		print(", move (%s %s)", state.lastMove / 5, state.lastMove % 5);
 	if (state.lastBuild != -1)
@@ -708,7 +721,6 @@ void Print(const State& state) {
 	print("\n");
 }
 
-// TODO print possible moves side by side to save space
 optional<State> Human(const State& state) {
 	vector<State> moves;
 	GenerateTurns(state, moves);
@@ -958,8 +970,9 @@ int main(int argc, char* argv[]) {
 		return Catch::Session().run(1, test_argv);
 	}
 
-	vector<God> gods = { God::None, God::None };
+	// SingleMatch({God::None, God::Hades}, Human, GreedyBot);
 
+	vector<God> gods = { God::None, God::None };
 	print("Greedy - Rand %s\n", RelativeSkill(10000, gods, GreedyBot, RandBot));
 	print("Brute - Rand %s\n", RelativeSkill(10, gods, BruteBot, RandBot));
 	print("Brute - Greedy %s\n", RelativeSkill(10, gods, BruteBot, GreedyBot));
