@@ -7,15 +7,16 @@
 #include <core/small_bfs.h>
 
 #include <catch.hpp>
+#include <magic_enum.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-enum class God : char { None, Dead,
+enum class God : char { Dead, None,
 // Simple
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
 // Advanced
-	Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus };
+	Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus,
 // - Aphrodite!, Ares*, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
 // Golden Fleece
 // - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Hades*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
@@ -23,7 +24,8 @@ enum class God : char { None, Dead,
 // Heroes
 // - Achilles*, Adonis*, Atalanta, Bellerophon*, Heracles*, Jason*, Medea*, Odysseus, Polyphemus*, Theseus*
 // Underworld
-// - Tyche, Sculla*, Proteus*, CastorPollux*, Eris, Maenads*, Asteria*, Hippolyta*, Hydra*, Iris*, Nyx, Pegasus*
+	Pegasus };
+// - Tyche, Sculla*, Proteus*, CastorPollux*, Eris, Maenads*, Asteria*, Hippolyta*, Hydra*, Iris*, Nyx
 
 using Coord = char; // 0-24 or -1 if empty
 
@@ -354,6 +356,8 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 	God god = state.gods[state.player];
 
 	int maxJump = 1;
+	if (god == God::Pegasus)
+		maxJump = 3;
 	if (god == God::Prometheus && state.lastBuild != -1)
 		maxJump = 0;
 	if (state.athenaMovedUp && god != God::Athena)
@@ -398,16 +402,20 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 				s.athenaMovedUp = true;
 			if (god == God::Pan && d.level - c.level <= -2)
 				s.victory = true;
-			if (d.level == 3 && c.level < 3) {
+			if (d.level == 3 && c.level == 2) {
 				s.victory = true;
-				// Hera prevents others from winning by climbing on perimeter level
+				// Hera prevents others from winning by climbing on a perimeter tower
 				if (god != God::Hera && contains(state.gods, God::Hera) && !OnPerimeter(id))
 					s.victory = false;
 			}
 			if (god == God::Eros && d.level == 1)
 				for (Coord ie : CellsAround(id))
-					if (state[ie].level == 1 && Player(state[ie]) == state.player)
+					if (state[ie].level == 1 && Player(state[ie]) == state.player) {
 						s.victory = true;
+						// Hera prevents Eros's winning condition by moving to perimeter
+						if (contains(state.gods, God::Hera) && !OnPerimeter(id))
+							s.victory = false;
+					}
 
 			if (god == God::Minotaur)
 				swap(s[ie].figure, s[id].figure);
@@ -887,15 +895,17 @@ double RelativeSkill2(int games, vector<God> gods, Strategy a, Strategy b) {
 	return double(wins[0]) / games;
 }
 
+// TODO make it multi-threaded!
 double RelativeSkill(int games, vector<God> gods, Strategy a, Strategy b) {
 	return (RelativeSkill2(games / 2, gods, a, b) + 1 - RelativeSkill2(games / 2, {gods[1], gods[0]}, b, a)) / 2;
 }
 
-void SingleMatch(vector<God> gods, Strategy a, Strategy b) {
+void SingleMatch(cspan<God> gods, Strategy a, Strategy b, bool verbose = true) {
 	State state;
 	for (int j = 0; j < state.gods.size(); j++)
 		state.gods[j] = (j < gods.size()) ? gods[j] : God::Dead;
-	Print(state);
+	if (verbose)
+		Print(state);
 
 	vector<Strategy> strategy = { a, b };
 	while (!state.victory) {
@@ -903,7 +913,8 @@ void SingleMatch(vector<God> gods, Strategy a, Strategy b) {
 		if (!s.has_value())
 			break;
 		state = *s;
-		Print(state);
+		if (verbose)
+			Print(state);
 	}
 }
 
@@ -920,8 +931,22 @@ TEST_CASE("Santorini Apollo", "[santorini]") {
 
 	vector<State> moves;
 	GenerateTurns(state, moves);
-	for (const State& m : moves)
-		Print(m);
+	//for (const State& m : moves)
+	//	Print(m);
+}
+
+inline God operator++(God& x) { return x = God(int(x) + 1); }
+
+TEST_CASE("All pairs matchups", "[santorini]") {
+	for (God a : magic_enum::enum_values<God>())
+		for (God b : magic_enum::enum_values<God>())
+			if (a != God::Dead && b != God::Dead) {
+				print("%s vs %s\n", magic_enum::enum_name(a), magic_enum::enum_name(b));
+				SingleMatch({a, b}, RandBot, RandBot, false);
+				SingleMatch({b, a}, RandBot, RandBot, false);
+				SingleMatch({a, b}, GreedyBot, GreedyBot, false);
+				SingleMatch({b, a}, GreedyBot, GreedyBot, false);
+			}
 }
 
 int main(int argc, char* argv[]) {
