@@ -224,6 +224,132 @@ Coord LMiddle2(Coord a, int dr, int dc) {
 	} else \
 		states.push_back(s);
 
+void GenerateHermesFastMoves(const State& state, vector<State>& states) {
+	// Find all horizontal possible moves for all builders at the same time
+	static_vector<Coord, 25> builders;
+	for (int row = 0; row < 5; row++)
+		for (int col = 0; col < 5; col++)
+			if (Player(state.cell[row][col]) == state.player)
+				builders.push_back(row * 5 + col);
+
+	if (builders.size() == 0 || builders.size() > 2)
+		THROW(runtime_error);
+	int sa = builders[0];
+	int sb = (builders.size() == 2) ? builders[1] : 0;
+
+	State base = state;
+	char ca = ' ', cb = ' ';
+	swap(base[sa].figure, ca);
+	swap(base[sb].figure, cb);
+
+	small_bfs<int> bfs(625);
+	bfs.add(sa * 25 + sb, sa * 25 + sb);
+	for (int e : bfs) {
+		int ia = e / 25;
+		int ib = e % 25;
+
+		State s = base;
+		s[ia].figure = ca;
+		s[ib].figure = cb;
+		s.lastMove = ia;
+		ADD_STATE(s);
+
+		// TODO move ia and add to bfs
+		for (int ic : CellsAround(ia))
+			if (ic != ib) {
+			}
+
+		if (builders.size() == 2) {
+			// TODO move ib and add to bfs
+		}
+	}
+}
+
+void GenerateTritonMove(const State& state, int maxJump, vector<State>& states) {
+	for (int ic : PlayerCells(state)) {
+		// TODO Triton can move back to initial cell if it jumps to perimeter first (it can also win this way)
+		small_bfs<int> bfs(25);
+		Cell c = state[ic];
+		for (int id : CellsAround(ic)) {
+			Cell d = state[id];
+
+			// Important to check bfs.visited last as some level can only be reachable from certain direction
+			if (!Empty(d) || d.level - c.level > maxJump || bfs.visited[id])
+				continue;
+
+			bfs.add(id, id);
+			State s = state;
+			// TODO check winning condition (and Hera)
+			swap(s[ic].figure, s[id].figure);
+			ADD_STATE(s);
+
+			for (int ie : bfs)
+				if (Cell e = state[ie]; OnPerimeter(ie))
+					for (int ib : CellsAround(ie))
+						if (Cell b = state[ib]; Empty(b) && b.level - e.level <= maxJump) {
+							bfs.add(ib, ib);
+							s = state;
+							// TODO check winning condition (and Hera)
+							swap(s[ic].figure, s[ib].figure);
+							ADD_STATE(s);
+						}
+		}
+	}
+}
+
+void GenerateArtemisMoves(const State& state, int maxJump, vector<State>& states) {
+	// perform one or two moves with a single builder, but not back to initial cell
+	for (auto ic : PlayerCells(state)) {
+		Cell c = state[ic];
+
+		for (auto id : CellsAround(ic)) {
+			Cell d = state[id];
+			if (!Empty(d) || d.level - c.level > maxJump)
+				continue;
+
+			State s = MoveBuilder(state, ic, id);
+			ADD_STATE(s);
+
+			// second move (in the same direction)
+			auto ie = CellInDirection(ic, id);
+			if (ie == -1)
+				continue;
+			Cell e = state[ie];
+			if (!Empty(e) || e.level - d.level > maxJump)
+				continue;
+
+			State u = MoveBuilder(s, id, ie);
+			ADD_STATE(u);
+		}
+
+		for (auto id : CellsAroundL2(ic)) {
+			Cell d = state[id];
+			if (!Empty(d))
+				continue;
+
+			int dr = id / 5 - ic / 5;
+			int dc = id % 5 - ic % 5;
+
+			Coord ia = LMiddle1(ic, dr, dc);
+			Cell a = state[ia];
+			if (Empty(a) && a.level - c.level <= maxJump && d.level - a.level <= maxJump) {
+				State s = MoveBuilder(state, ic, ia);
+				s = MoveBuilder(s, ia, id);
+				ADD_STATE(s);
+				continue;
+			}
+
+			Coord ib = LMiddle2(ic, dr, dc);
+			Cell b = state[ib];
+			if (Empty(b) && b.level - c.level <= maxJump && d.level - b.level <= maxJump) {
+				State s = MoveBuilder(state, ic, ib);
+				s = MoveBuilder(s, ib, id);
+				ADD_STATE(s);
+			}
+		}
+	}
+}
+
 void GenerateOneMove(const State& state, vector<State>& states) {
 	God god = state.gods[state.player];
 
@@ -233,131 +359,16 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 	if (state.athenaMovedUp && god != God::Athena)
 		maxJump = 0;
 
-	if (god == God::Hermes) {
-		// Find all horizontal possible moves for all builders at the same time
-		static_vector<Coord, 25> builders;
-		for (int row = 0; row < 5; row++)
-			for (int col = 0; col < 5; col++)
-				if (Player(state.cell[row][col]) == state.player)
-					builders.push_back(row * 5 + col);
-
-		if (builders.size() == 0 || builders.size() > 2)
-			THROW(runtime_error);
-		int sa = builders[0];
-		int sb = (builders.size() == 2) ? builders[1] : 0;
-
-		State base = state;
-		char ca = ' ', cb = ' ';
-		swap(base[sa].figure, ca);
-		swap(base[sb].figure, cb);
-
-		small_bfs<int> bfs(625);
-		bfs.add(sa * 25 + sb, sa * 25 + sb);
-		for (int e : bfs) {
-			int ia = e / 25;
-			int ib = e % 25;
-
-			State s = base;
-			s[ia].figure = ca;
-			s[ib].figure = cb;
-			s.lastMove = ia;
-			ADD_STATE(s);
-
-			// TODO move ia and add to bfs
-			for (int ic : CellsAround(ia))
-				if (ic != ib) {
-				}
-
-			if (builders.size() == 2) {
-				// TODO move ib and add to bfs
-			}
-		}
-	}
+	if (god == God::Hermes)
+		GenerateHermesFastMoves(state, states);
 
 	if (god == God::Triton) {
-		for (int ic : PlayerCells(state)) {
-			// TODO Triton can move back to initial cell if it jumps to perimeter first (it can also win this way)
-			small_bfs<int> bfs(25);
-			Cell c = state[ic];
-			for (int id : CellsAround(ic)) {
-				Cell d = state[id];
-
-				// Important to check bfs.visited last as some level can only be reachable from certain direction
-				if (!Empty(d) || d.level - c.level > maxJump || bfs.visited[id])
-					continue;
-
-				bfs.add(id, id);
-				State s = state;
-				// TODO check winning condition (and Hera)
-				swap(s[ic].figure, s[id].figure);
-				ADD_STATE(s);
-
-				for (int ie : bfs)
-					if (Cell e = state[ie]; OnPerimeter(ie))
-						for (int ib : CellsAround(ie))
-							if (Cell b = state[ib]; Empty(b) && b.level - e.level <= maxJump) {
-								bfs.add(ib, ib);
-								s = state;
-								// TODO check winning condition (and Hera)
-								swap(s[ic].figure, s[ib].figure);
-								ADD_STATE(s);
-							}
-			}
-		}
+		GenerateTritonMove(state, maxJump, states);
 		return;
 	}
 
 	if (god == God::Artemis) {
-		// perform one or two moves with a single builder, but not back to initial cell
-		for (auto ic : PlayerCells(state)) {
-			Cell c = state[ic];
-
-			for (auto id : CellsAround(ic)) {
-				Cell d = state[id];
-				if (!Empty(d) || d.level - c.level > maxJump)
-					continue;
-
-				State s = MoveBuilder(state, ic, id);
-				ADD_STATE(s);
-
-				// second move (in the same direction)
-				auto ie = CellInDirection(ic, id);
-				if (ie == -1)
-					continue;
-				Cell e = state[ie];
-				if (!Empty(e) || e.level - d.level > maxJump)
-					continue;
-
-				State u = MoveBuilder(s, id, ie);
-				ADD_STATE(u);
-			}
-
-			for (auto id : CellsAroundL2(ic)) {
-				Cell d = state[id];
-				if (!Empty(d))
-					continue;
-
-				int dr = id / 5 - ic / 5;
-				int dc = id % 5 - ic % 5;
-
-				Coord ia = LMiddle1(ic, dr, dc);
-				Cell a = state[ia];
-				if (Empty(a) && a.level - c.level <= maxJump && d.level - a.level <= maxJump) {
-					State s = MoveBuilder(state, ic, ia);
-					s = MoveBuilder(s, ia, id);
-					ADD_STATE(s);
-					continue;
-				}
-
-				Coord ib = LMiddle2(ic, dr, dc);
-				Cell b = state[ib];
-				if (Empty(b) && b.level - c.level <= maxJump && d.level - b.level <= maxJump) {
-					State s = MoveBuilder(state, ic, ib);
-					s = MoveBuilder(s, ib, id);
-					ADD_STATE(s);
-				}
-			}
-		}
+		GenerateArtemisMoves(state, maxJump, states);
 		return;
 	}
 
