@@ -16,8 +16,8 @@ enum class God : char { Dead, None,
 // Simple
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
 // Advanced
-	Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus,
-// - Aphrodite!, Ares*, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
+	Ares, Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus,
+// - Aphrodite!, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
 // Golden Fleece
 	Hades,
 // - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
@@ -542,7 +542,6 @@ void Deduplicate(vector<State>& turns) {
 	remove_dups(turns, LessCells, EqualCells);
 }
 
-// TODO: initial figure placement should also be a turn!
 void GenerateTurns(State state, vector<State>& turns) {
 	God god = state.gods[state.player];
 	if (state.setup) {
@@ -636,8 +635,6 @@ void GenerateTurns(State state, vector<State>& turns) {
 			turns.push_back(m); // second build is optional
 			GenerateOneBuild(m.lastMove, m, turns, m.lastBuild);
 		}
-		if (Wins(turns))
-			return;
 		Deduplicate(turns);
 	}
 
@@ -648,19 +645,17 @@ void GenerateTurns(State state, vector<State>& turns) {
 			swap(temp, turns);
 			for (const State& m : temp) {
 				turns.push_back(m); // building is optional
-				for (auto ia : PlayerCells(state))
+				for (auto ia : PlayerCells(m))
 					if (ia != m.lastMove && m[ia].level == 0)
 						GenerateOneBuild(ia, m, turns);
 			}
-			if (Wins(turns))
-				return;
 			Deduplicate(turns);
 		}
 	}
 
 	// perform medusa's build
-	if (god == God::Medusa) {
-		for (State& m : turns) {
+	if (god == God::Medusa)
+		for (State& m : turns)
 			for (auto ia : PlayerCells(m))
 				for (auto ib : CellsAround(ia)) {
 					Cell a = m[ia];
@@ -673,12 +668,28 @@ void GenerateTurns(State state, vector<State>& turns) {
 						if (BuilderCount(m, pb) == 0) {
 							// TODO 2 player assumption
 							m.victory = true;
+							turns[0] = m;
+							turns.resize(1);
+							return;
 						}
 					}
 				}
+
+	// optionally destroy a non-dome unoccupied level near unmoved worker if Ares
+	if (god == God::Ares) {
+		temp.clear();
+		swap(temp, turns);
+		for (const State& m : temp) {
+			turns.push_back(m);
+			for (auto ia : PlayerCells(m))
+				if (ia != m.lastMove)
+					for (auto ib : CellsAround(ia))
+						if (m[ib].level > 0 && Empty(m[ib])) {
+							State s = m;
+							s[ib].level -= 1;
+							turns.push_back(s);
+						}
 		}
-		if (Wins(turns))
-			return;
 	}
 
 	// TODO assert no duplicates
@@ -970,7 +981,7 @@ int main(int argc, char* argv[]) {
 		return Catch::Session().run(1, test_argv);
 	}
 
-	// SingleMatch({God::None, God::Hades}, Human, GreedyBot);
+	SingleMatch({God::Ares, God::None}, Human, RandBot);
 
 	vector<God> gods = { God::None, God::None };
 	print("Greedy - Rand %s\n", RelativeSkill(10000, gods, GreedyBot, RandBot));
