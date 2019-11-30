@@ -1,3 +1,4 @@
+#define CATCH_CONFIG_RUNNER
 #include <core/format.h>
 #include <core/each.h>
 #include <core/dynamic_array.h>
@@ -5,13 +6,24 @@
 #include <core/util.h>
 #include <core/small_bfs.h>
 
+#include <catch.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 enum class God : char { None, Dead,
+// Simple
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
+// Advanced
 	Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus };
+// - Aphrodite!, Ares*, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
+// Golden Fleece
+// - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Hades*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
+// - Tartarus*, Terpsichore, Urania*
+// Heroes
+// - Achilles*, Adonis*, Atalanta, Bellerophon*, Heracles*, Jason*, Medea*, Odysseus, Polyphemus*, Theseus*
+// Underworld
+// - Tyche, Sculla*, Proteus*, CastorPollux*, Eris, Maenads*, Asteria*, Hippolyta*, Hydra*, Iris*, Nyx, Pegasus*
 
 using Coord = char; // 0-24 or -1 if empty
 
@@ -52,6 +64,19 @@ struct State {
 
 	Cell operator[](int a) const { return cell[a / 5][a % 5]; }
 	Cell& operator[](int a) { return cell[a / 5][a % 5]; }
+
+	State() {}
+	State(string_view str) {
+		for (int i = 0; i < 25; i++) {
+			char l = str[i * 2];
+			REQUIRE((l == '.' || ('0' <= l && l <= '3')));
+			(*this)[i].level = (l == '.') ? 0 : (l - '0');
+
+			char f = str[i * 2 + 1];
+			REQUIRE((f == ' ' || f == ')' || ('a' <= f && f <= 'd') || ('A' <= f && f <= 'D')));
+			(*this)[i].figure = f;
+		}
+	}
 };
 
 auto Cells() {
@@ -61,16 +86,16 @@ auto Cells() {
 	return data;
 }
 
+bool IsFemale(Cell c) {
+	return 'a' <= c.figure && c.figure <= 'd';
+}
+
 int Player(Cell c) {
 	if ('a' <= c.figure && c.figure <= 'd')
 		return c.figure - 'a';
 	if ('A' <= c.figure && c.figure <= 'D')
 		return c.figure - 'A';
 	return -1;
-}
-
-bool IsFemale(Cell c) {
-	return 'a' <= c.figure && c.figure <= 'd';
 }
 
 int PrevPlayer(const State& state) {
@@ -191,7 +216,15 @@ Coord LMiddle2(Coord a, int dr, int dc) {
 	return a + dr * 5 + dc;
 }
 
-void GenerateOneMove(const State& state, vector<State>& moves) {
+#define ADD_STATE(s) \
+	if (s.victory) { \
+		states.clear(); \
+		states.push_back(s); \
+		return; \
+	} else \
+		states.push_back(s);
+
+void GenerateOneMove(const State& state, vector<State>& states) {
 	God god = state.gods[state.player];
 
 	int maxJump = 1;
@@ -201,7 +234,44 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 		maxJump = 0;
 
 	if (god == God::Hermes) {
-		// TODO find all horizontal possible moves for all builders at the same time
+		// Find all horizontal possible moves for all builders at the same time
+		static_vector<Coord, 25> builders;
+		for (int row = 0; row < 5; row++)
+			for (int col = 0; col < 5; col++)
+				if (Player(state.cell[row][col]) == state.player)
+					builders.push_back(row * 5 + col);
+
+		if (builders.size() == 0 || builders.size() > 2)
+			THROW(runtime_error);
+		int sa = builders[0];
+		int sb = (builders.size() == 2) ? builders[1] : 0;
+
+		State base = state;
+		char ca = ' ', cb = ' ';
+		swap(base[sa].figure, ca);
+		swap(base[sb].figure, cb);
+
+		small_bfs<int> bfs(625);
+		bfs.add(sa * 25 + sb, sa * 25 + sb);
+		for (int e : bfs) {
+			int ia = e / 25;
+			int ib = e % 25;
+
+			State s = base;
+			s[ia].figure = ca;
+			s[ib].figure = cb;
+			s.lastMove = ia;
+			ADD_STATE(s);
+
+			// TODO move ia and add to bfs
+			for (int ic : CellsAround(ia))
+				if (ic != ib) {
+				}
+
+			if (builders.size() == 2) {
+				// TODO move ib and add to bfs
+			}
+		}
 	}
 
 	if (god == God::Triton) {
@@ -217,11 +287,21 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 					continue;
 
 				bfs.add(id, id);
-				for (int ie : bfs) {
-					State s = state;
-					swap(s[ic].figure, s[ie].figure);
-					moves.push_back(s);
-				}
+				State s = state;
+				// TODO check winning condition (and Hera)
+				swap(s[ic].figure, s[id].figure);
+				ADD_STATE(s);
+
+				for (int ie : bfs)
+					if (Cell e = state[ie]; OnPerimeter(ie))
+						for (int ib : CellsAround(ie))
+							if (Cell b = state[ib]; Empty(b) && b.level - e.level <= maxJump) {
+								bfs.add(ib, ib);
+								s = state;
+								// TODO check winning condition (and Hera)
+								swap(s[ic].figure, s[ib].figure);
+								ADD_STATE(s);
+							}
 			}
 		}
 		return;
@@ -238,7 +318,7 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 					continue;
 
 				State s = MoveBuilder(state, ic, id);
-				moves.push_back(s);
+				ADD_STATE(s);
 
 				// second move (in the same direction)
 				auto ie = CellInDirection(ic, id);
@@ -248,7 +328,8 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 				if (!Empty(e) || e.level - d.level > maxJump)
 					continue;
 
-				moves.push_back(MoveBuilder(s, id, ie));
+				State u = MoveBuilder(s, id, ie);
+				ADD_STATE(u);
 			}
 
 			for (auto id : CellsAroundL2(ic)) {
@@ -263,7 +344,8 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 				Cell a = state[ia];
 				if (Empty(a) && a.level - c.level <= maxJump && d.level - a.level <= maxJump) {
 					State s = MoveBuilder(state, ic, ia);
-					moves.push_back(MoveBuilder(s, ia, id));
+					s = MoveBuilder(s, ia, id);
+					ADD_STATE(s);
 					continue;
 				}
 
@@ -271,14 +353,15 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 				Cell b = state[ib];
 				if (Empty(b) && b.level - c.level <= maxJump && d.level - b.level <= maxJump) {
 					State s = MoveBuilder(state, ic, ib);
-					moves.push_back(MoveBuilder(s, ib, id));
+					s = MoveBuilder(s, ib, id);
+					ADD_STATE(s);
 				}
 			}
 		}
 		return;
 	}
 
-	for (int ic : PlayerCells(state)) {
+	for (int ic : PlayerCells(state))
 		for (int id : CellsAround(ic)) {
 			Cell c = state[ic];
 			Cell d = state[id];
@@ -318,21 +401,20 @@ void GenerateOneMove(const State& state, vector<State>& moves) {
 			if (god == God::Minotaur)
 				swap(s[ie].figure, s[id].figure);
 			swap(s[ic].figure, s[id].figure);
-
-			moves.push_back(s);
+			ADD_STATE(s);
 		}
-	}
 }
 
 constexpr int MAX_BUILDERS = 4;
 
-int CompleteTowerCount(const State& s) {
+bool HasFiveCompleteTowers(const State& s) {
 	int count = 0;
 	for (int row = 0; row < 5; row++)
 		for (int col = 0; col < 5; col++)
 			if (auto c = s.cell[row][col]; Dome(c) && c.level == 3)
-				count += 1;
-	return count;
+				if (++count == 5)
+					return true;
+	return false;
 }
 
 int BuilderCount(const State& s, int player) {
@@ -344,9 +426,21 @@ int BuilderCount(const State& s, int player) {
 	return count;
 }
 
+bool IsNearLimus(const State& state, int ie) {
+	for (int ia : CellsAround(ie)) {
+		int pa = Player(state[ia]);
+		if (pa != -1 && state.gods[pa] == God::Limus)
+			return true;
+	}
+	return false;
+}
+
 // build in one cell (hephaestus can build twice in one cell)
-void GenerateOneBuild(int builder, const State& state, vector<State>& builds, bool seleneDome = false) {
+void GenerateOneBuild(int builder, const State& state, vector<State>& states, bool seleneDome = false) {
 	God god = state.gods[state.player];
+	bool containsChronus = contains(state.gods, God::Chronus);
+	bool containsLimus = contains(state.gods, God::Limus);
+
 	for (int ie : CellsAround(builder, god == God::Zeus)) {
 		Cell e = state[ie];
 		if (!Empty(e) || (state.lastBuild == ie && god == God::Demeter))
@@ -359,35 +453,27 @@ void GenerateOneBuild(int builder, const State& state, vector<State>& builds, bo
 			State s = state;
 			s[ie].figure = ')';
 			s.lastBuild = ie;
-			if (contains(state.gods, God::Chronus) && CompleteTowerCount(s) == 5) {
-				for (size_t i = 0; i < state.gods.size(); i++)
-					if (state.gods[i] == God::Chronus)
-						s.player = i;
-				s.victory = true;
+
+			if (containsChronus && HasFiveCompleteTowers(s)) {
+				if (god == God::Chronus)
+					s.victory = true;
+				else
+					continue;
 			}
-			builds.push_back(s);
+
+			ADD_STATE(s);
 			continue;
 		}
 
-		if (god != God::Limus && contains(state.gods, God::Limus)) {
-			bool nearLimus = false;
-			for (int ia : CellsAround(ie)) {
-				int pa = Player(state[ia]);
-				if (pa != -1 && state.gods[pa] == God::Limus) {
-					nearLimus = true;
-					break;
-				}
-			}
-			if (nearLimus)
-				continue;
-		}
+		if (containsLimus && god != God::Limus && IsNearLimus(state, ie))
+			continue;
 
 		if (god == God::Atlas || seleneDome) {
 			// build early dome
 			State s = state;
 			s[ie].figure = ')';
 			s.lastBuild = ie;
-			builds.push_back(s);
+			ADD_STATE(s);
 		}
 
 		if (!seleneDome) {
@@ -395,23 +481,18 @@ void GenerateOneBuild(int builder, const State& state, vector<State>& builds, bo
 			State s = state;
 			s[ie].level += 1;
 			s.lastBuild = ie;
-			builds.push_back(s);
+			ADD_STATE(s);
 
 			if (e.level < 2 && god == God::Hephaestus) {
 				s[ie].level += 1;
-				builds.push_back(s);
+				ADD_STATE(s);
 			}
 		}
 	}
 }
 
-bool FilterVictory(vector<State>& states) {
-	for (State& s : states)
-		if (s.victory) {
-			states = { s };
-			return true;
-		}
-	return false;
+bool Wins(vector<State>& states) {
+	return states.size() == 1 && states[0].victory;
 }
 
 Coord Opposite(Coord a) {
@@ -484,32 +565,20 @@ void GenerateTurns(State state, vector<State>& turns) {
 	state.lastMove = -1;
 	state.lastBuild = -1;
 	turns.push_back(state);
+	thread_local vector<State> temp;
 
 	// perform optional build if prometheus
 	if (god == God::Prometheus)
-		for (int ia : PlayerCells(state))
+		for (auto ia : PlayerCells(state))
 			GenerateOneBuild(ia, state, turns);
 
 	// perform one move
-	thread_local vector<State> temp;
 	temp.clear();
 	swap(temp, turns);
 	for (const State& m : temp)
 		GenerateOneMove(m, turns);
-	if (turns.size() == 0 && god != God::Hermes)
+	if ((turns.empty() && god != God::Hermes) || Wins(turns))
 		return;
-	if (FilterVictory(turns))
-		return;
-
-	// perform second optional move if artemis
-	if (god == God::Artemis) {
-		temp.clear();
-	    swap(temp, turns);
-		for (const State& m : temp)
-			GenerateOneMove(m, turns);
-		if (FilterVictory(turns))
-			return;
-	}
 
 	// perform one build
 	temp.clear();
@@ -522,15 +591,13 @@ void GenerateTurns(State state, vector<State>& turns) {
 			GenerateOneBuild(m.lastMove, m, turns);
 
 	if (god == God::Selene)
-		// Female builder can build a dome at any level even if it didn't move
+		// Female builder can build a dome at any level even if it didn't move (instead of normal build)
 		for (const State& m : temp)
 			for (Coord builder : PlayerCells(state))
 				if (IsFemale(m[builder]))
 					GenerateOneBuild(builder, m, turns, /*seleneDome=*/true);
 
-	if (turns.size() == 0)
-		return;
-	if (FilterVictory(turns))
+	if (turns.empty() || Wins(turns))
 		return;
 
 	// perform second optional build if demeter
@@ -541,7 +608,7 @@ void GenerateTurns(State state, vector<State>& turns) {
 			turns.push_back(m); // second build is optional
 			GenerateOneBuild(m.lastMove, m, turns, m.lastBuild);
 		}
-		if (FilterVictory(turns))
+		if (Wins(turns))
 			return;
 		Deduplicate(turns);
 	}
@@ -557,7 +624,7 @@ void GenerateTurns(State state, vector<State>& turns) {
 					if (ia != m.lastMove && m[ia].level == 0)
 						GenerateOneBuild(ia, m, turns);
 			}
-			if (FilterVictory(turns))
+			if (Wins(turns))
 				return;
 			Deduplicate(turns);
 		}
@@ -582,7 +649,7 @@ void GenerateTurns(State state, vector<State>& turns) {
 					}
 				}
 		}
-		if (FilterVictory(turns))
+		if (Wins(turns))
 			return;
 	}
 
@@ -829,8 +896,32 @@ void SingleMatch(vector<God> gods, Strategy a, Strategy b) {
 	}
 }
 
+TEST_CASE("Santorini Apollo", "[santorini]") {
+	print("running\n");
+	State state = ".b. . . . "
+				  ". 2 2 2 . "
+				  ". 2 .a2B. "
+				  ". 2 2A1). "
+				  ". . 2)2 . "sv;
+	state.gods = { God::Apollo, God::None };
+	state.setup = false;
+	Print(state);
+
+	vector<State> moves;
+	GenerateTurns(state, moves);
+	for (const State& m : moves)
+		Print(m);
+}
+
 int main(int argc, char* argv[]) {
+	InitSegvHandler();
 	srand(time(0));
+
+	if (argc == 2 && strcmp("-t", argv[1]) == 0) {
+		char* test_argv[1] = { argv[0] };
+		return Catch::Session().run(1, test_argv);
+	}
+
 	vector<God> gods = { God::None, God::None };
 
 	print("Greedy - Rand %s\n", RelativeSkill(10000, gods, GreedyBot, RandBot));
