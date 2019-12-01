@@ -150,6 +150,7 @@ auto CellsAround(Coord a, bool includeCenter = false) {
 	return data;
 }
 
+// TODO precompute
 auto CellsAroundL2(Coord a) {
 	static_vector<Coord, 25> data;
 	int row = a / 5;
@@ -168,6 +169,7 @@ auto CellsAroundL2(Coord a) {
 	return data;
 }
 
+// TODO precompute
 Coord CellInDirection(Coord a, Coord b) {
 	int row = b / 5 + b / 5 - a / 5;
 	int col = b % 5 + b % 5 - a % 5;
@@ -270,6 +272,59 @@ void GenerateHermesFastMoves(const State& state, vector<State>& states) {
 
 bool InOrder(int a, int b, int c) {
 	return a <= b && b <= c;
+}
+
+constexpr int MAX_BUILDERS = 4;
+
+bool HasFiveCompleteTowers(const State& s) {
+	int count = 0;
+	for (int row = 0; row < 5; row++)
+		for (int col = 0; col < 5; col++)
+			if (auto c = s.cell[row][col]; Dome(c) && c.level == 3)
+				if (++count == 5)
+					return true;
+	return false;
+}
+
+int BuilderCount(const State& s, int player) {
+	int count = 0;
+	for (int row = 0; row < 5; row++)
+		for (int col = 0; col < 5; col++)
+			if (player == Player(s.cell[row][col]))
+				count += 1;
+	return count;
+}
+
+bool IsNearLimus(const State& state, int ie) {
+	for (int ia : CellsAround(ie)) {
+		int pa = Player(state[ia]);
+		if (pa != -1 && state.gods[pa] == God::Limus)
+			return true;
+	}
+	return false;
+}
+
+bool Wins(vector<State>& states) {
+	return states.size() == 1 && states[0].victory;
+}
+
+Coord Opposite(Coord a) {
+	return (4 - a / 5) * 5 + (4 - a % 5);
+}
+
+bool LessCells(const State& a, const State& b) {
+	for (int i = 0; i < 25; i++)
+		if (a[i] != b[i])
+			return a[i] < b[i];
+	return false;
+}
+
+bool EqualCells(const State& a, const State& b) {
+	return a.cell == b.cell;
+}
+
+void Deduplicate(vector<State>& turns) {
+	remove_dups(turns, LessCells, EqualCells);
 }
 
 void GenerateTritonMove(const State& state, int minJump, int maxJump, vector<State>& states) {
@@ -433,36 +488,6 @@ void GenerateOneMove(const State& state, vector<State>& states) {
 		}
 }
 
-constexpr int MAX_BUILDERS = 4;
-
-bool HasFiveCompleteTowers(const State& s) {
-	int count = 0;
-	for (int row = 0; row < 5; row++)
-		for (int col = 0; col < 5; col++)
-			if (auto c = s.cell[row][col]; Dome(c) && c.level == 3)
-				if (++count == 5)
-					return true;
-	return false;
-}
-
-int BuilderCount(const State& s, int player) {
-	int count = 0;
-	for (int row = 0; row < 5; row++)
-		for (int col = 0; col < 5; col++)
-			if (player == Player(s.cell[row][col]))
-				count += 1;
-	return count;
-}
-
-bool IsNearLimus(const State& state, int ie) {
-	for (int ia : CellsAround(ie)) {
-		int pa = Player(state[ia]);
-		if (pa != -1 && state.gods[pa] == God::Limus)
-			return true;
-	}
-	return false;
-}
-
 // build in one cell (hephaestus can build twice in one cell)
 void GenerateOneBuild(int builder, const State& state, vector<State>& states, bool seleneDome = false) {
 	God god = state.gods[state.player];
@@ -517,29 +542,6 @@ void GenerateOneBuild(int builder, const State& state, vector<State>& states, bo
 			}
 		}
 	}
-}
-
-bool Wins(vector<State>& states) {
-	return states.size() == 1 && states[0].victory;
-}
-
-Coord Opposite(Coord a) {
-	return (4 - a / 5) * 5 + (4 - a % 5);
-}
-
-bool LessCells(const State& a, const State& b) {
-	for (int i = 0; i < 25; i++)
-		if (a[i] != b[i])
-			return a[i] < b[i];
-	return false;
-}
-
-bool EqualCells(const State& a, const State& b) {
-	return a.cell == b.cell;
-}
-
-void Deduplicate(vector<State>& turns) {
-	remove_dups(turns, LessCells, EqualCells);
 }
 
 void GenerateTurns(State state, vector<State>& turns) {
@@ -732,6 +734,7 @@ void Print(const State& state) {
 	print("\n");
 }
 
+// TODO add option to reset to start of turn
 optional<State> Human(const State& state) {
 	vector<State> moves;
 	GenerateTurns(state, moves);
@@ -858,6 +861,7 @@ double Heuristic(const State& state, const State& move) {
 	return score;
 }
 
+// TODO generalize for multiple state updates from a single player
 double SubTreeScore(const State& prev, const State& state, int depth, bool maxi) {
 	if (depth == 0)
 		return Heuristic(prev, state) * (maxi ? 1 : -1);
@@ -877,6 +881,7 @@ double SubTreeScore(const State& prev, const State& state, int depth, bool maxi)
 	return best;
 }
 
+// TODO generalize for multiple state updates from a single player
 optional<State> BruteBot(const State& state) {
 	vector<State> moves;
 	GenerateTurns(state, moves);
