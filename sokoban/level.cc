@@ -324,6 +324,7 @@ const Level* LoadLevel(string_view name) {
 	m.cleanup_walls();
 	int num_dead = m.find_dead_cells();
 
+	// TODO destroy on exception
 	Level* level = new Level;
 	level->buffer = m.cell;
 	level->name = name;
@@ -343,11 +344,15 @@ const Level* LoadLevel(string_view name) {
 		THROW(runtime_error, "agent on box2");
 	level->num_alive = m.cell_count - num_dead;
 	level->start.agent = GetCell(level, m.agent)->id;
-	for (Cell* c : level->cells)
-		level->start.boxes[c->id] = m.box[c->xy];
 
-	if (level->start.boxes[level->start.agent])
-		THROW(runtime_error, "agent on box");
+	if (level->num_alive > Boxes::size())
+		return nullptr;
+	for (Cell* c : level->cells)
+		if (c->alive)
+			level->start.boxes[c->id] = m.box[c->xy];
+
+	if (level->start.agent < level->num_alive && level->start.boxes[level->start.agent])
+		THROW(runtime_error, "agent(%s) on box", level->start.agent);
 	return level;
 }
 

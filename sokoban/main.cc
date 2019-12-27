@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
 	mutex levels_lock;
 
 	parallel_for(num, 1, [&](size_t task) {
-		string name = format("%s:%s%s%d", file, (task + 1) < 10 ? "0" : "", (task + 1) < 100 ? "0" : "", task + 1);
+		string name = format("%s:%d", file, task + 1);
 		if (name == "original:24") // syntax?
 			return;
 		if (name == "microban2:132") // large maze with one block
@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
 		// 1 locked thread: closed 19019k, open 76819k, elapsed 5m0s
 		// 8 locked thread: closed 23757k, open 94741k, elapsed 5m0s
 
-		if (name == "microban1:044" || name == "microban1:144") {
+		if (name == "microban1:44" || name == "microban1:144") {
 			skipped += 1;
 			return;
 		}
@@ -408,9 +408,12 @@ int main(int argc, char** argv) {
 
 		print("%s\n", name);
 		auto level = LoadLevel(cat(prefix, name));
-		levels_lock.lock();
-		levels.push_back(level);
-		levels_lock.unlock();
+		if (level) {
+			// TODO use lock guard
+			levels_lock.lock();
+			levels.push_back(level);
+			levels_lock.unlock();
+		}
 	});
 	sort(levels, [](const Level* a, const Level* b) { return a->name < b->name; });
 
