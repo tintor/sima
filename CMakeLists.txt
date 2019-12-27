@@ -64,6 +64,7 @@ set(test
 	core/test_span.cc
 	core/test_sparse_matrix.cc
 	core/test_util.cc
+	core/test_string_util.cc
 	core/test_zip.cc
 	core/test_bplustree.cc
 	sim/test_integration.cc
