@@ -16,8 +16,8 @@ enum class God : char { Dead, None,
 // Simple
 	Apollo, Artemis, Athena, Atlas, Demeter, Hephaestus, /*partial*/Hermes, Minotaur, Pan, Prometheus,
 // Advanced
-	Ares, Selene, Eros, Chronus, Hera, Limus, Medusa, Poseidon, /*partial*/Triton, Zeus,
-// - Aphrodite!, Bia*, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Morpheus, Persephone,
+	Ares, Bia, Selene, Eros, Chronus, Hera, Limus, Medusa, /*partial*/Morpheus, Poseidon, /*partial*/Triton, Zeus,
+// - Aphrodite!, Chaos!, Charon*, Circe!, Dionysus*, Hestia*, Hypnus*, Persephone,
 // Golden Fleece
 	Hades,
 // - Aeolus*, Charybdis*, Clio*, EuropaTalus*, Gaea!, Graeae*, Harpies*, Hecate, Moerae*, Nemesis, Siren*,
@@ -32,7 +32,27 @@ using Coord = char; // 0-24 or -1 if empty
 
 struct Cell {
 	char level = 0; // 0-3 height of level
-	char figure = ' '; // ' ' - empty, ')' - dome, A - first player, B - second player, ... (uppercase male, lowercase female)
+
+	char figure = ' ';
+	// <space> - empty
+	// ) - dome
+	// A - first player, B - second player, ... (uppercase male, lowercase female)
+	// @ - golden fleece
+	// T - talus
+
+	// AddToken only:
+	// $ - coin
+	// * - whirlpool
+	// T - talus
+	// ~ - wind
+	// > - siren's arrow
+	// O - abyss
+	// # - fate
+
+	bool whirlpool = false;
+	bool coin = false;
+	bool abyss = false;
+	bool fate = false;
 };
 
 bool Dome(Cell c) {
@@ -58,12 +78,23 @@ bool operator!=(Cell a, Cell b) { return !(a == b); }
 struct State {
 	array<array<Cell, 5>, 5> cell;
 	array<God, 2> gods;
-	bool athenaMovedUp = false;
 	char player = 0; // player about to play
-	Coord lastMove = -1; // coordinate of builder who moved last
-	Coord lastBuild = -1; // coordinate of last build
 	bool victory = false;
 	bool setup = true;
+	bool athenaMovedUp = false;
+	God golden_fleece = God::None;
+	char morpheus_blocks = 0;
+	char wind = -1;
+	char arrow = -1;
+
+	// transient
+	char ares_removed_blocks = 0;
+	bool hermes_slow_move = false;
+	Coord lastMoveSrc = -1;
+	Coord lastMove = -1; // coordinate of builder who moved last
+	Coord lastBuild = -1; // coordinate of last build
+	char builds = 0;
+	char moves = 0;
 
 	Cell operator[](int a) const { return cell[a / 5][a % 5]; }
 	Cell& operator[](int a) { return cell[a / 5][a % 5]; }
@@ -89,17 +120,21 @@ auto Cells() {
 	return data;
 }
 
-bool IsFemale(Cell c) {
-	return 'a' <= c.figure && c.figure <= 'd';
-}
+bool IsMale(char figure) { return 'A' <= figure && figure <= 'D'; }
+bool IsMale(Cell c) { return IsMale(c.figure); }
 
-int Player(Cell c) {
-	if ('a' <= c.figure && c.figure <= 'd')
-		return c.figure - 'a';
-	if ('A' <= c.figure && c.figure <= 'D')
-		return c.figure - 'A';
+bool IsFemale(char figure) { return 'a' <= figure && figure <= 'd'; }
+bool IsFemale(Cell c) { return IsFemale(c.figure); }
+
+int Player(char figure) {
+	if (IsMale(figure))
+		return figure - 'A';
+	if (IsFemale(figure))
+		return figure - 'a';
 	return -1;
 }
+
+int Player(Cell c) { return c.figure; }
 
 int PrevPlayer(const State& state) {
 	for (int i = 1; i < state.gods.size(); i++) {
@@ -221,6 +256,408 @@ Coord LMiddle2(Coord a, int dr, int dc) {
 	return a + dr * 5 + dc;
 }
 
+bool PlayingAgainst(const State& state, God god) {
+	for (size_t p = 0; p < state.gods.size(); p++)
+		if (p != state.player && state.gods[p] == god)
+			return true;
+	return false;
+}
+
+bool AreNear(Coord a, Coord b) {
+	int dc = int(a % 5) - int(b % 5);
+	int dr = int(a / 5) - int(b / 5);
+	return a != b && -1 <= dc && dc <= 1 && -1 <= dr && dr <= 1;
+}
+
+bool OnOppositeEdges(Coord a, Coord b) {
+	int dc = int(a % 5) - int(b % 5);
+	int dr = int(a / 5) - int(b / 5);
+	return dc == -4 || dc == 4 || dr == -4 || dr == 4;
+}
+
+bool Enemy(const State& state, Cell d) {
+	int pd = Player(d);
+	return pd != -1 && pd != state.player;
+}
+
+// atomic actions:
+// move worker (and optionally swap (apollo) or push (minotaur) or remove (bia))
+// force worker (nemesis / charon / scylla / proteus)
+// add worker (setup or later)
+// remove worker (hydra, theseus)
+// add dome
+// add block (can build over opponent if medussa)
+// remove block
+// add token (also used for rotating wind token)
+
+enum class ActionType : char { MoveWorker, ForceWorker, AddWorker, /*RemoveWorker,*/
+		BuildDome, BuildBlock, RemoveBlock, AddToken };
+struct Action {
+	ActionType type;
+	char extra; // worker/token when placing a new one, player that wins or looses
+	Coord src, dest;
+};
+
+string Print(Action action) {
+	// TODO
+	return "";
+}
+
+optional<State> MoveWorker(const State& state, Coord src, Coord dest) {
+	if (state.setup || src < 0 || src >= 25 || dest < 0 || dest >= 25 || !AreNear(src, dest))
+		return nullopt;
+
+	Cell c = state[src];
+	Cell d = state[dest];
+	State s = state;
+	God god = state.gods[state.player];
+
+	if (Player(c) != state.player || Player(d) == state.player || Dome(d))
+		return nullopt;
+
+	// Prometheus
+	if (god != God::Prometheus && state.builds > 0)
+		return nullopt;
+	if (god == God::Prometheus && state.builds > 1)
+		return nullopt;
+	if (god == God::Prometheus && d.level > c.level && state.builds > 0)
+		return nullopt;
+
+	// Artemis
+	if (god == God::Artemis) {
+		if (state.moves > 1)
+			return nullopt;
+		if (state.moves > 0 && (state.lastMove != src || state.lastMoveSrc == dest))
+			return nullopt;
+	}
+
+	// Pegasus
+	if (d.level - c.level > 1 && god != God::Pegasus)
+		return nullopt;
+
+	// Hades
+	if (d.level < c.level && PlayingAgainst(state, God::Hades))
+		return nullopt;
+
+	// Hermes
+	if (god == God::Hermes) {
+		if (d.level != c.level && !state.hermes_slow_move && state.moves > 0)
+			return nullopt;
+		if (state.hermes_slow_move)
+			return nullopt;
+		if (d.level != c.level)
+			s.hermes_slow_move = true;
+	}
+
+	// Minotaur
+	if (god == God::Minotaur) {
+		int push = CellInDirection(src, dest);
+		if (!Empty(d) && push != -1 && Empty(state[push]))
+			swap(s[dest].figure, s[push].figure);
+	}
+
+	// Apollo
+	if (!Empty(state[dest]) && god != God::Apollo)
+		return nullopt;
+
+	// Athena
+	if (god == God::Athena && d.level > c.level)
+		s.athenaMovedUp = true;
+	if (d.level > c.level && state.athenaMovedUp && PlayingAgainst(state, God::Athena))
+		return nullopt;
+
+	// Hera prevents victory when moving into perimeter space
+	if (!PlayingAgainst(state, God::Hera) || !OnPerimeter(dest)) {
+		if (d.level == 3 && c.level == 2)
+			s.victory = true;
+
+		// Pan
+		if (god == God::Pan && d.level - c.level <= -2)
+			s.victory = true;
+
+		// Eros
+		if (god == God::Eros && d.level == 1)
+			for (Coord ie : CellsAround(dest))
+				if (state[ie].level == 1 && Player(state[ie]) == state.player)
+						s.victory = true;
+	}
+
+	// Bia
+	if (god == God::Bia) {
+		int target = CellInDirection(src, dest);
+		if (target != -1) {
+			Cell e = state[target];
+			if (Enemy(state, e)) {
+				s[target].figure = ' ';
+				// TODO
+				//if (!AnyWorker(s))
+				//	s.victory = true;
+			}
+		}
+	}
+
+	s.lastMoveSrc = src;
+	s.lastMove = dest;
+	s.moves += 1;
+	swap(s[src].figure, s[dest].figure);
+	return s;
+}
+
+optional<State> ForceWorker(const State& state, Coord ia, Coord ib) {
+	if (state.setup || ia < 0 || ia >= 25 || ib < 0 || ib >= 25)
+		return nullopt;
+
+	Cell a = state[ia];
+	Cell b = state[ib];
+	if (Dome(a) || Dome(b))
+		return nullopt;
+
+	return nullopt;
+/*	// verify that ability allows forcing: Scylla, Proteus, Nemesis
+	God god = state.gods[state.player];
+	// swap workers on src and dest
+	State s = state;
+	swap(s[action.src].figure, s[action.dest].figure);
+	return s;*/
+}
+
+optional<State> AddWorker(const State& state, Coord dest, char figure) {
+	if (!state.setup || dest < 0 || dest >= 25 || !Empty(state[dest]))
+		return nullopt;
+
+	int male = 0, female = 0;
+	Coord m = -1, f = -1;
+	for (Coord i = 0; i < 25; i++) {
+		char c = state[i].figure;
+		if (c == 'A' + state.player) {
+			male += 1;
+			m = i;
+		}
+		if (c == 'a' + state.player) {
+			female += 1;
+			f = i;
+		}
+	}
+
+	if (IsMale(figure) && male > 0)
+		return nullopt;
+	if (IsFemale(figure) && female > 0)
+		return nullopt;
+	if (Player(figure) != state.player)
+		return nullopt;
+
+	God god = state.gods[state.player];
+
+	if (god == God::Eros) {
+		Coord other = (m != -1) ? m : f;
+		if (!OnOppositeEdges(m, dest))
+			return nullopt;
+	}
+
+	State s = state;
+	s[dest].figure = figure;
+	return s;
+}
+
+bool HasFiveCompleteTowers(const State& s) {
+	int count = 0;
+	for (int row = 0; row < 5; row++)
+		for (int col = 0; col < 5; col++)
+			if (auto c = s.cell[row][col]; Dome(c) && c.level == 3)
+				if (++count == 5)
+					return true;
+	return false;
+}
+
+bool IsNearLimus(const State& state, Coord ie) {
+	if (!PlayingAgainst(state, God::Limus))
+		return false;
+	for (int ia : CellsAround(ie)) {
+		int pa = Player(state[ia]);
+		if (pa != -1 && pa != state.player && state.gods[pa] == God::Limus)
+			return true;
+	}
+	return false;
+}
+
+optional<State> BuildDome(const State& state, Coord src, Coord dest) {
+	if (state.setup || src < 0 || src >= 25 || dest < 0 || dest >= 25 || !AreNear(src, dest))
+		return nullopt;
+
+	God god = state.gods[state.player];
+	Cell s = state[src];
+	Cell d = state[dest];
+
+	if (!Empty(d) || Player(s) != state.player)
+		return nullopt;
+
+	State m = state;
+	m.builds += 1;
+	m.lastBuild = dest;
+	m[dest].figure = ')';
+
+	switch (god) {
+	case God::Hermes:
+		if (d.level < 3 || state.builds > 0)
+			return nullopt;
+		break;
+
+	case God::Chronus:
+		if (d.level < 3 || state.builds > 0 || state.lastMove != src)
+			return nullopt;
+		m.victory = HasFiveCompleteTowers(m);
+		break;
+
+	case God::Selene:
+		if (state.lastBuild != -1)
+			return nullopt;
+		if (IsMale(s) && state.lastMove != src)
+			return nullopt;
+		break;
+
+	case God::Atlas:
+		if (state.builds > 0 || state.lastMove != src)
+			return nullopt;
+		break;
+
+	case God::Demeter:
+		if (d.level < 3 || state.builds >= 2 || state.lastMove != src)
+			return nullopt;
+		break;
+
+	case God::Morpheus:
+		if (d.level < 3 || state.morpheus_blocks == 0 || state.lastMove != src)
+			return nullopt;
+		m.morpheus_blocks -= 1;
+		break;
+
+	default:
+		if (d.level < 3 || state.builds > 0 || state.lastMove != src)
+			return nullopt;
+	}
+
+	if (d.level < 3 && IsNearLimus(state, dest))
+		return nullopt;
+	if (PlayingAgainst(state, God::Chronus) && HasFiveCompleteTowers(m))
+		return nullopt;
+	return m;
+}
+
+optional<State> BuildBlock(const State& state, Coord src, Coord dest) {
+	if (state.setup || src < 0 || src >= 25 || dest < 0 || dest >= 25 || !AreNear(src, dest))
+		return nullopt;
+
+	God god = state.gods[state.player];
+	Cell s = state[src];
+	Cell d = state[dest];
+
+	if (!Empty(d) || Player(s) != state.player)
+		return nullopt;
+
+	if (IsNearLimus(state, dest))
+		return nullopt;
+
+	State m = state;
+	switch (god) {
+	case God::Demeter:
+		if (src != state.lastMove || state.builds > 1 || dest == state.lastBuild)
+			return nullopt;
+		break;
+
+	case God::Hephaestus:
+		if (src != state.lastMove || state.builds > 1 || (state.builds > 0 && dest != state.lastBuild))
+			return nullopt;
+		break;
+
+	case God::Prometheus:
+		if (state.moves == 0 && state.builds > 1)
+			return nullopt;
+		if (state.moves > 0 && src != state.lastMove && state.builds > 0)
+			return nullopt;
+		break;
+
+	case God::Morpheus:
+		if (src != state.lastMove || state.moves == 0 || state.morpheus_blocks == 0)
+			return nullopt;
+		m.morpheus_blocks -= 1;
+		break;
+
+	case God::Poseidon:
+		break;
+
+	case God::Hermes:
+		if (state.builds > 0)
+			return nullopt;
+		break;
+
+	default:
+		if (src != state.lastMove || state.builds > 0)
+			return nullopt;
+	}
+
+	m.builds += 1;
+	m.lastBuild = dest;
+	m[dest].level += 1;
+	return m;
+}
+
+optional<State> RemoveBlock(const State& state, Coord dest) {
+	if (dest < 0 || dest >= 25)
+		return nullopt;
+
+	God god = state.gods[state.player];
+	if (god != God::Ares || state.builds == 0)
+		return nullopt;
+
+	Cell d = state[dest];
+	if (!Empty(d) || d.level == 0)
+		return nullopt;
+
+	if (state.ares_removed_blocks > 0)
+		return nullopt;
+
+	// TODO check that there is unmoved worker of Ares near dest
+	// TODO check that Ares can only remove one block per turn
+	State m = state;
+	m[dest].figure = ' ';
+	m[dest].level -= 1;
+	m.ares_removed_blocks += 1;
+	return m;
+}
+
+optional<State> AddToken(const State& state, Coord dest, char token) {
+	return nullopt;
+}
+
+// returns nullopt if not allowed
+optional<State> ExecuteAction(const State& state, Action action) {
+	switch (action.type) {
+	case ActionType::MoveWorker:
+		return MoveWorker(state, action.src, action.dest);
+
+	case ActionType::ForceWorker:
+		return ForceWorker(state, action.src, action.dest);
+
+	case ActionType::AddWorker:
+		return AddWorker(state, action.dest, action.extra);
+
+	case ActionType::BuildDome:
+		return BuildDome(state, action.src, action.dest);
+
+	case ActionType::BuildBlock:
+		return BuildBlock(state, action.src, action.dest);
+
+	case ActionType::RemoveBlock:
+		return RemoveBlock(state, action.dest);
+
+	case ActionType::AddToken:
+		return AddToken(state, action.dest, action.extra);
+	}
+	return nullopt;
+}
+
+using Actions = vector<Action>;
+
 #define ADD_STATE(s) \
 	if (s.victory) { \
 		states.clear(); \
@@ -276,31 +713,13 @@ bool InOrder(int a, int b, int c) {
 
 constexpr int MAX_BUILDERS = 4;
 
-bool HasFiveCompleteTowers(const State& s) {
-	int count = 0;
+bool AnyEnemy(const State& s) {
 	for (int row = 0; row < 5; row++)
-		for (int col = 0; col < 5; col++)
-			if (auto c = s.cell[row][col]; Dome(c) && c.level == 3)
-				if (++count == 5)
-					return true;
-	return false;
-}
-
-int BuilderCount(const State& s, int player) {
-	int count = 0;
-	for (int row = 0; row < 5; row++)
-		for (int col = 0; col < 5; col++)
-			if (player == Player(s.cell[row][col]))
-				count += 1;
-	return count;
-}
-
-bool IsNearLimus(const State& state, int ie) {
-	for (int ia : CellsAround(ie)) {
-		int pa = Player(state[ia]);
-		if (pa != -1 && state.gods[pa] == God::Limus)
-			return true;
-	}
+		for (int col = 0; col < 5; col++) {
+			int p = Player(s.cell[row][col]);
+			if (p != -1 && p != s.player)
+				return true;
+		}
 	return false;
 }
 
@@ -327,6 +746,7 @@ void Deduplicate(vector<State>& turns) {
 	remove_dups(turns, LessCells, EqualCells);
 }
 
+// TODO This is complicated. Could just use output vector of states as bfs queue with additional state hash set
 void GenerateTritonMove(const State& state, int minJump, int maxJump, vector<State>& states) {
 	for (int ic : PlayerCells(state)) {
 		// TODO Triton can move back to initial cell if it jumps to perimeter first (it can also win this way)
@@ -359,6 +779,7 @@ void GenerateTritonMove(const State& state, int minJump, int maxJump, vector<Sta
 	}
 }
 
+// TODO This is complicated, and wrong! Artemis might take two moves to move up one cell from current cell.
 void GenerateArtemisMoves(const State& state, int minJump, int maxJump, vector<State>& states) {
 	// perform one or two moves with a single builder, but not back to initial cell
 	for (auto ic : PlayerCells(state)) {
@@ -655,20 +1076,17 @@ void GenerateTurns(State state, vector<State>& turns) {
 		}
 	}
 
-	// perform medusa's build
 	if (god == God::Medusa)
 		for (State& m : turns)
 			for (auto ia : PlayerCells(m))
 				for (auto ib : CellsAround(ia)) {
 					Cell a = m[ia];
 					Cell& b = m[ib];
-					auto pb = Player(b);
-					if (a.level > b.level && pb != -1 && pb != state.player) {
+					if (a.level > b.level && Enemy(m, b)) {
 						b.level += 1;
 						b.figure = ' ';
 						m.lastBuild = ib;
-						if (BuilderCount(m, pb) == 0) {
-							// TODO 2 player assumption
+						if (!AnyEnemy(m)) {
 							m.victory = true;
 							turns[0] = m;
 							turns.resize(1);
@@ -702,16 +1120,150 @@ void GenerateTurns(State state, vector<State>& turns) {
 		s.player = next;
 }
 
+optional<State> EndTurn(const State& state) {
+	God god = state.gods[state.player];
+	State m = state;
+
+	if (state.setup) {
+		// TODO verify both workers have been placed
+	}
+
+	// check if player completed its turn
+	if (state.moves == 0 && god != God::Hermes)
+		return nullopt;
+	if (state.builds == 0 && god != God::Morpheus)
+		return nullopt;
+
+	// auto-stone enemies around Medussa on lower level
+	if (god == God::Medusa)
+		for (auto ia : PlayerCells(m))
+			for (auto ib : CellsAround(ia)) {
+					Cell a = m[ia];
+					Cell& b = m[ib];
+					if (a.level > b.level && Enemy(m, b)) {
+						b.level += 1;
+						b.figure = ' ';
+						if (!AnyEnemy(m)) {
+							m.victory = true;
+							break;
+						}
+					}
+				}
+
+	// switch state for next player
+	m.player = NextPlayer(state);
+	if (m.setup && m.player == 0)
+		m.setup = false;
+	m.lastMoveSrc = -1;
+	m.lastMove = -1;
+	m.lastBuild = -1;
+	m.builds = 0;
+	m.moves = 0;
+	m.hermes_slow_move = false;
+	m.ares_removed_blocks = 0;
+	god = m.gods[m.player];
+
+	// if next player is Morpheus give him a block
+	if (god == God::Morpheus)
+		m.morpheus_blocks += 1;
+
+	if (god == God::Athena)
+		m.athenaMovedUp = false;
+	return m;
+}
+
+void GenerateTurns(const State& state, vector<pair<State, Actions>>& states) {
+	God god = state.gods[state.player];
+
+	// Move or build abilities
+	if (god == God::Artemis) {
+		// TODO add all possible moves from state to states
+		// TODO for each state in states, generate all possible second moves (ignoring dups)
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Hermes) {
+		// TODO add state to states
+		// TODO for each state in states (BFS), generate all possible moves (ignoring dups)
+
+		// TODO for each s in states generate all possible builds (not-optional)
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Prometheus) {
+		// TODO add all possible moves and builds from state to states
+		// TODO move after build (not optional)
+		// TODO build after move (not optional)
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Morpheus) {
+		// TODO add all possible moves from state to states
+		// TODO for each state in states (BFS), generate all possible builds (ignoring dups)
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Selene) {
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Triton) {
+		// TODO add all possible moves from state to states
+		// TODO for each state in states (BFS), if on perimeter, generate all possible moves (ignoring dups)
+
+		// TODO for each s in states generate all possible builds
+		// TODO end turn on every state
+		return;
+	}
+
+	if (god == God::Zeus) {
+		// TODO end turn on every state
+		return;
+	}
+
+	// everyone else
+	// TODO generate all possible moves from state
+	// TODO for each s in states: generate all possible builds
+
+	// End of turn abilities
+	if (god == God::Demeter) {
+		// TODO for each s in states: generate optional second build on a different space
+	}
+
+	if (god == God::Ares) {
+		// TODO for each s in states: optionally remove one unoccupied block
+	}
+
+	if (god == God::Hephaestus) {
+		// TODO for each s in states: generate optional second build on the same space
+	}
+
+	if (god == God::Poseidon) {
+		// TODO 3 optional builds with unmoved worker on ground level (ignoring dups)
+	}
+
+	// TODO end turn on every state
+}
+
 // TODO print possible moves side by side to save space
 // TODO print last build and last move in different color
 void Print(const State& state) {
 	print("player %s", int(state.player));
-	for (God a : state.gods)
-		print(" %s", magic_enum::enum_name(a));
-	if (state.lastMove != -1)
-		print(", move (%s %s)", state.lastMove / 5, state.lastMove % 5);
-	if (state.lastBuild != -1)
-		print(", build (%s %s)", state.lastBuild / 5, state.lastBuild % 5);
+	if (state.golden_fleece != God::None) {
+		print(" golden fleece %s", magic_enum::enum_name(state.golden_fleece));
+	} else {
+		for (God a : state.gods)
+			print(" %s", magic_enum::enum_name(a));
+	}
+	if (state.wind != -1)
+		print(", wind %d", state.wind);
+	if (state.arrow != -1)
+		print(", arrow %d", state.arrow);
 	if (state.athenaMovedUp)
 		print(", athena moved up");
 	if (state.victory)
@@ -720,10 +1272,33 @@ void Print(const State& state) {
 
 	for (auto& row : state.cell) {
 		for (auto& c : row) {
-			char code[] = {' ', ' ', ' ', ' ', '\0'};
+			char code[] = {' ', ' ', ' ', ' ', ' ', '\0'};
 			char* p = code;
 			for (int i = 0; i < c.level; i++)
 				*p++ = ']';
+
+			int tokens = 0;
+			if (c.coin) {
+				*p = '$';
+				tokens += 1;
+			}
+			if (c.whirlpool) {
+				*p = '*';
+				tokens += 1;
+			}
+			if (c.abyss) {
+				*p = 'O';
+				tokens += 1;
+			}
+			if (c.fate) {
+				*p = '#';
+				tokens += 1;
+			}
+			if (tokens == 1)
+				p++;
+			if (tokens > 1)
+				*p++ = '?';
+
 			*p++ = c.figure;
 			if (code[0] == ' ')
 				code[0] = '.';
