@@ -12,7 +12,7 @@
 #include <complex>
 
 template<typename... Args>
-void format_s(string& s, string_view fmt, Args... args);
+void format_s(string& s, string_view fmt, const Args& ... args);
 
 template<typename T>
 void format_span(string& s, string_view spec, span<T> m) {
@@ -170,7 +170,7 @@ void format_int(string& s, string_view spec, Integer v) {
 	s += string_view(p, buffer.end() - p);
 }
 
-#define FORMAT_INT(T) inline void format_e(string& s, string_view spec, T v) { format_int(s, spec, v); }
+#define FORMAT_INT(T) inline void format_e(string& s, string_view spec, const T& v) { format_int(s, spec, v); }
 
 FORMAT_INT(short)
 FORMAT_INT(ushort)
@@ -413,7 +413,7 @@ inline void format_a(string& s, int skip, string_view spec) {
 
 template<typename T, typename... Args>
 void format_a(string& s, int skip, string_view spec, const T& arg,
-			  Args... args) {
+			  const Args& ... args) {
 	if (skip == 0) {
 		format_e(s, spec, arg);
 	} else {
@@ -421,11 +421,16 @@ void format_a(string& s, int skip, string_view spec, const T& arg,
 	}
 }
 
+template<typename T>
+void format_e(string& s, string_view spec, const atomic<T>& m) {
+	format_e(s, spec, m.load());
+}
+
 // TODO check if string_view::find() is faster
 // TODO send multiple chars at once to s instead of one by one
 // TODO support positional args
 template<typename... Args>
-void format_s(string& s, string_view fmt, Args... args) {
+void format_s(string& s, string_view fmt, const Args& ... args) {
 	auto p = fmt.begin(), e = fmt.end();
 	int a = 0;
 	while (p != e) {
@@ -461,19 +466,19 @@ template<typename T> string& operator<<(string& s, T v) {
 }
 
 template<typename... Args>
-[[nodiscard]] string format(string_view fmt, Args... args) {
+[[nodiscard]] string format(string_view fmt, const Args& ... args) {
 	string s;
 	format_s(s, fmt, args...);
 	return s;
 }
 
 template<typename... Args>
-void print(string_view fmt, Args... args) {
+void print(string_view fmt, const Args& ... args) {
 	cout << format(fmt, args...);
 }
 
 template<typename... Args>
-void dprint(string_view fmt, Args... args) {
+void dprint(string_view fmt, const Args& ... args) {
 	if (debug)
 		cout << format(fmt, args...);
 }

@@ -18,6 +18,8 @@
 #include <random>
 #include <optional>
 
+#include <atomic>
+
 using std::regex;
 using std::string;
 using std::string_view;
@@ -46,6 +48,8 @@ using std::numeric_limits;
 using std::optional;
 using std::nullopt;
 using std::unique_ptr;
+
+using std::atomic;
 
 using namespace std::literals;
 
