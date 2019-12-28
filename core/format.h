@@ -369,7 +369,7 @@ inline void format_fp(string& s, double fvalue, int min, int max, bool plus, boo
 }
 
 inline bool isIntSpec(string_view spec) {
-	return spec.size() >= 2 && spec[0] == '%' && (spec.back() == 'd' || spec.back() == 'b' || spec.back() == 'x' || spec.back() == 'b');
+	return spec.size() >= 2 && spec[0] == '%' && (spec.back() == 'd' || spec.back() == 'b' || spec.back() == 'x' || spec.back() == 'b' || spec.back() == 't');
 }
 
 template<typename T>

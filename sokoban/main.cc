@@ -1,4 +1,6 @@
+#include "core/auto.h"
 #include "core/util.h"
+#include "core/string_util.h"
 #include "core/bits_util.h"
 #include "core/format.h"
 #include "core/small_bfs.h"
@@ -101,7 +103,15 @@ public:
 			queue_push_cv.notify_one();
 	}
 
-	optional<State> pop() {
+	optional<pair<State, uint>> top() {
+		uint mq;
+		auto s = pop(&mq);
+		if (s.has_value())
+			return pair<State, uint>{*s, mq};
+		return nullopt;
+	}
+
+	optional<State> pop(uint* top_ptr = nullptr) {
 		Timestamp lock_ts;
 		std::unique_lock<mutex> lk(queue_lock);
 		_overhead2 += lock_ts.elapsed();
@@ -125,9 +135,19 @@ public:
 			return nullopt;
 		while (queue[min_queue].size() == 0)
 			min_queue += 1;
+
+		if (top_ptr) {
+			*top_ptr = min_queue;
+			return queue[min_queue][0];
+		}
 		State s = queue[min_queue].pop_front();
 		queue_size -= 1;
 		return s;
+	}
+
+	size_t size() {
+		std::unique_lock<mutex> lk(queue_lock);
+		return queue_size;
 	}
 
 	void shutdown() {
@@ -173,6 +193,9 @@ struct Solver {
 	StateQueue queue;
 	atomic<size_t> queue_pop_misses = 0;
 
+	atomic<size_t> simple_deadlocks = 0;
+	atomic<size_t> frozen_box_deadlocks = 0;
+
 	Solver(const Level* level)
 		: level(level)
 	{ }
@@ -186,7 +209,7 @@ struct Solver {
 			int shard = StateMap::shard(*s);
 			states.lock2(shard);
 			StateInfo* q = states.query(*s, shard);
-			if (!q && q->closed)  {
+			if (!q || q->closed)  {
 				states.unlock(shard);
 				queue_pop_misses += 1;
 				continue;
@@ -241,24 +264,32 @@ struct Solver {
 
 		thread monitor([verbosity, this]() {
 			Timestamp start_ts;
-			while (verbosity > 0) {
+			bool running = verbosity > 0;
+			while (running) {
 				if (!queue.wait_while_running_for(5s))
-					break;
+					running = false;
 				long seconds = std::lround(start_ts.elapsed_s());
-				if (seconds < 4)
+				if (seconds < 4 && running)
 					continue;
-				print("%s: states %dM, elapsed %d:%02d", level->name, states.size() / 1000000, seconds / 60, seconds % 60);
-				print(", lock overhead (states1 %ds, states2 %ds", Timestamp::to_s(states.overhead.load()), Timestamp::to_s(states.overhead2.load()));
-				print(", queue1 %ds, queue2 %ds)", queue.overhead(), queue.overhead2());
-				print(", queue_pop_misses %s\n", queue_pop_misses.load());
+				auto ss = states.size();
+				auto qs = queue.size();
+				print("%s: states %h (%h %h), elapsed %t", level->name, ss, (ss >= qs) ? ss - qs : 0, qs, seconds);
+				print(", deadlocks (simple %h, frozen_boxes %h)", simple_deadlocks, frozen_box_deadlocks);
+				print(", lock time (%t %t", Timestamp::to_s(states.overhead), Timestamp::to_s(states.overhead2));
+				print(" %t %t %h)\n", queue.overhead(), queue.overhead2(), queue_pop_misses);
 				if (verbosity >= 2) {
-					// TODO print level at the top of queue Print(level, s);
+					auto s = queue.top();
+					if (s.has_value()) {
+						print("state cost %h\n", s->second);
+						Print(level, s->first);
+					}
 				}
 			}
 		});
 		parallel([&]() {
+			size_t local_queue_pops = 0;
 			small_bfs<Cell*> agent_visitor(level->cells.size());
-			small_bfs<Cell*> norm_visitor(level->cells.size());
+			small_bfs<Cell*> tmp_visitor(level->cells.size());
 			while (true) {
 				auto p = queue_pop();
 				if (!p)
@@ -281,11 +312,15 @@ struct Solver {
 						State ns(b->id, s.boxes);
 						ns.boxes[b->id] = false;
 						ns.boxes[c->id] = true;
-						if (is_simple_deadlock(c, ns.boxes))
+						if (is_simple_deadlock(c, ns.boxes)) {
+							simple_deadlocks += 1;
 							continue;
-						//if (!is_reversible_push(ns, d, level) && contains_frozen_boxes(c, ns.boxes))
-						//	continue;
-						normalize(ns, norm_visitor);
+						}
+						if (!is_reversible_push(ns, d, level, tmp_visitor) && contains_frozen_boxes(c, ns.boxes, tmp_visitor)) {
+							frozen_box_deadlocks += 1;
+							continue;
+						}
+						normalize(ns, tmp_visitor);
 
 						int shard = StateMap::shard(ns);
 						states.lock(shard);
@@ -302,7 +337,8 @@ struct Solver {
 							// no need to update heuristic
 							q->prev_agent = a->id;
 							states.unlock(shard);
-							queue.push(ns, uint(q->distance) + uint(q->heuristic));
+							// 2 is overestimation factor
+							queue.push(ns, uint(q->distance) + uint(q->heuristic) * 2);
 							continue;
 						}
 						// new state
@@ -413,9 +449,11 @@ int main(int argc, char** argv) {
 			levels_lock.lock();
 			levels.push_back(level);
 			levels_lock.unlock();
+		} else {
+			print("%s failed to load\n", name);
 		}
 	});
-	sort(levels, [](const Level* a, const Level* b) { return a->name < b->name; });
+	sort(levels, [](const Level* a, const Level* b) { return natural_less(a->name, b->name); });
 
 	parallel_for(levels.size(), 1, [&](size_t task) {
 		auto level = levels[task];
@@ -459,6 +497,6 @@ int main(int argc, char** argv) {
 	});
 
 	int seconds = std::lround(start_ts.elapsed_s());
-	print("solved %d/%d in %dm:%ds (skipped %d)\n", completed.load(), total.load(), seconds / 60, seconds % 60, skipped.load());
+	print("solved %d/%d in %dm:%ds (skipped %d)\n", completed, total, seconds / 60, seconds % 60, skipped);
 	return 0;
 }

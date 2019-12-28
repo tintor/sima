@@ -10,6 +10,12 @@ using Boxes = array_bool<32 * 3>;
 
 // TODO save space by allocating minimal space for agent and boxes
 
+// TODO save space by having separate maps for open and closed states
+
+// TODO save space by keeping agent outside of state
+
+// with State of 16 bytes and StateInfo of 8 bytes, solver lasted until 1265M states
+
 // sizeof 16 bytes
 struct State {
 	Boxes boxes;
