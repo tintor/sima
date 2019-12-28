@@ -113,73 +113,7 @@ inline void format_e(string& s, string_view spec, char v) { s += v; }
 inline void format_e(string& s, string_view spec, bool v) { s += v ? "true"sv : "false"sv; }
 
 template<typename Integer>
-void format_int(string& s, string_view spec, Integer v) {
-	if (spec == "%h"sv && v != -v) {
-		// print int with scientific notation, ie 123e6
-		if (v < 0) {
-			s += '-';
-			v = -v;
-		}
-
-		if (v < 1000) {
-			format_int(s, "", v);
-			return;
-		}
-
-		int e = 0;
-		while (v >= 1000 || v % 10 == 0) {
-			v = (v + 4) / 10;
-			e += 1;
-		}
-		format_int(s, "", v);
-		switch(e) {
-		case 3:
-			s += 'k';
-			break;
-		case 6:
-			s += 'm';
-			break;
-		case 9:
-			s += 'g';
-			break;
-		default:
-			s += 'e';
-			format_int(s, "", e);
-		}
-		return;
-	}
-
-	if (spec == "%t"sv && v != -v) {
-		// interpret v as time in seconds: and print as [[hh:]mm:]ss
-		if (v < 0) {
-			s += '-';
-			v = -v;
-		}
-
-		uint sec = v % 60;
-		v /= 60;
-		uint min = v % 60;
-		auto hour = v / 60;
-
-		if (hour != 0) {
-			format_int(s, "", hour);
-			s += ':';
-			format_int(s, "%02", min);
-			s += ':';
-			format_int(s, "%02", sec);
-		} else if (min != 0) {
-			format_int(s, "", min);
-			s += ':';
-			format_int(s, "%02", sec);
-		} else
-			format_int(s, "", sec);
-		return;
-	}
-
-	int zero_pad = 0;
-	if (spec.size() >= 3 && spec[0] == '%' && spec[1] == '0' && '1' <= spec[2] && spec[2] <= '9')
-		zero_pad = spec[2] - '0';
-
+void format_int(string& s, Integer v, int zero_pad, bool hexadecimal) {
 	if (v == 0) {
 		zero_pad -= 1;
 		for (int i = 0; i < zero_pad; i++)
@@ -193,7 +127,7 @@ void format_int(string& s, string_view spec, Integer v) {
 	char* p = buffer.end();
 	const char* digits = "0123456789ABCDEF";
 
-	if (spec.size() >= 2 && spec[0] == '%' && spec.back() == 'x') {
+	if (hexadecimal) {
 		if (v < 0) {
 			while (v != 0) {
 				assert(buffer.begin() < p);
@@ -230,6 +164,81 @@ void format_int(string& s, string_view spec, Integer v) {
 	for (int i = 0; i < zero_pad; i++)
 		s += '0';
 	s += string_view(p, buffer.end() - p);
+}
+
+template<typename T>
+inline T abs(T a, T b) {
+	return (a > b) ? a - b : b - a;
+}
+
+inline bool try_short(string& s, ucent v, ulong m, char c) {
+	constexpr int E = 100;
+	if (v < m - m / E)
+		return false;
+
+	auto a = (v + m / 2) / m;
+	if (abs(a * m, v) * E > v)
+		return false;
+	format_int(s, a, 0, false);
+	s += c;
+	return true;
+}
+
+template<typename Integer>
+void format_int(string& s, string_view spec, Integer v) {
+	if (spec == "%h"sv && v != -v) {
+		// print int with order of magnitude, ie 123m
+		if (v < 0) {
+			s += '-';
+			v = -v;
+		}
+
+		if (try_short(s, v, 1000000000000lu, 't'))
+			return;
+		if (try_short(s, v, 1000000000lu, 'g'))
+			return;
+		if (try_short(s, v, 1000000, 'm'))
+			return;
+		if (try_short(s, v, 1000, 'k'))
+			return;
+		format_int(s, v, 0, false);
+		return;
+	}
+
+	if (spec == "%t"sv && v != -v) {
+		// interpret v as time in seconds: and print as [[hh:]mm:]ss
+		if (v < 0) {
+			s += '-';
+			v = -v;
+		}
+
+		uint sec = v % 60;
+		v /= 60;
+		uint min = v % 60;
+		auto hour = v / 60;
+
+		if (hour != 0) {
+			format_int(s, hour, 0, false);
+			s += ':';
+			format_int(s, min, 2, false);
+			s += ':';
+			format_int(s, sec, 2, false);
+		} else if (min != 0) {
+			format_int(s, min, 0, false);
+			s += ':';
+			format_int(s, sec, 2, false);
+		} else
+			format_int(s, sec, 0, false);
+		return;
+	}
+
+	int zero_pad = 0;
+	if (spec.size() >= 3 && spec[0] == '%' && spec[1] == '0' && '1' <= spec[2] && spec[2] <= '9')
+		zero_pad = spec[2] - '0';
+
+	bool hexadecimal = spec.size() >= 2 && spec[0] == '%' && spec.back() == 'x';
+
+	format_int(s, v, zero_pad, hexadecimal);
 }
 
 #define FORMAT_INT(T) inline void format_e(string& s, string_view spec, const T& v) { format_int(s, spec, v); }

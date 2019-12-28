@@ -14,7 +14,7 @@ struct array_bool {
 
 	array_bool(const array_bool& o) : words(o.words) { }
 
-	static uint size() {
+	constexpr static uint size() {
 		return Size;
 	}
 
@@ -52,6 +52,11 @@ struct array_bool {
 	void reset(int index) {
 		uint mask = uint(1) << (index % 32);
 		words[index / 32] &= ~mask;
+	}
+
+	void reset() {
+		for (uint& w : words)
+			w = 0;
 	}
 };
 

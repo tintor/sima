@@ -70,6 +70,11 @@ public:
 	dynamic_array() : _data(nullptr), _size(0) { }
 
 	dynamic_array(uint size, bool zero_init = false) {
+		if (size == 0) {
+			_data = nullptr;
+			_size = 0;
+			return;
+		}
 		_data = reinterpret_cast<T*>(zero_init ? calloc(sizeof(T), size) : malloc(sizeof(T) * size));
 		if (_data == nullptr)
 			throw std::bad_alloc();

@@ -54,18 +54,23 @@ TEST_CASE("format - int scientific", "[format]") {
 
 	REQUIRE("9" == format("%h", 9));
 	REQUIRE("99" == format("%h", 99));
-	REQUIRE("999" == format("%h", 999));
+	REQUIRE("1k" == format("%h", 999));
 
-	REQUIRE("14e5" == format("%h", 1400000));
-	REQUIRE("123e4" == format("%h", 1234567));
+	REQUIRE("1k" == format("%h", 1000));
+	REQUIRE("1m" == format("%h", 1000000));
+	REQUIRE("1g" == format("%h", 1000000000lu));
+	REQUIRE("1t" == format("%h", 1000000000000lu));
+
+	REQUIRE("1400k" == format("%h", 1400000));
+	REQUIRE("1235k" == format("%h", 1234567));
 	REQUIRE("2g" == format("%h", 1999999999));
 	REQUIRE("2m" == format("%h", 1999999));
 	REQUIRE("2k" == format("%h", 1999));
-	REQUIRE("199e4" == format("%h", 1990009));
+	REQUIRE("2m" == format("%h", 1990009));
 
 	REQUIRE("-9" == format("%h", -9));
-	REQUIRE("-999" == format("%h", -999));
-	REQUIRE("-14e5" == format("%h", -1400000));
+	REQUIRE("-1k" == format("%h", -999));
+	REQUIRE("-1400k" == format("%h", -1400000));
 }
 
 TEST_CASE("format - int time", "[format]") {
