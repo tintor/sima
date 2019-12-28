@@ -43,5 +43,43 @@ TEST_CASE("format - basic", "[format]") {
 	REQUIRE("e1b2.3ctruea" == format("e%sb%sc%sa", 1, 2.3, true));
 }
 
+TEST_CASE("format - atomic", "[format]") {
+	atomic<long> a;
+	a = 3;
+	REQUIRE("3" == format("%s", a));
+}
+
+TEST_CASE("format - int scientific", "[format]") {
+	REQUIRE("0" == format("%h", 0));
+
+	REQUIRE("9" == format("%h", 9));
+	REQUIRE("99" == format("%h", 99));
+	REQUIRE("999" == format("%h", 999));
+
+	REQUIRE("14e5" == format("%h", 1400000));
+	REQUIRE("123e4" == format("%h", 1234567));
+	REQUIRE("2g" == format("%h", 1999999999));
+	REQUIRE("2m" == format("%h", 1999999));
+	REQUIRE("2k" == format("%h", 1999));
+	REQUIRE("199e4" == format("%h", 1990009));
+
+	REQUIRE("-9" == format("%h", -9));
+	REQUIRE("-999" == format("%h", -999));
+	REQUIRE("-14e5" == format("%h", -1400000));
+}
+
+TEST_CASE("format - int time", "[format]") {
+	REQUIRE("0" == format("%t", 0));
+	REQUIRE("9" == format("%t", 9));
+	REQUIRE("59" == format("%t", 59));
+	REQUIRE("1:00" == format("%t", 60));
+	REQUIRE("1:01" == format("%t", 61));
+	REQUIRE("10:00" == format("%t", 600));
+	REQUIRE("1:00:00" == format("%t", 3600));
+
+	REQUIRE("-1:00:00" == format("%t", -3600));
+	REQUIRE("-1:00" == format("%t", -60));
+}
+
 TEST_CASE("format - vector", "[format]") {
 }

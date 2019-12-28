@@ -114,6 +114,68 @@ inline void format_e(string& s, string_view spec, bool v) { s += v ? "true"sv : 
 
 template<typename Integer>
 void format_int(string& s, string_view spec, Integer v) {
+	if (spec == "%h"sv && v != -v) {
+		// print int with scientific notation, ie 123e6
+		if (v < 0) {
+			s += '-';
+			v = -v;
+		}
+
+		if (v < 1000) {
+			format_int(s, "", v);
+			return;
+		}
+
+		int e = 0;
+		while (v >= 1000 || v % 10 == 0) {
+			v = (v + 4) / 10;
+			e += 1;
+		}
+		format_int(s, "", v);
+		switch(e) {
+		case 3:
+			s += 'k';
+			break;
+		case 6:
+			s += 'm';
+			break;
+		case 9:
+			s += 'g';
+			break;
+		default:
+			s += 'e';
+			format_int(s, "", e);
+		}
+		return;
+	}
+
+	if (spec == "%t"sv && v != -v) {
+		// interpret v as time in seconds: and print as [[hh:]mm:]ss
+		if (v < 0) {
+			s += '-';
+			v = -v;
+		}
+
+		uint sec = v % 60;
+		v /= 60;
+		uint min = v % 60;
+		auto hour = v / 60;
+
+		if (hour != 0) {
+			format_int(s, "", hour);
+			s += ':';
+			format_int(s, "%02", min);
+			s += ':';
+			format_int(s, "%02", sec);
+		} else if (min != 0) {
+			format_int(s, "", min);
+			s += ':';
+			format_int(s, "%02", sec);
+		} else
+			format_int(s, "", sec);
+		return;
+	}
+
 	int zero_pad = 0;
 	if (spec.size() >= 3 && spec[0] == '%' && spec[1] == '0' && '1' <= spec[2] && spec[2] <= '9')
 		zero_pad = spec[2] - '0';
@@ -452,7 +514,7 @@ void format_s(string& s, string_view fmt, const Args& ... args) {
 				s += '%';
 				break;
 			}
-			if (c == 's' || c == 'f' || c == 'd' || c == 'g' || c == 'x' || c == 'X' || c == 'p') {
+			if (c == 's' || c == 'f' || c == 'd' || c == 'g' || c == 'x' || c == 'X' || c == 'p' || c == 't' || c == 'h') {
 				format_a(s, a++, string_view(q - 1, p - q + 1), args...);
 				break;
 			}
