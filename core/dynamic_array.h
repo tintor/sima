@@ -123,6 +123,11 @@ public:
 		return _data[idx];
 	}
 
+	void resize(uint size, T value) {
+		resize(size);
+		fill(value);
+	}
+
 	void resize(uint size) {
 		if (size == _size)
 			return;
@@ -152,6 +157,8 @@ public:
 	uint size() const { return _size; }
 	T* begin() { return _data; }
 	T* end() { return _data + _size; }
+	const T* begin() const { return _data; }
+	const T* end() const { return _data + _size; }
 private:
     T *_data;
     uint _size;

@@ -58,6 +58,16 @@ T max(T a, T b, Args... args) {
 	return max(a, max(b, args...));
 }
 
+template<typename Container>
+auto min(const Container& container) {
+	return *std::min_element(container.begin(), container.end());
+}
+
+template<typename Container>
+auto max(const Container& container) {
+	return *std::max_element(container.begin(), container.end());
+}
+
 template<typename T>
 T median(T x, T y, T z) {
 	if (x <= y) {

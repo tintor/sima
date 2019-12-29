@@ -4,6 +4,7 @@
 
 template<uint Size>
 struct array_bool {
+	typedef uint WordType;
 	static constexpr uint Words = (Size + 31) / 32;
 	std::array<uint, Words> words;
 

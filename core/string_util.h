@@ -1,5 +1,6 @@
 #pragma once
 #include <core/std.h>
+#include <core/util.h>
 #include <strstream>
 
 template<typename Number>
@@ -34,12 +35,12 @@ inline bool match(string_view s, const regex& re, std::cmatch& match) {
 	return std::regex_match(s.begin(), s.end(), /*out*/match, re);
 }
 
-inline vector<string_view> split(string_view s, char delim = ' ') {
+inline vector<string_view> split(string_view s, cspan<char> delim) {
 	vector<string_view> out;
 	const char* b = s.begin();
 	int c = 0;
 	for (const char* i = s.begin(); i != s.end(); i++) {
-		if (*i == delim) {
+		if (contains(delim, *i)) {
 			if (c > 0)
 				out.push_back(string_view(b, c));
 			b = i + 1;
@@ -51,6 +52,11 @@ inline vector<string_view> split(string_view s, char delim = ' ') {
 	if (c > 0)
 		out.push_back(string_view(b, c));
 	return out;
+}
+
+inline vector<string_view> split(string_view s, char delim = ' ') {
+	cspan<char> d = { delim };
+	return split(s, d);
 }
 
 inline bool is_digit(char c) {

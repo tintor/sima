@@ -7,6 +7,7 @@
 
 using std::thread;
 using std::atomic;
+using std::unique_lock;
 using std::lock_guard;
 using std::mutex;
 using std::condition_variable;

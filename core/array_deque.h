@@ -5,6 +5,7 @@ template<typename T>
 class array_deque {
 public:
 	array_deque() { }
+	array_deque(uint capacity) : m_data(capacity) { }
 
 	array_deque(const array_deque& o) {
 		m_data.resize(o.capacity());
@@ -75,6 +76,11 @@ public:
 		m_data.swap(o.m_data);
 		std::swap(m_start, o.m_start);
 		std::swap(m_size, o.m_size);
+	}
+
+	void clear() {
+		m_start = 0;
+		m_size = 0;
 	}
 
 private:
