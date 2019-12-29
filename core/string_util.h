@@ -55,7 +55,7 @@ inline vector<string_view> split(string_view s, cspan<char> delim) {
 }
 
 inline vector<string_view> split(string_view s, char delim = ' ') {
-	cspan<char> d = { delim };
+	array<char, 1> d = { delim };
 	return split(s, d);
 }
 
