@@ -23,27 +23,6 @@ struct array_bool {
 		return (words[index / 32] & mask) != 0;
 	}
 
-	struct BitRef {
-		uint mask;
-		uint* word;
-
-		operator bool() {
-			return (*word & mask) != 0;
-		}
-
-		BitRef& operator=(bool a) {
-			if (a)
-				*word |= mask;
-			else
-				*word &= ~mask;
-			return *this;
-		}
-	};
-
-	BitRef operator[](int index) {
-		return { uint(1) << (index % 32), words.data() + index / 32 };
-	}
-
 	void set(int index) {
 		uint mask = uint(1) << (index % 32);
 		words[index / 32] |= mask;

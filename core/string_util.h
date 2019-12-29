@@ -93,3 +93,19 @@ inline bool natural_less(string_view a, string_view b) {
 	}
 	return ai == a.end() && bi != b.end();
 }
+
+inline string cat(string_view a, string_view b) {
+	string s;
+	s.resize(a.size() + b.size());
+	copy(a.begin(), a.end(), s.begin());
+	copy(b.begin(), b.end(), s.begin() + a.size());
+	return s;
+}
+
+inline string cat(string_view a, const string& b) {
+	string s;
+	s.resize(a.size() + b.size());
+	copy(a.begin(), a.end(), s.begin());
+	copy(b.begin(), b.end(), s.begin() + a.size());
+	return s;
+}

@@ -4,7 +4,32 @@
 #include "core/murmur3.h"
 
 using Agent = uint;
-using Boxes = array_bool<32 * 3>;
+
+struct Boxes : public array_bool<32 * 2> {
+	bool operator[](int index) const {
+		return index < size() && array_bool::operator[](index);
+	}
+
+	void set(int index) {
+		if (index >= size())
+			THROW(runtime_error, "boxes out of range");
+		array_bool::set(index);
+	}
+
+	void reset(int index) {
+		if (index >= size())
+			THROW(runtime_error, "boxes out of range");
+		array_bool::reset(index);
+	}
+
+	void reset() {
+		array_bool::reset();
+	}
+
+	auto hash() const {
+		return std::hash<array_bool<size()>>()(*this);
+	}
+};
 
 // TODO save space by combining State and StateInfo into one struct
 
@@ -24,7 +49,7 @@ struct State {
 	State() {}
 	State(Agent agent, const Boxes& boxes) : agent(agent), boxes(boxes) {}
 };
-static_assert(sizeof(State) == 16);
+static_assert(sizeof(State) <= 16);
 
 inline bool operator==(const State& a, const State& b) {
 	return a.agent == b.agent && a.boxes == b.boxes;
@@ -33,7 +58,7 @@ inline bool operator==(const State& a, const State& b) {
 namespace std {
 	template<> struct hash<State> {
 		size_t operator()(const State& a) const {
-			return std::hash<Boxes>()(a.boxes) ^ fmix64(a.agent);
+			return a.boxes.hash() ^ fmix64(a.agent);
 		}
 	};
 }

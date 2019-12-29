@@ -98,6 +98,14 @@ void remove_dups(Vector& v, const Func& less, const Func& equal) {
 }
 
 template<typename T>
+bool contains(const vector<T>& container, T element) {
+	for (const T& e : container)
+		if (e == element)
+			return true;
+	return false;
+}
+
+template<typename T>
 bool contains(cspan<T> container, T element) {
 	for (const T& e : container)
 		if (e == element)

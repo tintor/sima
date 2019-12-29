@@ -18,3 +18,9 @@ TEST_CASE("natural_less", "[string_util]") {
 	REQUIRE(!natural_less("ma2", "ma2"));
 	REQUIRE(natural_less("a", "b"));
 }
+
+TEST_CASE("cat", "[string_util]") {
+	using namespace std::literals;
+	REQUIRE("abcde" == cat("abc"sv, "de"s));
+	REQUIRE("abcde" == cat("abc"sv, "de"sv));
+}

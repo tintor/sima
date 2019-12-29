@@ -1,38 +1,41 @@
 #pragma once
 #include <core/std.h>
-#include <core/format.h>
+//#include <core/format.h>
+#include <core/auto.h>
 
 struct Timestamp {
 	Timestamp() : _ticks(__builtin_readcyclecounter()) { }
-	Timestamp(long a) : _ticks(a) { }
+	Timestamp(ulong a) : _ticks(a) { }
 
-	long elapsed(Timestamp a = Timestamp()) const { return a._ticks - _ticks; }
+	ulong elapsed(Timestamp a = Timestamp()) const { return a._ticks - _ticks; }
 
 	double elapsed_s(Timestamp a = Timestamp()) const { return elapsed(a) * _ms_per_tick * 1e-3; }
 	double elapsed_ms(Timestamp a = Timestamp()) const { return elapsed(a) * _ms_per_tick; }
 
 	static void init();
 
-	static double to_s(long ticks) { return ticks * _ms_per_tick * 1e-3; }
+	static double to_s(ulong ticks) { return ticks * _ms_per_tick * 1e-3; }
+	static double ms_per_tick() { return _ms_per_tick; }
 
 private:
-	long _ticks;
+	ulong _ticks;
 	static double _ms_per_tick;
 };
 
-class AutoTimestamp {
-public:
-	AutoTimestamp(string_view name) : _name(name) {}
-	~AutoTimestamp() { print("%s took %s ms\n", _name, _begin.elapsed_ms()); }
-private:
-	string_view _name;
-	Timestamp _begin;
-};
-
-template<typename Func>
-auto measure(string_view name, Func func) {
-	AutoTimestamp mm(name);
+/*template<typename Func>
+auto measure_internal(string_view name, Func func) {
+	Timestamp ts;
+	ON_SCOPE_EXIT(print("%s took %s ms\n", name, ts.elapsed_ms()));
 	return func();
 }
 
-#define MEASURE(X) measure(#X, [&](){ return X; } )
+#define MEASURE(X) measure(#X, [&](){ return X; } )*/
+
+template<typename Func>
+auto timer_internal(const Func& func, atomic<ulong>& ticks) {
+	Timestamp ts;
+	ON_SCOPE_EXIT(ticks += ts.elapsed());
+	return func();
+}
+
+#define TIMER(EXPR, TICKS) timer_internal([&]() { return (EXPR); }, TICKS)

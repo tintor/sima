@@ -158,7 +158,7 @@ inline void format_e(string& s, string_view spec, Validity v) {
 TEST_CASE("convex_hull bunny benchmark", "[!hide][convex_hull]") {
 		try{
 	std::default_random_engine rnd(0);
-	mesh3 mm = MEASURE(load_stl("models/bunny.stl"));
+	mesh3 mm = load_stl("models/bunny.stl");
 	/*vector<double3> vertices;
 	for (const itriangle3& f : mm)
 		for (auto i : range(3))

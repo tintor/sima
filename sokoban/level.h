@@ -16,6 +16,8 @@ struct Cell {
 	array<Cell*, 4> dir;
 	dynamic_array<pair<int, Cell*>> moves;
 
+	array<Cell*, 8> dir8;
+
 	bool straight() const { return moves.size() == 2 && (moves[0].first ^ 2) == moves[1].first; }
 };
 
@@ -38,4 +40,4 @@ int NumberOfLevels(string_view filename);
 const Level* LoadLevel(string_view filename);
 uint CellCount(string_view filename);
 void PrintInfo(const Level* level);
-void Print(const Level* level, const State& key);
+void Print(const Level* level, const State& key, std::function<string_view(Cell*)> fn = [](Cell*) {return "";});

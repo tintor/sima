@@ -9,6 +9,7 @@
 #include <core/std.h>
 #include <core/span.h>
 #include <core/interval.h>
+#include <core/timestamp.h>
 #include <complex>
 
 template<typename... Args>
@@ -205,7 +206,50 @@ void format_int(string& s, string_view spec, Integer v) {
 		return;
 	}
 
-	if (spec == "%t"sv && v != -v) {
+	if (spec == "%T"sv) {
+		v *= Timestamp::ms_per_tick();
+		ulong ms = v % 1000;
+
+		v /= 1000;
+		uint sec = v % 60;
+		v /= 60;
+		uint min = v % 60;
+		v /= 60;
+		uint hour = v % 24;
+		v /= 24;
+		uint days = v;
+
+		// interpret v as time in ticks: and print as [[hh:]mm:]ss[.ms]
+		if (days != 0) {
+			format_int(s, days, 0, false);
+			s += ' ';
+			format_int(s, hour, 0, false);
+			s += ':';
+			format_int(s, min, 2, false);
+			s += ':';
+			format_int(s, sec, 2, false);
+		} else if (hour != 0) {
+			format_int(s, hour, 0, false);
+			s += ':';
+			format_int(s, min, 2, false);
+			s += ':';
+			format_int(s, sec, 2, false);
+		} else if (min != 0) {
+			format_int(s, min, 0, false);
+			s += ':';
+			format_int(s, sec, 2, false);
+		} else {
+			format_int(s, sec, 0, false);
+			s += '.';
+			format_int(s, ms, 3, false);
+		}
+		return;
+	}
+
+	if ((spec == "%t"sv || spec == "%Y"sv)  && v != -v) {
+		if (spec == "%Y")
+			v = round(v * (Timestamp::ms_per_tick() * 1e-3));
+
 		// interpret v as time in seconds: and print as [[hh:]mm:]ss
 		if (v < 0) {
 			s += '-';
@@ -523,7 +567,8 @@ void format_s(string& s, string_view fmt, const Args& ... args) {
 				s += '%';
 				break;
 			}
-			if (c == 's' || c == 'f' || c == 'd' || c == 'g' || c == 'x' || c == 'X' || c == 'p' || c == 't' || c == 'h') {
+			if (c == 's' || c == 'Y' || c == 'f' || c == 'd' || c == 'g' || c == 'x' || c == 'X'
+				|| c == 'p' || c == 't' || c == 'T' || c == 'h') {
 				format_a(s, a++, string_view(q - 1, p - q + 1), args...);
 				break;
 			}

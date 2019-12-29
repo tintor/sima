@@ -53,9 +53,7 @@ bool is_simple_deadlock(Cell* pushed_box, const Boxes& boxes) {
 	return is_2x2_deadlock(pushed_box, boxes) || is_2x3_deadlock(pushed_box, boxes);
 }
 
-bool is_frozen_on_goal(Cell* box, const Boxes& boxes) {
-	if (!box->goal)
-		return false;
+bool is_frozen_on_goal_simple(Cell* box, const Boxes& boxes) {
 	for (int d = 0; d < 4; d++) {
 		Cell* a = box->dir[d];
 		if (free(a, boxes))
@@ -63,6 +61,7 @@ bool is_frozen_on_goal(Cell* box, const Boxes& boxes) {
 		Cell* b = box->dir[(d + 1) % 4];
 		if (free(b, boxes))
 			continue;
+
 		if (!a && !b)
 			return true;
 		if (a) {
@@ -77,6 +76,68 @@ bool is_frozen_on_goal(Cell* box, const Boxes& boxes) {
 		}
 	}
 	return false;
+}
+
+Boxes goals_with_frozen_boxes(Cell* agent, const Boxes& boxes, small_bfs<Cell*>* visitor_ptr) {
+	Boxes frozen;
+	auto level = agent->level;
+
+	// try simple approach first
+	bool simple = true;
+	for (int g = 0; g < level->num_goals; g++)
+		if (boxes[g]) {
+			if (is_frozen_on_goal_simple(level->cells[g], boxes))
+				frozen.set(g);
+			else
+				simple = false;
+		}
+	if (simple)
+		return frozen;
+
+	// will use visitor_ptr if not null, otherwise it will allocate temp visitor
+	small_bfs<Cell*> my_visitor(visitor_ptr ? 0 : level->cells.size());
+	small_bfs<Cell*>& visitor = visitor_ptr ? *visitor_ptr : my_visitor;
+
+	// more extensive check
+	// iteratively remove all boxes that agent can push from its reachable area
+	frozen = boxes;
+	int num_boxes = agent->level->num_goals;
+    visitor.clear();
+	visitor.add(agent, agent->id);
+
+	for (Cell* a : visitor)
+        for (auto [d, b] : a->moves) {
+            if (visitor.visited[b->id])
+                continue;
+            if (!b->alive || !frozen[b->id]) {
+                // agent moves to B
+                visitor.add(b, b->id);
+                continue;
+            }
+
+            Cell* c = b->dir[d];
+            if (!c || !c->alive || frozen[c->id])
+                continue;
+
+			frozen.reset(b->id);
+			frozen.set(c->id);
+            bool m = is_simple_deadlock(c, frozen);
+            frozen.reset(c->id);
+            if (m) {
+				frozen.set(b->id);
+                continue;
+            }
+
+            // agent pushes box from B to C (and box disappears)
+            if (--num_boxes == 1) {
+				frozen.reset();
+				return frozen;
+			}
+			visitor.add(b, b->id);
+            break;
+        }
+
+	return frozen;
 }
 
 static bool around(Cell* z, int side, const State& s, int s_dir) {
@@ -121,8 +182,8 @@ bool is_reversible_push(const State& s, int dir, const Level* level, small_bfs<C
 		State s2;
 		s2.agent = b->id;
 		s2.boxes = s.boxes;
-		s2.boxes[b->id] = false;
-		s2.boxes[s.agent] = true;
+		s2.boxes.reset(b->id);
+		s2.boxes.set(s.agent);
 
 		Cell* b2 = b->dir[dir ^ 2];
 		Cell* c2 = b2->dir[dir ^ 2];
@@ -136,7 +197,6 @@ bool is_reversible_push(const State& s, int dir, const Level* level, small_bfs<C
 
 // frozen box deadlock
 bool contains_frozen_boxes(Cell* agent, Boxes boxes, small_bfs<Cell*>& visitor) {
-    int pushed_boxes = 0;
 	int num_boxes = agent->level->num_goals;
 
     visitor.clear();
@@ -146,7 +206,7 @@ bool contains_frozen_boxes(Cell* agent, Boxes boxes, small_bfs<Cell*>& visitor) 
         for (auto [d, b] : a->moves) {
             if (visitor.visited[b->id])
                 continue;
-            if (!b->alive || !boxes[b->id]) {
+            if (!boxes[b->id]) {
                 // agent moves to B
                 visitor.add(b, b->id);
                 continue;
@@ -156,20 +216,19 @@ bool contains_frozen_boxes(Cell* agent, Boxes boxes, small_bfs<Cell*>& visitor) 
             if (!c || !c->alive || boxes[c->id])
                 continue;
 
-			boxes[b->id] = false;
-			boxes[c->id] = true;
+			boxes.reset(b->id);
+			boxes.set(c->id);
             bool m = is_simple_deadlock(c, boxes);
-            boxes[c->id] = false;
+            boxes.reset(c->id);
             if (m) {
-				boxes[b->id] = true;
+				boxes.set(b->id);
                 continue;
             }
 
             // agent pushes box from B to C (and box disappears)
             if (--num_boxes == 1)
 				return false;
-            pushed_boxes += 1;
-            visitor.clear();
+            visitor.clear(); // TODO is this strictly necessary?
 			visitor.add(b, b->id);
             break;
         }
@@ -177,6 +236,10 @@ bool contains_frozen_boxes(Cell* agent, Boxes boxes, small_bfs<Cell*>& visitor) 
 	// deadlock if any remaining box isn't on goal
 	for (uint i = agent->level->num_goals; i < agent->level->num_alive; i++)
 		if (boxes[i])
+			return true;
+	// deadlock if any remaining goal isn't reachable
+	for (uint i = 0; i < agent->level->num_goals; i++)
+		if (!visitor.visited[i] && !boxes[i])
 			return true;
 	return false;
 }

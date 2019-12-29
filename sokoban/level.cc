@@ -113,9 +113,9 @@ struct Minimal {
 		dirs[3] = -w;
 
 		dirs8[0] = -1;
-		dirs8[1] = +1;
-		dirs8[2] = -w;
-		dirs8[3] = +w;
+		dirs8[1] = +w;
+		dirs8[2] = +1;
+		dirs8[3] = -w;
 		dirs8[4] = -1-w;
 		dirs8[5] = +1-w;
 		dirs8[6] = -1+w;
@@ -285,6 +285,9 @@ struct Minimal {
 			for (int d = 0; d < 4; d++)
 				c->dir[d] = open(c->xy + dirs[d]) ? reverse[c->xy + dirs[d]] : nullptr;
 
+			for (int d = 0; d < 8; d++)
+				c->dir8[d] = open(c->xy + dirs8[d]) ? reverse[c->xy + dirs8[d]] : nullptr;
+
 			int m = 0;
 			for (int d = 0; d < 4; d++)
 				if (c->dir[d])
@@ -314,6 +317,13 @@ uint CellCount(string_view name) {
 	m.remove_deadends();
 	m.cleanup_walls();
 	return m.cell_count;
+}
+
+void assign(Boxes& b, int index, bool value) {
+	if (value)
+		b.set(index);
+	else
+		b.reset(index);
 }
 
 const Level* LoadLevel(string_view name) {
@@ -349,42 +359,62 @@ const Level* LoadLevel(string_view name) {
 		return nullptr;
 	for (Cell* c : level->cells)
 		if (c->alive)
-			level->start.boxes[c->id] = m.box[c->xy];
+			assign(level->start.boxes, c->id, m.box[c->xy]);
 
 	if (level->start.agent < level->num_alive && level->start.boxes[level->start.agent])
 		THROW(runtime_error, "agent(%s) on box", level->start.agent);
 	return level;
 }
 
-static string_view Emoji(const Level* level, const State& key, uint xy) {
+static string_view Emoji(const Level* level, const State& key, uint xy, const Boxes& frozen, std::function<string_view(Cell*)> fn) {
 	if (level->buffer[xy] == Code::Wall)
 		return "✴️ ";
 	if (level->buffer[xy] == 'e')
 		return "  ";
+
 	Cell* c = GetCell(level, xy);
+	string_view e = fn(c);
+	if (e != "")
+		return e;
+
 	if (c->id == key.agent)
 		return c->goal ? "😎" : "😀";
 	if (!c->alive)
 	 	return "🌀";
 	if (key.boxes[c->id]) {
-		if (is_frozen_on_goal(c, key.boxes))
-			return "Ⓜ️ ";
-		return c->goal ? "🔵" : "🔴";
+		if (c->goal)
+			return frozen[c->id] ? "Ⓜ️ " : "🔵";
+		return "🔴";
 	}
 	if (c->goal)
 		return "🏳 ";
 	return "🕸️ ";
 }
 
-void Print(const Level* level, const State& key) {
+void Print(const Level* level, const State& key, std::function<string_view(Cell*)> fn) {
+	auto frozen = goals_with_frozen_boxes(level->cells[key.agent], key.boxes);
 	for (uint xy = 0; xy < level->buffer.size(); xy++) {
-		print("%s", Emoji(level, key, xy));
+		print("%s", Emoji(level, key, xy, frozen, fn));
 		if (xy % level->width == level->width - 1)
 			print("\n");
 	}
 }
 
+inline double Choose(uint a, uint b) {
+	double s = 1;
+	for (uint i = a; i >= b; i--)
+		s *= i;
+	for (uint i = 1; i <= b; i++)
+		s /= i;
+	return s;
+}
+
+inline double Complexity(const Level* level) {
+	return log((level->cells.size() - level->num_boxes) * Choose(level->num_alive, level->num_boxes));
+}
+
 void PrintInfo(const Level* level) {
-	print("level [%s], cells %s, alive %s, boxes %s\n", level->name, level->cells.size(), level->num_alive, level->num_boxes);
+	print("level [%s], cells %s, alive %s, boxes %s, complexity %s\n",
+		level->name, level->cells.size(), level->num_alive, level->num_boxes, round(Complexity(level)));
 	Print(level, level->start);
 }
