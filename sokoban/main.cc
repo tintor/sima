@@ -81,6 +81,13 @@ struct StateMap {
 		return result;
 	}
 
+	void reset() {
+		overhead = 0;
+		overhead2 = 0;
+		for (auto& d : data)
+			d.clear();
+	}
+
 	atomic<long> overhead = 0;
 	atomic<long> overhead2 = 0;
 };
@@ -185,6 +192,16 @@ public:
 		return Timestamp::to_s(_overhead2);
 	}
 
+	void reset() {
+		running = true;
+		_overhead = 0;
+		_overhead2 = 0;
+		min_queue = 0;
+		blocked_on_queue = 0;
+		queue_size = 0;
+		queue.clear();
+	}
+
 private:
 	bool running = true;
 	long _overhead = 0;
@@ -197,6 +214,7 @@ private:
 	condition_variable queue_push_cv;
 };
 
+// TODO move to utils
 // check if unreachable area can only be reached by pushing a box into it
 bool is_corral(const Level* level, const Boxes& boxes, const dynamic_array<bool>& reachable, const dynamic_array<bool>& corral) {
 	bool r = false;
@@ -258,10 +276,95 @@ struct Solver {
 	StateMap states;
 	StateQueue queue;
 	vector<Counters> counters;
+	small_bfs<Cell*> visitor;
+	Boxes goals;
 
 	Solver(const Level* level)
-		: level(level)
-	{ }
+		: level(level), visitor(level->cells.size()) {
+		for (Cell* c : level->goals())
+			goals.set(c->id);
+	}
+
+private:
+	void add_more_boxes(Boxes& boxes, const Boxes& goals, int num_boxes, int b0, vector<Boxes>& all_boxes) {
+		if (num_boxes == 0) {
+			if (!goals.contains(boxes))
+				all_boxes.push_back(boxes);
+			return;
+		}
+
+		for (uint b = b0; b < level->num_alive; b++) {
+			boxes.set(b);
+			if (!is_simple_deadlock(level->cells[b], boxes))
+				add_more_boxes(boxes, goals, num_boxes - 1, b + 1, all_boxes);
+			boxes.reset(b);
+		}
+	}
+
+public:
+	// TODO move to utils
+	// Note: uses visitor
+	bool contains_deadlock(const State& s, const State& deadlock) {
+		return s.boxes.contains(deadlock.boxes) && is_cell_reachable(level->cells[s.agent], deadlock, visitor);
+	}
+
+	// TODO move to utils
+	// Note: uses visitor
+	bool contains_deadlock(const State& s, const vector<State>& deadlocks) {
+		for (const State& d : deadlocks)
+			if (contains_deadlock(s, d))
+				return true;
+		return false;
+	}
+
+	void generate_deadlocks(int num_boxes, vector<State>& deadlocks) {
+		vector<Boxes> all_boxes;
+		Boxes boxes;
+		add_more_boxes(boxes, goals, num_boxes, 0, all_boxes);
+
+		vector<pair<State, int>> candidates;
+		State s;
+		for (const Boxes& my_boxes : all_boxes) {
+			visitor.clear();
+			int h = heuristic(my_boxes);
+			for (uint b = 0; b < level->num_alive; b++)
+				if (my_boxes[b])
+					for (auto [_, a] : level->cells[b]->moves)
+						if (!my_boxes[a->id] && !visitor.visited[a->id]) {
+							// visit everything reachable from A
+							s.boxes = my_boxes;
+							s.agent = a->id;
+							normalize(s, visitor, false/*don't clear*/);
+							for (auto [_, c] : a->moves)
+								if (!my_boxes[c->id]) {
+									candidates.emplace_back(s, h);
+									break;
+								}
+						}
+		}
+
+		// order candidates by highest heuristic value first to maximize overlaps in paths
+		sort(candidates, [](const pair<State, int>& a, const pair<State, int>& b) { return a.second > b.second; });
+
+		vector<State> new_deadlocks;
+		phmap::flat_hash_set<State> solvable;
+		int i = 0;
+		for (auto [candidate, _] : candidates)
+			if (!solvable.contains(candidate) && !contains_deadlock(candidate, deadlocks)) {
+				states.reset();
+				queue.reset();
+				auto result = solve(candidate, 0, false/*pre_normalize*/);
+				if (result.has_value()) {
+					for (const State& p : solution(*result))
+						solvable.insert(p);
+				} else {
+					Print(level, candidate);
+					new_deadlocks.push_back(candidate);
+				}
+			}
+		deadlocks.reserve(deadlocks.size() + new_deadlocks.size());
+		std::copy(new_deadlocks.begin(), new_deadlocks.end(), std::back_inserter(deadlocks));
+	}
 
 	optional<pair<State, StateInfo>> queue_pop() {
 		while (true) {
@@ -283,8 +386,9 @@ struct Solver {
 		}
 	}
 
-	void normalize(State& s, small_bfs<Cell*>& visitor) {
-		visitor.clear();
+	void normalize(State& s, small_bfs<Cell*>& visitor, bool clear = true) {
+		if (clear)
+			visitor.clear();
 		visitor.add(level->cells[s.agent], s.agent);
 		for (Cell* a : visitor) {
 			if (a->id < s.agent)
@@ -325,20 +429,12 @@ struct Solver {
 		return cost;
 	}
 
-	optional<pair<State, StateInfo>> solve(int verbosity = 0) {
+	optional<pair<State, StateInfo>> solve(State start, int verbosity = 0, bool pre_normalize = true) {
 		Timestamp start_ts;
-		State start = level->start;
-
-		{
-			small_bfs<Cell*> visitor(level->cells.size());
+		if (pre_normalize)
 			normalize(start, visitor);
-		}
 		states.add(start, StateInfo(), StateMap::shard(start));
 		queue.push(start, 0);
-
-		Boxes goals;
-		for (Cell* c : level->goals())
-			goals.set(c->id);
 
 		if (start.boxes == goals)
 			return pair<State, StateInfo>{ start, StateInfo() };
@@ -348,14 +444,14 @@ struct Solver {
 
 		counters.resize(thread::hardware_concurrency());
 		thread monitor([verbosity, this, &result_lock, start_ts]() {
+			bool running = verbosity > 0;
+			if (!running)
+				return;
 			dynamic_array<bool> reachable;
 			reachable.resize(level->cells.size());
 			dynamic_array<bool> corral;
 			corral.resize(level->cells.size());
 
-			small_bfs<Cell*> agent_visitor(level->cells.size());
-
-			bool running = verbosity > 0;
 			while (running) {
 				if (!queue.wait_while_running_for(5s))
 					running = false;
@@ -413,25 +509,25 @@ struct Solver {
 
 						// TODO don't duplicate this logic
 						// find all reachable cells
-						agent_visitor.clear();
-						agent_visitor.add(level->cells[s.agent], s.agent);
+						visitor.clear();
+						visitor.add(level->cells[s.agent], s.agent);
 						reachable.fill(false);
-						for (Cell* a : agent_visitor) {
+						for (Cell* a : visitor) {
 							reachable[a->id] = true;
 							for (auto [_, b] : a->moves)
 								if (!s.boxes[b->id])
-									agent_visitor.add(b, b->id);
+									visitor.add(b, b->id);
 						}
 
 						// find all unreachable cells
 						bool push_into_corral = false;
 						for (Cell* a : level->cells)
-							if (!s.boxes[a->id] && !agent_visitor.visited[a->id]) {
+							if (!s.boxes[a->id] && !visitor.visited[a->id]) {
 								corral.fill(false);
 								bool candidate = false;
 
-								agent_visitor.add(a, a->id);
-								for (Cell* e : agent_visitor) {
+								visitor.add(a, a->id);
+								for (Cell* e : visitor) {
 									corral[e->id] = true;
 									for (Cell* b : e->dir8) // TODO e->moves8
 										if (b && s.boxes[b->id]) {
@@ -444,7 +540,7 @@ struct Solver {
 
 									for (auto [_, b] : e->moves)
 										if (!s.boxes[b->id])
-											agent_visitor.add(b, b->id);
+											visitor.add(b, b->id);
 								}
 
 								if (candidate && is_corral(level, s.boxes, reachable, corral)) {
@@ -640,7 +736,7 @@ struct Solver {
 						queue.push(ns, int(nsi.distance) + int(nsi.heuristic) * Overestimate);
 						q.queue_push_ticks += queue_push_ts.elapsed();
 
-						if (ns.boxes == goals) {
+						if (goals.contains(ns.boxes)) {
 							queue.shutdown();
 							lock_guard g(result_lock);
 							if (!result)
@@ -654,6 +750,43 @@ struct Solver {
 		monitor.join();
 		return result;
 	}
+
+	pair<State, StateInfo> previous(pair<State, StateInfo> p) {
+		auto [s, si] = p;
+		if (si.distance <= 0)
+			THROW(runtime_error);
+
+		State ps;
+		ps.agent = si.prev_agent;
+		ps.boxes = s.boxes;
+		Cell* a = level->cells[ps.agent];
+		if (!a)
+			THROW(runtime_error);
+		Cell* b = a->dir(si.dir);
+		if (!b)
+			THROW(runtime_error);
+		if (ps.boxes[b->id])
+			THROW(runtime_error);
+		Cell* c = b->dir(si.dir);
+		if (!c || !ps.boxes[c->id])
+			THROW(runtime_error);
+		ps.boxes.reset(c->id);
+		ps.boxes.set(b->id);
+		normalize(ps, visitor);
+		return { ps, states.get(ps, StateMap::shard(s)) };
+	}
+
+	vector<State> solution(pair<State, StateInfo> s) {
+		vector<State> result;
+		while (true) {
+			result.push_back(s.first);
+			if (s.second.distance == 0)
+				break;
+			s = previous(s);
+		}
+		std::reverse(result.begin(), result.end());
+		return result;
+	}
 };
 
 const cspan<string_view> Blacklist = {
@@ -661,6 +794,7 @@ const cspan<string_view> Blacklist = {
 	"microban1:44",
 	"microban2:132", // large maze with one block
 	"microban3:47", // takes 2+ hours
+	"microban3:58", // takes 10+ minutes
 	"microban4:75", // takes 1+ hours
 	"microban4:85", // takes 1.5+ hours
 	"microban4:92", // deadlocks easily
@@ -668,11 +802,10 @@ const cspan<string_view> Blacklist = {
 	"microban5:26",
 };
 
+constexpr string_view prefix = "sokoban/levels/";
+
 string solve(string_view file) {
 	Timestamp start_ts;
-
-	constexpr string_view prefix = "sokoban/levels/";
-
 	atomic<int> total = 0;
 	atomic<int> completed = 0;
 	vector<const Level*> levels;
@@ -717,33 +850,16 @@ string solve(string_view file) {
 		total += 1;
 
 		Solver solver(level);
-		auto solved = solver.solve(2);
+		auto solved = solver.solve(level->start, 2);
 		if (solved) {
 			completed += 1;
 			print("%s: solved in %d pushes!\n", level->name, solved->second.distance);
 			if (false) {
-				small_bfs<Cell*> visitor(level->cells.size());
 				State s = solved->first;
 				StateInfo si = solved->second;
-				while (si.distance > 0) {
-					Print(level, s);
-					State ps;
-					ps.agent = si.prev_agent;
-					ps.boxes = s.boxes;
-					Cell* a = solver.level->cells[ps.agent];
-					if (!a)
-						THROW(runtime_error);
-					Cell* b = a->dir(si.dir);
-					if (!b || ps.boxes[b->id])
-						THROW(runtime_error);
-					Cell* c = b->dir(si.dir);
-					if (!c || !ps.boxes[c->id])
-						THROW(runtime_error);
-					ps.boxes.reset(c->id);
-					ps.boxes.set(b->id);
-					solver.normalize(ps, visitor);
-					s = ps;
-					si = solver.states.get(s, StateMap::shard(s));
+				while (solved->second.distance > 0) {
+					Print(level, solved->first);
+					*solved = solver.previous(*solved);
 				}
 			}
 		} else {
@@ -764,17 +880,40 @@ string solve(string_view file) {
 	return result;
 }
 
-int main(int argc, char** argv) {
-	InitSegvHandler();
-	Timestamp::init();
-	if (argc == 1) {
+void run(cspan<string_view> args) {
+	if (args.size() == 2 && args[0] == "dbox2") {
+		Timestamp ts;
+		auto level = LoadLevel(cat(prefix, args[1]));
+		PrintInfo(level);
+		Solver solver(level);
+		vector<State> deadlocks;
+		solver.generate_deadlocks(2, deadlocks);
+		solver.generate_deadlocks(3, deadlocks);
+		solver.generate_deadlocks(4, deadlocks);
+		print("found deadlocks %s in %T\n", deadlocks.size(), ts.elapsed());
+		return;
+	}
+	if (args.size() == 0) {
 		vector<string> results;
 		for (auto file : {"microban1", "microban2", "microban3", "microban4", "microban5"})
 			results.emplace_back(solve(file));
 		for (auto result : results)
 			print("%s\n", result);
+		return;
 	}
-	if (argc == 2)
-		print("%s\n", solve(argv[1]));
+	if (args.size() == 1) {
+		print("%s\n", solve(args[0]));
+		return;
+	}
+}
+
+int main(int argc, char** argv) {
+	InitSegvHandler();
+	Timestamp::init();
+
+	vector<string_view> args;
+	for (int i = 1; i < argc; i++)
+		args.push_back(argv[i]);
+	run(args);
 	return 0;
 }

@@ -38,6 +38,13 @@ struct array_bool {
 		for (uint& w : words)
 			w = 0;
 	}
+
+	bool contains(const array_bool& b) const {
+		for (uint i = 0; i < Words; i++)
+			if ((words[i] | b.words[i]) != words[i])
+				return false;
+		return true;
+	}
 };
 
 template<uint Size>

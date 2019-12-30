@@ -4,6 +4,13 @@ inline bool free(Cell* a, const Boxes& boxes) {
 	return a && !boxes[a->id];
 }
 
+//      ##
+// TODO #*
+//      $$
+//      #*
+//      ##
+// * are dead cells
+
 // $$  $#  $#
 // $$  $#  $$
 static bool is_2x2_deadlock(Cell* box, const Boxes& boxes) {

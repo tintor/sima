@@ -5,7 +5,7 @@
 
 using Agent = uint;
 
-struct Boxes : public array_bool<32 * 3> {
+struct Boxes : public array_bool<32 * 4> {
 	bool operator[](int index) const {
 		return index < size() && array_bool::operator[](index);
 	}
@@ -49,7 +49,6 @@ struct State {
 	State() {}
 	State(Agent agent, const Boxes& boxes) : agent(agent), boxes(boxes) {}
 };
-static_assert(sizeof(State) <= 16);
 
 inline bool operator==(const State& a, const State& b) {
 	return a.agent == b.agent && a.boxes == b.boxes;
