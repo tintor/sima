@@ -665,6 +665,7 @@ const cspan<string_view> Blacklist = {
 	"microban4:85", // takes 1.5+ hours
 	"microban4:92", // deadlocks easily
 	"microban4:96", // takes .5+ hours
+	"microban5:26",
 };
 
 string solve(string_view file) {

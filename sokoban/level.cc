@@ -425,8 +425,10 @@ const Level* LoadLevel(string_view name) {
 	level->num_alive = m.cell_count - num_dead;
 	level->start.agent = GetCell(level, m.agent)->id;
 
-	if (level->num_alive > Boxes::size())
+	if (level->num_alive > Boxes::size()) {
+		print("level %s, alive(%s) > max_boxes(%s)\n", level->name, level->num_alive, Boxes::size());
 		return nullptr;
+	}
 	for (Cell* c : level->cells)
 		if (c->alive)
 			assign(level->start.boxes, c->id, m.box[c->xy]);

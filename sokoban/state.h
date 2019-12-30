@@ -5,7 +5,7 @@
 
 using Agent = uint;
 
-struct Boxes : public array_bool<32 * 2> {
+struct Boxes : public array_bool<32 * 3> {
 	bool operator[](int index) const {
 		return index < size() && array_bool::operator[](index);
 	}
