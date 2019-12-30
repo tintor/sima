@@ -31,8 +31,8 @@ auto measure_internal(string_view name, Func func) {
 
 #define MEASURE(X) measure(#X, [&](){ return X; } )*/
 
-template<typename Func>
-auto timer_internal(const Func& func, atomic<ulong>& ticks) {
+template<typename Func, typename Ticks>
+auto timer_internal(const Func& func, Ticks& ticks) {
 	Timestamp ts;
 	ON_SCOPE_EXIT(ticks += ts.elapsed());
 	return func();

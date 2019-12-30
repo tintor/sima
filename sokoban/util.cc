@@ -8,21 +8,21 @@ inline bool free(Cell* a, const Boxes& boxes) {
 // $$  $#  $$
 static bool is_2x2_deadlock(Cell* box, const Boxes& boxes) {
 	for (int d = 0; d < 4; d++) {
-		Cell* a = box->dir[d];
+		Cell* a = box->dir(d);
 		if (free(a, boxes))
 			continue;
-		Cell* b = box->dir[(d + 1) % 4];
+		Cell* b = box->dir(d + 1);
 		if (free(b, boxes))
 			continue;
 		if (!a && !b)
 			return !box->goal;
 		if (a) {
-			Cell* c = a->dir[(d + 1) % 4];
+			Cell* c = a->dir(d + 1);
 			if (!free(c, boxes))
 				return !(box->goal && a->goal && (!b || b->goal) && (!c || c->goal));
 		}
 		if (b) {
-			Cell* c = b->dir[d];
+			Cell* c = b->dir(d);
 			if (!free(c, boxes))
 				return !(box->goal && b->goal && (!a || a->goal) && (!c || c->goal));
 		}
@@ -35,15 +35,15 @@ static bool is_2x2_deadlock(Cell* box, const Boxes& boxes) {
 static bool is_2x3_deadlock(Cell* pushed_box, const Boxes& boxes) {
     Cell* a = pushed_box;
     for (int d = 0; d < 4; d++) {
-        Cell* b = a->dir[d];
+        Cell* b = a->dir(d);
         if (!b || !boxes[b->id])
             continue;
         if (a->goal && b->goal)
             continue;
         // Both A and B are boxes, and one of them is not on goal
-        if (!a->dir[(d + 3) % 4] && !b->dir[(d + 1) % 4])
+        if (!a->dir(d - 1) && !b->dir(d + 1))
             return true;
-        if (!a->dir[(d + 1) % 4] && !b->dir[(d + 3) % 4])
+        if (!a->dir(d + 1) && !b->dir(d - 1))
             return true;
     }
     return false;
@@ -55,22 +55,23 @@ bool is_simple_deadlock(Cell* pushed_box, const Boxes& boxes) {
 
 bool is_frozen_on_goal_simple(Cell* box, const Boxes& boxes) {
 	for (int d = 0; d < 4; d++) {
-		Cell* a = box->dir[d];
+		Cell* a = box->dir(d);
 		if (free(a, boxes))
 			continue;
-		Cell* b = box->dir[(d + 1) % 4];
+		Cell* b = box->dir(d + 1);
 		if (free(b, boxes))
 			continue;
 
 		if (!a && !b)
 			return true;
+
 		if (a) {
-			Cell* c = a->dir[(d + 1) % 4];
+			Cell* c = a->dir(d + 1);
 			if (!free(c, boxes))
 				return true;
 		}
 		if (b) {
-			Cell* c = b->dir[d];
+			Cell* c = b->dir(d);
 			if (!free(c, boxes))
 				return true;
 		}
@@ -115,7 +116,7 @@ Boxes goals_with_frozen_boxes(Cell* agent, const Boxes& boxes, small_bfs<Cell*>*
                 continue;
             }
 
-            Cell* c = b->dir[d];
+            Cell* c = b->dir(d);
             if (!c || !c->alive || frozen[c->id])
                 continue;
 
@@ -133,6 +134,7 @@ Boxes goals_with_frozen_boxes(Cell* agent, const Boxes& boxes, small_bfs<Cell*>*
 				frozen.reset();
 				return frozen;
 			}
+			visitor.clear();
 			visitor.add(b, b->id);
             break;
         }
@@ -141,13 +143,13 @@ Boxes goals_with_frozen_boxes(Cell* agent, const Boxes& boxes, small_bfs<Cell*>*
 }
 
 static bool around(Cell* z, int side, const State& s, int s_dir) {
-    Cell* m = z->dir[(s_dir + side) % 4];
+    Cell* m = z->dir(s_dir + side);
     if (!m || s.boxes[m->id])
         return false;
-    m = m->dir[s_dir];
+    m = m->dir(s_dir);
     if (!m || s.boxes[m->id])
         return false;
-    m = m->dir[s_dir];
+    m = m->dir(s_dir);
     if (!m || s.boxes[m->id])
         return false;
     return true;
@@ -173,8 +175,8 @@ bool is_cell_reachable(Cell* c, const State& s, small_bfs<Cell*>& visitor) {
 
 bool is_reversible_push(const State& s, int dir, const Level* level, small_bfs<Cell*>& visitor) {
 	Cell* agent = level->cells[s.agent];
-	Cell* b = agent->dir[dir];
-	Cell* c = b->dir[dir];
+	Cell* b = agent->dir(dir);
+	Cell* c = b->dir(dir);
 	if (!c || s.boxes[c->id])
 		return false;
 
@@ -185,8 +187,8 @@ bool is_reversible_push(const State& s, int dir, const Level* level, small_bfs<C
 		s2.boxes.reset(b->id);
 		s2.boxes.set(s.agent);
 
-		Cell* b2 = b->dir[dir ^ 2];
-		Cell* c2 = b2->dir[dir ^ 2];
+		Cell* b2 = b->dir(dir ^ 2);
+		Cell* c2 = b2->dir(dir ^ 2);
 		if (!c2 || s.boxes[c2->id])
 			return false;
 
@@ -212,7 +214,7 @@ bool contains_frozen_boxes(Cell* agent, Boxes boxes, small_bfs<Cell*>& visitor) 
                 continue;
             }
 
-            Cell* c = b->dir[d];
+            Cell* c = b->dir(d);
             if (!c || !c->alive || boxes[c->id])
                 continue;
 

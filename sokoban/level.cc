@@ -5,6 +5,9 @@
 #include "core/exception.h"
 #include "core/string_util.h"
 #include "core/small_bfs.h"
+#include "core/matrix.h"
+#include "core/array_deque.h"
+
 #include "sokoban/level.h"
 #include "sokoban/util.h"
 
@@ -283,21 +286,21 @@ struct Minimal {
 
 		for (Cell* c : cells) {
 			for (int d = 0; d < 4; d++)
-				c->dir[d] = open(c->xy + dirs[d]) ? reverse[c->xy + dirs[d]] : nullptr;
+				c->_dir[d] = open(c->xy + dirs[d]) ? reverse[c->xy + dirs[d]] : nullptr;
 
 			for (int d = 0; d < 8; d++)
 				c->dir8[d] = open(c->xy + dirs8[d]) ? reverse[c->xy + dirs8[d]] : nullptr;
 
 			int m = 0;
 			for (int d = 0; d < 4; d++)
-				if (c->dir[d])
+				if (c->dir(d))
 					m += 1;
 
 			c->moves.resize(m);
 			m = 0;
 			for (int d = 0; d < 4; d++)
-				if (c->dir[d])
-					c->moves[m++] = pair<int, Cell*>(d, c->dir[d]);
+				if (c->dir(d))
+					c->moves[m++] = pair<int, Cell*>(d, c->dir(d));
 		}
 		return cells;
 	}
@@ -317,6 +320,73 @@ uint CellCount(string_view name) {
 	m.remove_deadends();
 	m.cleanup_walls();
 	return m.cell_count;
+}
+
+class PairVisitor : public each<PairVisitor> {
+public:
+	PairVisitor(uint size1, uint size2) {
+		visited.resize(size1, size2);
+	}
+
+	bool try_add(uint a, uint b) {
+		if (visited(a, b))
+			return false;
+		visited(a, b) = true;
+		deque.push_back({a, b});
+		return true;
+	}
+
+	void reset() {
+		deque.clear();
+		visited.fill(false);
+	}
+
+	optional<pair<uint, uint>> next() {
+		if (deque.empty())
+			return nullopt;
+		return deque.pop_front();
+	}
+
+private:
+	array_deque<pair<uint, uint>> deque;
+	matrix<bool> visited;
+};
+
+void ComputePushDistances(Level* level) {
+	for (Cell* c : level->cells)
+		if (c->alive) {
+			c->push_distance.resize(level->num_goals, Cell::Inf);
+		}
+
+	matrix<uint> distance;
+	distance.resize(level->cells.size(), level->num_alive);
+	PairVisitor visitor(level->cells.size(), level->num_alive);
+
+	for (Cell* g : level->goals()) {
+		auto goal = g->id;
+		visitor.reset();
+		distance.fill(Cell::Inf);
+		for (auto [_, e] : g->moves)
+			if (visitor.try_add(e->id, goal))
+				distance(e->id, goal) = 0;
+		g->push_distance[goal] = 0;
+
+		for (auto [agent, box] : visitor) {
+			Cell* a = level->cells[agent];
+			minimize(level->cells[box]->push_distance[goal], distance(agent, box));
+
+			for (auto [d, n] : a->moves) {
+				uint next = n->id;
+				if (next != box && visitor.try_add(next, box))
+					distance(next, box) = distance(agent, box); // no move cost
+				if (a->alive && a->dir(d ^ 2) && a->dir(d ^ 2)->id == box && visitor.try_add(next, agent))
+					distance(next, agent) = distance(agent, box) + 1; // push cost
+			}
+		}
+	}
+
+	for (Cell* b : level->alive())
+		b->min_push_distance = min(b->push_distance);
 }
 
 void assign(Boxes& b, int index, bool value) {
@@ -363,10 +433,13 @@ const Level* LoadLevel(string_view name) {
 
 	if (level->start.agent < level->num_alive && level->start.boxes[level->start.agent])
 		THROW(runtime_error, "agent(%s) on box", level->start.agent);
+
+	ComputePushDistances(level);
 	return level;
 }
 
-static string_view Emoji(const Level* level, const State& key, uint xy, const Boxes& frozen, std::function<string_view(Cell*)> fn) {
+static string_view Emoji(const Level* level, const State& key, uint xy,
+		const Boxes& frozen, std::function<string_view(Cell*)> fn) {
 	if (level->buffer[xy] == Code::Wall)
 		return "✴️ ";
 	if (level->buffer[xy] == 'e')

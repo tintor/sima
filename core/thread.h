@@ -22,7 +22,21 @@ inline void parallel(size_t max_threads, const std::function<void()>& func) {
 		w.join();
 }
 
+inline void parallel(size_t max_threads, const std::function<void(size_t)>& func) {
+	vector<thread> workers;
+	auto m = max_threads;
+	workers.reserve(m);
+	for (decltype(m) i = 0; i < m; i++)
+		workers.emplace_back(func, i);
+	for (thread& w : workers)
+		w.join();
+}
+
 inline void parallel(const std::function<void()>& func) {
+	parallel(thread::hardware_concurrency(), func);
+}
+
+inline void parallel(const std::function<void(size_t)>& func) {
 	parallel(thread::hardware_concurrency(), func);
 }
 
