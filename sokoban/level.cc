@@ -489,7 +489,7 @@ inline double Complexity(const Level* level) {
 }
 
 void PrintInfo(const Level* level) {
-	print("level [%s], cells %s, alive %s, boxes %s, complexity %s\n",
-		level->name, level->cells.size(), level->num_alive, level->num_boxes, round(Complexity(level)));
+	print("level [%s], cells %s, alive %s, boxes %s, choose %s, complexity %s\n",
+		level->name, level->cells.size(), level->num_alive, level->num_boxes, Choose(level->num_alive, level->num_boxes), round(Complexity(level)));
 	Print(level, level->start);
 }

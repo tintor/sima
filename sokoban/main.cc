@@ -893,6 +893,16 @@ void run(cspan<string_view> args) {
 		print("found deadlocks %s in %T\n", deadlocks.size(), ts.elapsed());
 		return;
 	}
+	if (args.size() == 2 && args[0] == "scan") {
+		auto num = NumberOfLevels(cat(prefix, args[1]));
+		for (size_t i = 0; i < num; i++) {
+			string name = format("%s:%d", args[1], i + 1);
+			auto level = LoadLevel(cat(prefix, name));
+			if (level)
+				PrintInfo(level);
+		}
+		return;
+	}
 	if (args.size() == 0) {
 		vector<string> results;
 		for (auto file : {"microban1", "microban2", "microban3", "microban4", "microban5"})
