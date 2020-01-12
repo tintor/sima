@@ -487,7 +487,7 @@ void Print(const Level* level, const State& key, std::function<string_view(Cell*
 
 inline double Choose(uint a, uint b) {
 	double s = 1;
-	for (uint i = a; i >= b; i--)
+	for (uint i = a; i > a - b; i--)
 		s *= i;
 	for (uint i = 1; i <= b; i++)
 		s /= i;
