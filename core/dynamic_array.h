@@ -124,8 +124,21 @@ public:
 	}
 
 	void resize(uint size, T value) {
-		resize(size);
-		fill(value);
+		if (size == _size)
+			return;
+		if (size == 0) {
+			free(_data);
+			_data = nullptr;
+			_size = 0;
+			return;
+		}
+		T* data = reinterpret_cast<T*>(realloc(_data, sizeof(T) * size));
+		if (!data)
+			throw std::bad_alloc();
+		_data = data;
+		for (uint i = _size; i < size; i++)
+			_data[i] = value;
+		_size = size;
 	}
 
 	void resize(uint size) {
