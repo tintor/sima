@@ -45,6 +45,7 @@ set(render
 	glad/src/glad.c)
 
 set(sokoban
+	sokoban/corrals.cc
 	sokoban/level.cc
 	sokoban/util.cc
 	sokoban/main.cc)

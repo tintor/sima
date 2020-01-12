@@ -1,3 +1,4 @@
+#pragma once
 #include "sokoban/level.h"
 
 bool is_simple_deadlock(Cell* box, const Boxes& boxes);

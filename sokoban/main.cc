@@ -12,6 +12,7 @@
 #include "sokoban/frozen.h"
 #include "sokoban/util.h"
 #include "sokoban/hungarian.h"
+#include "sokoban/corrals.h"
 
 #include "phmap/phmap.h"
 using namespace std::chrono_literals;
@@ -214,26 +215,6 @@ private:
 	condition_variable queue_push_cv;
 };
 
-// TODO move to utils
-// check if unreachable area can only be reached by pushing a box into it
-bool is_corral(const Level* level, const Boxes& boxes, const dynamic_array<bool>& reachable, const dynamic_array<bool>& corral) {
-	bool r = false;
-	for (uint i = 0; i < level->num_alive; i++)
-		if (boxes[i] && corral[i]) {
-			Cell* a = level->cells[i];
-			for (auto [d, p] : a->moves) {
-				Cell* q = a->dir(d ^ 2);
-				if (q && p->alive && !boxes[q->id] && !boxes[p->id]) {
-					if (!corral[q->id] && !corral[p->id])
-						return false;
-					if (reachable[q->id] && corral[p->id])
-						r = true;
-				}
-			}
-		}
-	return r;
-}
-
 struct Counters {
 	typedef ulong T;
 
@@ -429,6 +410,20 @@ public:
 		return cost;
 	}
 
+	void PrintWithCorral(const State& s, const optional<Corral>& corral) {
+		Print(level, s, [&](Cell* c) {
+			if (!corral.has_value() || !(*corral)[c->id])
+				return "";
+			if (s.boxes[c->id])
+				return c->goal ? "🔷" : "⚪";
+			if (c->goal)
+				return "❔";
+			if (!c->alive)
+				return "❕";
+			return "▫️ ";
+		});
+	}
+
 	optional<pair<State, StateInfo>> solve(State start, int verbosity = 0, bool pre_normalize = true) {
 		Timestamp start_ts;
 		if (pre_normalize)
@@ -444,13 +439,10 @@ public:
 
 		counters.resize(thread::hardware_concurrency());
 		thread monitor([verbosity, this, &result_lock, start_ts]() {
+			Corrals corrals(level);
 			bool running = verbosity > 0;
 			if (!running)
 				return;
-			dynamic_array<bool> reachable;
-			reachable.resize(level->cells.size());
-			dynamic_array<bool> corral;
-			corral.resize(level->cells.size());
 
 			while (running) {
 				if (!queue.wait_while_running_for(5s))
@@ -506,60 +498,8 @@ public:
 						StateInfo* q = states.query(s, shard);
 						states.unlock(shard);
 						print("queue cost %s, distance %s, heuristic %s\n", ss->second, q->distance, q->heuristic);
-
-						// TODO don't duplicate this logic
-						// find all reachable cells
-						visitor.clear();
-						visitor.add(level->cells[s.agent], s.agent);
-						reachable.fill(false);
-						for (Cell* a : visitor) {
-							reachable[a->id] = true;
-							for (auto [_, b] : a->moves)
-								if (!s.boxes[b->id])
-									visitor.add(b, b->id);
-						}
-
-						// find all unreachable cells
-						bool push_into_corral = false;
-						for (Cell* a : level->cells)
-							if (!s.boxes[a->id] && !visitor.visited[a->id]) {
-								corral.fill(false);
-								bool candidate = false;
-
-								visitor.add(a, a->id);
-								for (Cell* e : visitor) {
-									corral[e->id] = true;
-									for (Cell* b : e->dir8) // TODO e->moves8
-										if (b && s.boxes[b->id]) {
-											corral[b->id] = true;
-											if (!b->goal)
-												candidate = true;
-										}
-									if (e->goal)
-										candidate = true;
-
-									for (auto [_, b] : e->moves)
-										if (!s.boxes[b->id])
-											visitor.add(b, b->id);
-								}
-
-								if (candidate && is_corral(level, s.boxes, reachable, corral)) {
-									push_into_corral = true;
-									break;
-								}
-							}
-
-						Print(level, s, [&](Cell* c) {
-							if (!push_into_corral || !corral[c->id])
-								return "";
-							if (s.boxes[c->id])
-								return c->goal ? "🔷" : "⚪";
-							if (c->goal)
-								return "❔";
-							if (!c->alive)
-								return "❕";
-							return "▫️ ";
-						});
+						corrals.find_unsolved_picorral(s);
+						PrintWithCorral(s, corrals.opt_picorral());
 					}
 				}
 			}
@@ -569,11 +509,7 @@ public:
 			Counters& q = counters[thread_id];
 			small_bfs<Cell*> agent_visitor(level->cells.size());
 			small_bfs<Cell*> tmp_visitor(level->cells.size());
-
-			dynamic_array<bool> reachable;
-			reachable.resize(level->cells.size());
-			dynamic_array<bool> corral;
-			corral.resize(level->cells.size());
+			Corrals corrals(level);
 
 			while (true) {
 				Timestamp queue_pop_ts;
@@ -596,52 +532,8 @@ public:
 
 				Timestamp corral_ts;
 				q.queue_pop_ticks += queue_pop_ts.elapsed(corral_ts);
-
-				// find all reachable cells
-				agent_visitor.clear();
-				agent_visitor.add(level->cells[s.agent], s.agent);
-				reachable.fill(false);
-				for (Cell* a : agent_visitor) {
-					reachable[a->id] = true;
-					for (auto [_, b] : a->moves)
-						if (!s.boxes[b->id])
-							agent_visitor.add(b, b->id);
-				}
-				// TODO remember [a, d] pairs with boxes avoid generating it again later
-
-				Timestamp corral2_ts;
-				q.corral_ticks += corral_ts.elapsed(corral2_ts);
-
-				// find all unreachable cells
-				bool push_into_corral = false;
-				for (Cell* a : level->cells)
-					if (!s.boxes[a->id] && !agent_visitor.visited[a->id]) {
-						corral.fill(false);
-						bool candidate = false;
-
-						agent_visitor.add(a, a->id);
-						for (Cell* e : agent_visitor) {
-							corral[e->id] = true;
-							for (Cell* b : e->dir8) // TODO e->moves8
-								if (b && s.boxes[b->id]) {
-									corral[b->id] = true;
-									if (!b->goal)
-										candidate = true;
-								}
-							if (e->goal)
-								candidate = true;
-
-							for (auto [_, b] : e->moves)
-								if (!s.boxes[b->id])
-									agent_visitor.add(b, b->id);
-						}
-
-						if (candidate && is_corral(level, s.boxes, reachable, corral)) {
-							push_into_corral = true;
-							break;
-						}
-					}
-				q.corral2_ticks += corral2_ts.elapsed();
+				corrals.find_unsolved_picorral(s);
+				q.corral_ticks += corral_ts.elapsed();
 
 				agent_visitor.clear();
 				agent_visitor.add(level->cells[s.agent], s.agent);
@@ -655,7 +547,7 @@ public:
 						Cell* c = b->dir(d);
 						if (!c || !c->alive || s.boxes[c->id])
 							continue;
-						if (push_into_corral && !corral[c->id]) {
+						if (corrals.has_picorral() && !corrals.picorral()[c->id]) {
 							q.corral_cuts += 1;
 							continue;
 						}
@@ -792,6 +684,7 @@ public:
 const cspan<string_view> Blacklist = {
 	"original:24", // syntax?
 	"microban1:44",
+	"microban2:131", // takes 15+ minutes
 	"microban2:132", // large maze with one block
 	"microban3:47", // takes 2+ hours
 	"microban3:58", // takes 10+ minutes
