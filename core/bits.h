@@ -1,3 +1,4 @@
+#pragma once
 // no explicit size, but you can query to highest bit set (behaves like an big
 // uint) expands to store new 1s, but doesn't shrink to store 0s has
 // shrink_to_fit()
@@ -8,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include "core/murmur3.h"
 
 template <typename T> T div_up(T a, T b) { return (a + b - 1) / b; }
 
@@ -228,6 +230,13 @@ class Bits {
 		_words[index / WordBits] |= mask;
 	}
 
+	void set(size_t index, bool value) {
+		if (value)
+			set(index);
+		else
+			reset(index);
+	}
+
 	// TODO set range of bits
 	// TODO reset range of bits
 	// TODO flip range of bits
@@ -364,6 +373,21 @@ class Bits {
 	static void _or(const Bits& a, const Bits& b, Bits& c) { BITOP(|); }
 	static void _xor(const Bits& a, const Bits& b, Bits& c) { BITOP (^); }
 
+	static bool contains(const Bits& a, const Bits& b) {
+		for (Capacity i = 0; i < std::min(a.capacity(), b.capacity()); i++) {
+			auto aw = a.data()[i];
+			auto bw = b.data()[i];
+			if ((aw | bw) != aw)
+				return false;
+		}
+		for (Capacity i = a.capacity(); i < b.capacity(); i++)
+			if (b.data()[i])
+				return false;
+		return true;
+	}
+
+	bool contains(const Bits& b) const { return Bits::contains(*this, b); }
+
 	/*Bits opeator&(const Bits& b) const {
 		Bits c;
 		_and(*this, b, c);
@@ -447,6 +471,10 @@ class Bits {
 		return hex;
 	}
 
+	size_t hash() const {
+		return MurmurHash3_x64_128(&_words, _capacity * WordBytes, 0);
+	}
+
   private:
 	static bool is_zero(const Word* src, Capacity capacity) {
 		for (Capacity i = 0; i < capacity; i++)
@@ -499,3 +527,12 @@ class Bits {
 	Word* _words;
 	Capacity _capacity;
 };
+
+namespace std {
+	template<> struct hash<Bits> {
+		size_t operator()(const Bits& a) const {
+			return a.hash();
+		}
+	};
+}
+
