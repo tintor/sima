@@ -211,7 +211,7 @@ class Bits {
 		return b;
 	}
 
-	bool operator[](size_t index) {
+	bool operator[](size_t index) const {
 		if (index / WordBits >= _capacity)
 			return false;
 		Word mask = 1;
