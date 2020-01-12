@@ -2,6 +2,7 @@
 #include <core/int.h>
 #include <type_traits>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <cassert>
 #include <initializer_list>
