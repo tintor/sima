@@ -487,13 +487,6 @@ static bool is_error(const Node* e) {
 
 static const Node* eval(const Node* n);
 
-template<typename Int>
-inline bool add_overflow(Int a, Int b) {
-	if (b >= 0)
-		return numeric_limits<Int>::max() - b < a;
-	return a < numeric_limits<Int>::min() - b;
-}
-
 const Node* eval_plus(span<const Node*> args) {
 	if (args.size() == 2) {
 		const Node* a = eval(args[0]);

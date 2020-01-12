@@ -1,4 +1,5 @@
 #pragma once
+#include <limits>
 
 static_assert(sizeof(char) == 1);
 static_assert(sizeof(short) == 2);
@@ -20,4 +21,11 @@ namespace std {
 
 inline cent abs(cent a) { return (a < 0) ? -a : a; }
 
+}
+
+template<typename Int>
+inline bool add_overflow(Int a, Int b) {
+	if (b >= 0)
+		return std::numeric_limits<Int>::max() - b < a;
+	return a < std::numeric_limits<Int>::min() - b;
 }
