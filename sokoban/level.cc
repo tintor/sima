@@ -301,6 +301,16 @@ struct Minimal {
 			for (int d = 0; d < 4; d++)
 				if (c->dir(d))
 					c->moves[m++] = pair<int, Cell*>(d, c->dir(d));
+
+			int p = 0;
+			for (int d = 0; d < 4; d++)
+				if (c->dir(d) && c->dir(d)->alive && c->dir(d ^ 2))
+					p += 1;
+			c->pushes.resize(p);
+			p = 0;
+			for (int d = 0; d < 4; d++)
+				if (c->dir(d) && c->dir(d)->alive && c->dir(d ^ 2))
+					c->pushes[p++] = pair<Cell*, Cell*>(c->dir(d), c->dir(d ^ 2));
 		}
 		return cells;
 	}
@@ -410,8 +420,8 @@ const Level* LoadLevel(string_view name) {
 	level->name = name;
 	level->width = m.w;
 	level->cells = m.cells(level);
-	if (level->cells.size() > 256)
-		THROW(invalid_argument, "too many cells %s", level->cells.size());
+//	if (level->cells.size() > 256)
+//		THROW(invalid_argument, "too many cells %s", level->cells.size());
 
 	level->num_boxes = m.num_boxes();
 	if (level->num_boxes == 0)

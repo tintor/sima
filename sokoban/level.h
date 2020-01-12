@@ -21,6 +21,7 @@ struct Cell {
 	Cell* dir(int d) { return _dir[d & 3]; }
 
 	dynamic_array<pair<int, Cell*>> moves;
+	dynamic_array<pair<Cell*, Cell*>> pushes; // (box_dest, agent_src)
 
 	array<Cell*, 8> dir8;
 
