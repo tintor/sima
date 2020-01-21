@@ -93,6 +93,7 @@ set(test
 
 add_executable(arena arena.cc ${prod} ${render})
 add_executable(main main.cc ${prod} ${render})
+add_executable(piano_mover piano_mover.cc ${prod} ${render})
 add_executable(collision collision.cc ${prod} ${render})
 add_executable(run_gravity run_gravity.cc ${prod} ${render})
 add_executable(test ${prod} ${test})
@@ -137,6 +138,7 @@ endif()
 
 target_link_libraries(arena ${RENDER_LIBS})
 target_link_libraries(main ${RENDER_LIBS})
+target_link_libraries(piano_mover ${RENDER_LIBS})
 target_link_libraries(collision ${RENDER_LIBS})
 target_link_libraries(run_gravity ${RENDER_LIBS})
 target_link_libraries(pid ${RENDER_LIBS})
