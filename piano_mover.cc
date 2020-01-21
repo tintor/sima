@@ -15,7 +15,7 @@
 constexpr int Width = 1000, Height = 1000;
 
 constexpr double LinearSpeed = 100;
-constexpr double AngularSpeed = M_PI / 2;
+constexpr double AngularSpeed = M_PI / 10;
 
 struct Info {
 	pose2 prev;
@@ -220,6 +220,7 @@ struct Model {
 					solution_dist.push_back(0);
 					for (size_t i = 1; i < solution.size(); i++)
 						solution_dist.push_back(solution_dist.back() + graph[solution[i]].dist);
+					break;
 				}
 			}
 		}
@@ -262,7 +263,7 @@ void render_piano(uint64_t color, const mat3& ortho, pose2 pose,
 		Uniform_mat3& transformUniform, VertexBuffer_vec2_rgba& buffer) {
 	mat3 transform(ortho);
 	transform = glm::translate(transform, vec2(pose.position.x, pose.position.y));
-	transform = glm::rotate(transform, float(pose.orientation));
+	transform = glm::rotate(transform, float(-pose.orientation));
 	transformUniform = transform;
 
 	for (const auto& p : model.piano)
@@ -315,7 +316,7 @@ int main(int argc, char** argv) {
 	ortho[2][1] = -1.0f;
 
 	VertexBuffer_vec2_rgba buffer(2000);
-	glPointSize(10);
+	glPointSize(2);
 
 	RunEventLoop(window, [&]() {
 		if (!model.paused) {
