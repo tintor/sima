@@ -1,4 +1,5 @@
 #pragma once
+#include <core/hash.h>
 #include <geom/matrix.h>
 #include <geom/quaternion.h>
 
@@ -17,7 +18,12 @@ struct pose2 {
 
 	double2 rotate(double2 v) const { return ::rotate(orientation, v); }
 	double2 apply(double2 p) const { return rotate(p) + position; }
+
+	bool operator==(pose2 o) const { return equal(position, o.position) && orientation == o.orientation; }
+	bool operator!=(pose2 o) const { return !operator==(o); }
 };
+
+inline hash operator<<(hash h, pose2 p) { return h << p.position << p.orientation; }
 
 inline double slerp(double angle_a, double angle_b, double t) {
 	double d = angle_b - angle_a;
@@ -69,7 +75,12 @@ struct pose3 {
 
 	double3 rotate(double3 v) const { return quat_rotate(orientation, v.xyz); }
 	double3 apply(double3 p) const { return rotate(p) + position; }
+
+	bool operator==(pose3 o) const { return equal(position, o.position) && equal(orientation, o.orientation); }
+	bool operator!=(pose3 o) const { return !operator==(o); }
 };
+
+inline hash operator<<(hash h, pose3 p) { return h << p.position << p.orientation; }
 
 inline pose3 interpolate(pose3 a, pose3 b, double t) {
 	return pose3(
