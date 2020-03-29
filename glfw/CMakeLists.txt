@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 2.8.12)
 if (NOT CMAKE_VERSION VERSION_LESS "3.0")
     # Until all major package systems have moved to CMake 3,
     # we stick with the older INSTALL_NAME_DIR mechanism
-    cmake_policy(SET CMP0042 OLD)
+	cmake_policy(SET CMP0042 OLD)
 endif()
 
 set(GLFW_VERSION_MAJOR "3")
@@ -377,11 +377,11 @@ configure_file(src/glfw3.pc.in src/glfw3.pc @ONLY)
 add_subdirectory(src)
 
 if (GLFW_BUILD_EXAMPLES)
-    add_subdirectory(examples)
+	#add_subdirectory(examples)
 endif()
 
 if (GLFW_BUILD_TESTS)
-    add_subdirectory(tests)
+	#add_subdirectory(tests)
 endif()
 
 if (DOXYGEN_FOUND AND GLFW_BUILD_DOCS)

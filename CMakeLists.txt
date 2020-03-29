@@ -1,9 +1,12 @@
-#    LDFLAGS:  -L/usr/local/opt/llvm/lib
-#    CPPFLAGS: -I/usr/local/opt/llvm/include
-
-cmake_minimum_required(VERSION 2.8)
-
+cmake_minimum_required(VERSION 3.5)
 project(sima)
+
+set(CMAKE_C_COMPILER /usr/bin/clang)
+set(CMAKE_CXX_COMPILER /usr/bin/clang++)
+
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -109,7 +112,7 @@ add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 # 14.7s for -O3 -DNDEBUG -mavx2
 # 16.1s for -O3 -DNDEBUG -mavx2 -flto
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ferror-limit=1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
 add_subdirectory(glm)
 include_directories(glm)
