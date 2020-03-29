@@ -16,6 +16,7 @@ test
 pid
 soko
 collision
+piano_mover
 compile_commands.json
 benchmark.cc
 temp/*

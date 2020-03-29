@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(sima)
 
-set(CMAKE_C_COMPILER /usr/bin/clang)
-set(CMAKE_CXX_COMPILER /usr/bin/clang++)
-
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
@@ -114,34 +110,60 @@ add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
-add_subdirectory(glm)
-include_directories(glm)
+# GLM
+# ---
+# Apple: brew install glm
+# Linux: sudo apt install libglm-dev
+find_package(GLM REQUIRED)
 
-# brew install freetype
-include_directories(/usr/local/Cellar/freetype/2.9.1/include/freetype2)
+# Freetype
+# --------
+# Apple: brew install freetype
+find_package(Freetype REQUIRED)
+if (APPLE)
+	include_directories(/usr/local/Cellar/freetype/2.10.1/include/freetype2)
+else()
+	include_directories(/usr/include/freetype2)
+endif()
+set(LIBRARIES ${LIBRARIES} ${FREETYPE_LIBRARIES})
 
 include_directories(.)
 include_directories(glad/include)
 
-add_subdirectory(glfw)
-include_directories(glfw/include)
+# GLFW
+# ----
+# Apple: brew install glfw3
+# Linux: sudo apt install libglfw3-dev libglfw3
+find_package(glfw3 3.3 REQUIRED)
+set(LIBRARIES ${LIBRARIES} glfw ${GLFW_LIBRARIES})
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework OpenGl")
 
+# lodepng
+# -------
 include_directories(lodepng)
-include_directories(../libraries)
 
-find_package(Freetype REQUIRED)
+# Eigen
+# -----
+# Apple: brew install eigen
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 if (APPLE)
-	set(RENDER_LIBS glfw ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
-	#target_link_libraries(a.test glfw ${GLFW_LIBRARIES})
-else()
+	include_directories(/usr/local/Cellar/eigen/3.3.7/include/eigen3)
+endif()
+set(LIBRARIES ${LIBRARIES} Eigen3::Eigen)
+
+# Boost
+# -----
+# Apple: brew install boost
+find_package(Boost 1.72 REQUIRED)
+
+if (!APPLE)
     find_package(GLEW REQUIRED)
-	set(RENDER_LIBS glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
-	#target_link_libraries(a.test glfw dl ${GLEW_LIBRARIES} ${GLFW_LIBRARIES})
+	set(LIBRARIES ${LIBRARIES} dl ${GLEW_LIBRARIES})
 endif()
 
-target_link_libraries(arena ${RENDER_LIBS})
-target_link_libraries(main ${RENDER_LIBS})
-target_link_libraries(piano_mover ${RENDER_LIBS})
-target_link_libraries(collision ${RENDER_LIBS})
-target_link_libraries(run_gravity ${RENDER_LIBS})
-target_link_libraries(pid ${RENDER_LIBS})
+target_link_libraries(arena ${LIBRARIES})
+target_link_libraries(main ${LIBRARIES})
+target_link_libraries(piano_mover ${LIBRARIES})
+target_link_libraries(collision ${LIBRARIES})
+target_link_libraries(run_gravity ${LIBRARIES})
+target_link_libraries(pid ${LIBRARIES})
