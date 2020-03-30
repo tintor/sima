@@ -22,6 +22,7 @@ bool gGravity = true;
 bool gAirDrag = false;
 bool gFriction = false;
 
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	const char* key_name = glfwGetKeyName(key, 0);
 	print("key_callback [%s] key:%s scancode:%s action:%s mods:%s\n", key_name, key, scancode, action, mods);
