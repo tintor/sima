@@ -22,7 +22,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 # ---
 # Apple: brew install glm
 # Linux: sudo apt install libglm-dev
-find_package(GLM REQUIRED)
 
 # Freetype
 # --------
