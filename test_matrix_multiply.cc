@@ -44,9 +44,9 @@ void multiply2(const Matrix<N>& a, const Matrix<N>& b, Matrix<N>& c) {
 TEST_CASE("fma flops/cycle", "[!hide][fma]") {
 	std::default_random_engine rnd;
 	float8 a, b, c;
-	for (int i = 0; i < 8; i++) a[i] = std::uniform_real_distribution(-1, 1)(rnd);
-	for (int i = 0; i < 8; i++) b[i] = std::uniform_real_distribution(-1, 1)(rnd);
-	for (int i = 0; i < 8; i++) c[i] = std::uniform_real_distribution(-1, 1)(rnd);
+	for (int i = 0; i < 8; i++) a[i] = std::uniform_real_distribution(-1., 1.)(rnd);
+	for (int i = 0; i < 8; i++) b[i] = std::uniform_real_distribution(-1., 1.)(rnd);
+	for (int i = 0; i < 8; i++) c[i] = std::uniform_real_distribution(-1., 1.)(rnd);
 
 	float af = a.x;
 	float bf = b.x;
@@ -77,11 +77,11 @@ TEST_CASE("matrix multitply benchmark", "[!hide][matrix_multiply]") {
 	auto* c = new Matrix<2048>;
 
 	for (float& e : c->m)
-		e = std::uniform_real_distribution(-1, 1)(rnd);
+		e = std::uniform_real_distribution(-1., 1.)(rnd);
 	for (float& e : a->m)
-		e = std::uniform_real_distribution(-1, 1)(rnd);
+		e = std::uniform_real_distribution(-1., 1.)(rnd);
 	for (float& e : b->m)
-		e = std::uniform_real_distribution(-1, 1)(rnd);
+		e = std::uniform_real_distribution(-1., 1.)(rnd);
 	const int N = 2048;
 
 	SECTION("kernel") {

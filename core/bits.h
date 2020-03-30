@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <cstring>
 #include "core/murmur3.h"
 
 template <typename T> T div_up(T a, T b) { return (a + b - 1) / b; }

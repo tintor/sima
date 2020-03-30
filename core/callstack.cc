@@ -3,6 +3,7 @@
 #include <core/auto.h>
 #include <execinfo.h>
 #include <cxxabi.h>
+#include <signal.h>
 
 using namespace std::literals;
 

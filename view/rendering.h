@@ -5,10 +5,8 @@
 #include <mutex>
 
 #define GLFW_INCLUDE_GLCOREARB
-#ifndef __APPLE_CC__
-	#include <GL/glew.h>
-#endif
 #define GL_SILENCE_DEPRECATION
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <core/format.h>

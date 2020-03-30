@@ -22,3 +22,4 @@ benchmark.cc
 temp/*
 glfw/src/glfw3.pc
 glfw/src/glfw_config.h
+tags

@@ -34,7 +34,7 @@ struct hash_t {
 	}
 };
 
-namespace std {
+/*namespace std {
 
 template<typename T>
 struct hash {
@@ -43,4 +43,4 @@ struct hash {
 	}
 };
 
-}
+}*/

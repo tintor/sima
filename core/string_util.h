@@ -1,21 +1,23 @@
 #pragma once
 #include <core/std.h>
 #include <core/util.h>
-#include <strstream>
+#include <sstream>
 
 template<typename Number>
 Number parse(string_view s) {
-    std::istrstream is(s.data(), s.size());
+	std::string ss(s);
+	std::istringstream is(ss);
 	Number out;
-    is >> out;
+	is >> out;
 	return out;
 }
 
 template<typename Number>
 Number parse(pair<const char*, const char*> s) {
-    std::istrstream is(s.first, s.second - s.first);
+	std::string ss(s.first, s.second - s.first);
+	std::istringstream is(ss);
 	Number out;
-    is >> out;
+	is >> out;
 	return out;
 }
 

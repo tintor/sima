@@ -5,6 +5,7 @@
 #include <cassert>
 #include <string>
 #include <string_view>
+#include <cstring>
 
 // clang-format off
 struct prime_number_hash_policy {

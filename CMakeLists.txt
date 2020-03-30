@@ -114,7 +114,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 # ---
 # Apple: brew install glm
 # Linux: sudo apt install libglm-dev
-find_package(GLM REQUIRED)
+#find_package(GLM REQUIRED)
 
 # Freetype
 # --------
@@ -136,7 +136,15 @@ include_directories(glad/include)
 # Linux: sudo apt install libglfw3-dev libglfw3
 find_package(glfw3 3.3 REQUIRED)
 set(LIBRARIES ${LIBRARIES} glfw ${GLFW_LIBRARIES})
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework OpenGl")
+if (APPLE)
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework OpenGl")
+endif()
+
+# pthread and dl
+# --------------
+if (NOT APPLE)
+	set(LIBRARIES ${LIBRARIES} dl pthread)
+endif()
 
 # lodepng
 # -------
@@ -145,22 +153,22 @@ include_directories(lodepng)
 # Eigen
 # -----
 # Apple: brew install eigen
+# Linux: sudo apt install libeigen3-dev
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 if (APPLE)
 	include_directories(/usr/local/Cellar/eigen/3.3.7/include/eigen3)
+else()
+	include_directories(/usr/local/include/eigen3)
 endif()
 set(LIBRARIES ${LIBRARIES} Eigen3::Eigen)
 
 # Boost
 # -----
 # Apple: brew install boost
-find_package(Boost 1.72 REQUIRED)
+# Linux: sudo apt install libboost-all-dev
+find_package(Boost 1.67 REQUIRED)
 
-if (!APPLE)
-    find_package(GLEW REQUIRED)
-	set(LIBRARIES ${LIBRARIES} dl ${GLEW_LIBRARIES})
-endif()
-
+target_link_libraries(soko ${LIBRARIES})
 target_link_libraries(arena ${LIBRARIES})
 target_link_libraries(main ${LIBRARIES})
 target_link_libraries(piano_mover ${LIBRARIES})

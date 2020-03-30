@@ -17,12 +17,6 @@ using ucent = __uint128_t;
 
 using size_t = ulong;
 
-namespace std {
-
-inline cent abs(cent a) { return (a < 0) ? -a : a; }
-
-}
-
 template<typename Int>
 inline bool add_overflow(Int a, Int b) {
 	if (b >= 0)
