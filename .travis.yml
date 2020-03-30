@@ -1,11 +1,19 @@
+language: cpp
+os: linux
+compiler: clang
+
 addons:
 	apt:
 		packages:
-			- cmake
 			- libglfw3-dev
 			- libglfw3
 			- libeigen3-dev
 			- libboost-all-dev
 			- libglm-dev
-compiler:
-  - clang
+
+before_script:
+	- cmake .
+
+script:
+	- make
+	- ./test
