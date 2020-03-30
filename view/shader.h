@@ -2,8 +2,7 @@
 #include <core/std.h>
 #include <view/glm.h>
 
-#define GL_SILENCE_DEPRECATION
-#include <glad/glad.h>
+#include <view/opengl.h>
 
 class Shader {
 public:

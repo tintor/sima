@@ -4,11 +4,7 @@
 #include <vector>
 #include <mutex>
 
-#define GLFW_INCLUDE_GLCOREARB
-#define GL_SILENCE_DEPRECATION
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
+#include <view/opengl.h>
 #include <core/format.h>
 
 void Error(const char* name);

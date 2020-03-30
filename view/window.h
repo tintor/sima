@@ -1,9 +1,6 @@
 #pragma once
 
-// 3rd party
-#define GL_SILENCE_DEPRECATION
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include <view/opengl.h>
 
 #include <functional>
 
