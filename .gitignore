@@ -7,7 +7,9 @@ Makefile
 */*/Makefile
 *.cmake
 */*.cmake
+*/*.a
 */*/*.a
+*/*_test
 arena
 santorini
 main

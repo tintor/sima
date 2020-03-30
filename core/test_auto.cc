@@ -1,7 +1,7 @@
 #include <core/auto.h>
 #include <catch.hpp>
 
-TEST_CASE("auto") {
+TEST_CASE("auto", "[auto]") {
 	int a = 1;
 	{
 		ON_SCOPE_EXIT(a *= 2);

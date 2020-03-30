@@ -1,0 +1,47 @@
+add_library(geom
+	aabb.cc
+	classify.cc
+	convex_hull.cc
+	convex_body.cc
+	csg.cc
+	distance.cc
+	is_valid.cc
+	gjk.cc
+	sphere.cc
+	tesselate.cc
+	transform.cc
+	properties.cc
+	generators.cc
+	solid_bsp_tree.cc
+	shape.cc
+	primitives.cc
+	mesh_import.cc
+	buffer.cc
+	segment.cc
+	project.cc
+	broadphase.cc)
+
+add_executable(geom_test
+	../test.cc
+	test_aabb.cc
+	test_buffer.cc
+	test_classify.cc
+	test_convex_hull.cc
+	test_convex_body.cc
+	test_gjk.cc
+	test_is_valid.cc
+	test_quaternion.cc
+	test_sphere.cc
+	test_tesselate.cc
+	test_vector.cc
+	test_transform.cc
+	test_solid_bsp_tree.cc
+	test_properties.cc
+	test_pose.cc
+	test_matrix.cc
+	test_generators.cc
+	test_shape.cc
+	test_primitives.cc
+	test_broadphase.cc)
+
+target_link_libraries(geom_test core geom ${LIBRARIES})
