@@ -22,8 +22,10 @@ GLFWwindow* CreateWindow(WindowDef wd) {
 		exit(1);
 
 	glfwMakeContextCurrent(window);
+#ifdef __linux__
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 		exit(1);
+#endif
 	glfwSwapInterval(wd.vsync ? 1 : 0);
 
 	return window;
