@@ -103,7 +103,7 @@ add_executable(run_gravity run_gravity.cc)
 add_executable(pid pid.cc)
 
 target_link_libraries(santorini   ${LIBRARIES} core)
-target_link_libraries(arena       ${LIBRARIES} core)
+target_link_libraries(arena       ${LIBRARIES} core view)
 target_link_libraries(main        ${LIBRARIES} core geom view)
 target_link_libraries(piano_mover ${LIBRARIES} core geom view)
 target_link_libraries(collision   ${LIBRARIES} core geom view)
