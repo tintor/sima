@@ -1,5 +1,11 @@
-install:
-  - sudo apt install libglm-dev
-
+addons:
+	apt:
+		packages:
+			- cmake
+			- libglfw3-dev
+			- libglfw3
+			- libeigen3-dev
+			- libboost-all-dev
+			- libglm-dev
 compiler:
   - clang
