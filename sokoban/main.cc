@@ -683,7 +683,6 @@ public:
 
 const cspan<string_view> Blacklist = {
 	"original:24", // syntax?
-	"microban1:44",
 	"microban2:131", // takes 15+ minutes
 	"microban2:132", // large maze with one block
 	"microban3:47", // takes 2+ hours

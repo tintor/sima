@@ -149,7 +149,9 @@ struct Minimal {
 	void move_agent_from_deadend() {
 		while (empty(agent) && move_count(agent) == 1) {
 			int m = first_move(agent);
-			if (box[agent + m] && open(agent + m + m)) {
+			if (box[agent + m]) {
+				if (!open(agent + m + m))
+					break;
 				box[agent + m] = false;
 				box[agent + m + m] = true;
 			}
@@ -420,8 +422,6 @@ const Level* LoadLevel(string_view name) {
 	level->name = name;
 	level->width = m.w;
 	level->cells = m.cells(level);
-//	if (level->cells.size() > 256)
-//		THROW(invalid_argument, "too many cells %s", level->cells.size());
 
 	level->num_boxes = m.num_boxes();
 	if (level->num_boxes == 0)
