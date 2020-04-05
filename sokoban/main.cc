@@ -36,27 +36,18 @@ string Solve(string_view file) {
 
 	if (file.find(":"sv) != string_view::npos) {
 		auto level = LoadLevel(cat(prefix, file));
-		if (level)
-			levels.push_back(level);
-		else
-			skipped.emplace_back(split(file, {':', '/'}).back());
+		levels.push_back(level);
 	} else {
 		auto num = NumberOfLevels(cat(prefix, file));
 		parallel_for(num, 1, [&](size_t task) {
 			string name = format("%s:%d", file, task + 1);
-			if (contains(Blacklist, string_view(name)) || CellCount(cat(prefix, name)) > 256) {
+			if (contains(Blacklist, string_view(name))) {
 				unique_lock g(levels_lock);
 				skipped.emplace_back(split(name, {':', '/'}).back());
 				return;
 			}
 
 			auto level = LoadLevel(cat(prefix, name));
-			if (!level) {
-				unique_lock g(levels_lock);
-				skipped.emplace_back(split(name, {':', '/'}).back());
-				return;
-			}
-
 			unique_lock g(levels_lock);
 			levels.push_back(level);
 		});

@@ -699,12 +699,12 @@ Solution InternalSolve(const Level* level) {
 	Solver<TState<Boxes>> solver(level);
 	auto solution = solver.solve(level->start, 2);
 	if (solution)
-		return solver.solution(*solution);
+		return {solution->first}; // solver.solution(*solution);
 	return {};
 }
 
 Solution Solve(const Level* level) {
-#if OPTIMIZE_MEMORY
+#ifdef OPTIMIZE_MEMORY
 	const int dense_size = (level->num_alive + 31) / 32;
 
 	double f = (level->num_alive <= 256) ? 1 : 2;
