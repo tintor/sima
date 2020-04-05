@@ -194,7 +194,8 @@ void Interact(Body& a, Body& b, polygon2& temp, vector<IContact2>& contacts) {
 
 void SetShape(Body& body, const polygon2& poly) {
 	double2 com = CenterOfMass(poly);
-	body.shape = poly;
+	body.shape.clear();
+	body.shape << poly;
 	for (double2& v : body.shape)
 		v -= com;
 

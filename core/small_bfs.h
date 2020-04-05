@@ -1,8 +1,9 @@
 #pragma once
+#include "core/std.h"
 #include "core/each.h"
 #include "core/exception.h"
-#include "core/dynamic_array.h"
 #include "core/format.h"
+#include <cstring>
 
 // very simple and fast array queue (but number of pushes is limited)
 template<typename T>
@@ -16,7 +17,7 @@ public:
 	void clear() { _head = _tail = 0; }
 	uint tail() const { return _tail; }
 private:
-	dynamic_array<T> _data;
+	vector<T> _data;
 	uint _head = 0;
 	uint _tail = 0;
 };
@@ -24,21 +25,20 @@ private:
 template<typename T>
 struct small_bfs : public each<small_bfs<T>> {
 	small_queue<T> queue;
-	dynamic_array<bool> visited;
+	vector<uchar> visited; // avoid slower vector<bool> as it is bit compressed!
 
 	small_bfs(uint capacity) : queue(capacity) {
-		visited.resize(capacity);
-		memset(visited.begin(), 0, visited.size());
+		visited.resize(capacity, 0);
 	}
 
 	void clear() {
 		queue.clear();
-		memset(visited.begin(), 0, visited.size());
+		for (auto& e : visited) e = 0;
 	}
 
 	void add(T e, uint index) {
 		if (!visited[index]) {
-			visited[index] = true;
+			visited[index] = 1;
 			queue.push(e);
 		}
 	}

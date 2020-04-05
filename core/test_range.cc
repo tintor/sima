@@ -17,10 +17,10 @@ auto collect(const range<T>& r) {
 }
 
 TEST_CASE("range simple") {
-	REQUIRE(collect(range(4)) == vector{0, 1, 2, 3});
-	REQUIRE(collect(range(1, 4)) == vector{1, 2, 3});
-	REQUIRE(collect(range(4, 0, -1)) == vector{4, 3, 2, 1});
-	REQUIRE(collect(range<double>(1, 4, 0.5)) == vector{1.0, 1.5, 2.0, 2.5, 3.0, 3.5});
+	REQUIRE(collect(range(4)) == vector<int>{0, 1, 2, 3});
+	REQUIRE(collect(range(1, 4)) == vector<int>{1, 2, 3});
+	REQUIRE(collect(range(4, 0, -1)) == vector<int>{4, 3, 2, 1});
+	REQUIRE(collect(range<double>(1, 4, 0.5)) == vector<double>{1.0, 1.5, 2.0, 2.5, 3.0, 3.5});
 }
 
 TEST_CASE("range by_reference") {
@@ -31,7 +31,7 @@ TEST_CASE("range by_reference") {
 		if (x == 0)
 			b += 1;
 	}
-	REQUIRE(a == vector{0, 1});
+	REQUIRE(a == vector<int>{0, 1});
 }
 
 TEST_CASE("range by_reference2") {
@@ -45,5 +45,5 @@ TEST_CASE("range by_reference2") {
 			e = false;
 		}
 	}
-	REQUIRE(a == vector{0, 1, 1, 2});
+	REQUIRE(a == vector<int>{0, 1, 1, 2});
 }

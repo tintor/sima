@@ -56,10 +56,10 @@ inline bool ContainsSimilarAxis(const vector<double3>& v, double3 a) {
 	return false;
 }
 
-cmesh3 GenerateConvexMesh(const vector<double3>& vertices) {
+cmesh3 GenerateConvexMesh(cspan<double3> vertices) {
 	cmesh3 m;
 	convex_hull(vertices, m.mesh);
-	m.vertices = vertices;
+	m.vertices << vertices;
 
 	m.position = CenterOfMass(m.mesh);
 	for (double3& v : m.vertices)

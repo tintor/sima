@@ -11,15 +11,6 @@
 
 using poly_mesh3 = vector<polygon3>;
 
-inline bool operator==(const poly_mesh3& a, const poly_mesh3& b) {
-	if (a.size() != b.size())
-		return false;
-	for (size_t i = 0; i < a.size(); i++)
-		if (a[i] != b[i])
-			return false;
-	return true;
-}
-
 #include <catch.hpp>
 
 bool less(double3 a, double3 b) {
@@ -93,6 +84,18 @@ static poly_mesh3 hull(cspan<double3> a) {
 	}
 }*/
 
+void REQUIRE_EQ(const polygon3& a, const polygon3& b) {
+	REQUIRE(a.size() == b.size());
+	for (auto i : range(a.size()))
+		REQUIRE(equal(a[i], b[i]));
+}
+
+void REQUIRE_EQ(const poly_mesh3& a, const poly_mesh3& b) {
+	REQUIRE(a.size() == b.size());
+	for (auto i : range(a.size()))
+		REQUIRE_EQ(a[i], b[i]);
+}
+
 TEST_CASE("convex_hull trivial", "[convex_hull]") {
 	double3 a = {0, 0, 0};
 	double3 b = {1, 0, 0};
@@ -120,10 +123,10 @@ TEST_CASE("convex_hull simple", "[convex_hull]") {
 	auto m = hull({a, b, c, d});
 	REQUIRE(m.size() == 4);
 
-	REQUIRE(hull({a, b, c, d, double3{1, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{0, 1, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{1, 0, 1}}) == m);
-	REQUIRE(hull({a, b, c, d, double3{1, 1, 0}}) == m);
+	REQUIRE_EQ(hull({a, b, c, d, double3{1, 1, 1}}), m);
+	REQUIRE_EQ(hull({a, b, c, d, double3{0, 1, 1}}), m);
+	REQUIRE_EQ(hull({a, b, c, d, double3{1, 0, 1}}), m);
+	REQUIRE_EQ(hull({a, b, c, d, double3{1, 1, 0}}), m);
 
 	REQUIRE(hull({a, b, c, d, double3{-1, 0, 0}}).size() == 4);
 }

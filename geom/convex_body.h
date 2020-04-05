@@ -19,7 +19,7 @@ struct cmesh3 {
 	vector<double3> edgeAxis;
 };
 
-cmesh3 GenerateConvexMesh(const vector<double3>& vertices);
+cmesh3 GenerateConvexMesh(cspan<double3> vertices);
 
 // TODO move pose outside of cmesh3 and pass it directly to classify
 

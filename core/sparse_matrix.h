@@ -1,7 +1,6 @@
 #pragma once
+#include <core/std.h>
 #include <cmath>
-#include <vector>
-#include <algorithm>
 
 constexpr float EPS = 1e-9;
 

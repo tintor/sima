@@ -24,6 +24,7 @@ inline int hex_to_dec(char c) {
 	throw std::invalid_argument("c");
 }
 
+// TODO switch internals to vector<Word>
 class Bits {
   public:
 	using Word = ulong;

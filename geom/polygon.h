@@ -129,28 +129,6 @@ inline bool equal(const vector<T>& a, const vector<T>& b) {
 	return true;
 }
 
-inline bool operator==(const polygon2& a, const polygon2& b) {
-	if (a.size() != b.size())
-		return false;
-	for (size_t i = 0; i < a.size(); i++)
-		if (!equal(a[i], b[i]))
-			return false;
-	return true;
-}
-
-inline bool operator==(const polygon3& a, const polygon3& b) {
-	if (a.size() != b.size())
-		return false;
-	for (size_t i = 0; i < a.size(); i++)
-		if (!equal(a[i], b[i]))
-			return false;
-	return true;
-}
-
-inline bool operator!=(const polygon3& a, const polygon3& b) {
-	return !operator==(a, b);
-}
-
 inline string wkt(const polygon2& poly) {
 	string s;
 	s += "POLYGON (";

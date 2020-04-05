@@ -2,6 +2,8 @@
 #include <core/std.h>
 #include <algorithm>
 
+#define LAMBDA(EXPR) (const auto& e) { return EXPR; }
+
 template<typename T>
 inline int sign(T a) {
 	return (0 < a) - (a < 0);
@@ -84,6 +86,8 @@ T median(T x, T y, T z) {
 		return x;
 	return z;
 }
+
+using std::sort;
 
 template<typename Container>
 void sort(Container& container) {

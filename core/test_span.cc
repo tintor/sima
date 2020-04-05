@@ -1,4 +1,4 @@
-#include <core/span.h>
+#include <core/std.h>
 #include <catch.hpp>
 #include <array>
 

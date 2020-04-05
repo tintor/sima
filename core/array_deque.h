@@ -1,6 +1,7 @@
 #pragma once
-#include <core/dynamic_array.h>
+#include <core/std.h>
 
+// Ignores element constructors / destructors!
 template<typename T>
 class array_deque {
 public:
@@ -47,7 +48,7 @@ public:
 			if (m_data.size() == 0) {
 				m_data.resize(4);
 			} else {
-				dynamic_array<T> data(m_data.size() * 2);
+				vector<T> data(m_data.size() * 2);
 				for (uint i = 0; i < m_size; i++) {
 					data[i] = std::move(operator[](i));
 				}
@@ -84,7 +85,7 @@ public:
 	}
 
 private:
-	dynamic_array<T> m_data;
+	vector<T> m_data;
 	uint m_start = 0;
 	uint m_size = 0;
 };

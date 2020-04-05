@@ -1,5 +1,5 @@
 #pragma once
-#include <core/span.h>
+#include <core/std.h>
 #include <geom/vector.h>
 #include <geom/segment.h>
 #include <core/auto.h>

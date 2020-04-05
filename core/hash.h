@@ -3,6 +3,7 @@
 #include <functional>
 #include <immintrin.h>
 
+// Hash combine using a single SSE4.2 instruction!
 struct hash {
 	ulong seed = ~static_cast<ulong>(0);
 	hash& operator<<(ulong b) { seed = _mm_crc32_u64(seed, b); return *this; }

@@ -1,12 +1,12 @@
 #pragma once
-#include "core/dynamic_array.h"
+#include <core/std.h>
 
 template<typename T>
 class matrix {
 private:
 	uint _dim_a = 0;
 	uint _dim_b = 0;
-	dynamic_array<T> _data;
+	vector<T> _data;
 
 public:
 	void resize(uint a, uint b) {

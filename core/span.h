@@ -1,7 +1,6 @@
 #pragma once
 #include <core/int.h>
 #include <iterator>
-#include <vector>
 #include <array>
 #include <cassert>
 
@@ -38,10 +37,10 @@ public:
 	constexpr span(std::array<T, N>& v) : span(v.data(), v.data() + v.size()) { }
 
 	template<typename A>
-	constexpr span(const std::vector<M, A>& v) : span(v.data(), v.data() + v.size()) { }
+	constexpr span(const vector<M, A>& v) : span(v.data(), v.data() + v.size()) { }
 
 	template<typename A>
-	constexpr span(std::vector<T, A>& v) : span(v.data(), v.data() + v.size()) { }
+	constexpr span(vector<T, A>& v) : span(v.data(), v.data() + v.size()) { }
 
 	constexpr span(const std::initializer_list<M>& v) : span(v.begin(), v.end()) { }
 
@@ -100,11 +99,3 @@ private:
 
 template<typename T>
 using cspan = span<const T>;
-
-template<typename T, typename M>
-void operator<<(std::vector<T>& v, span<M> e) {
-	v.resize(v.size() + e.size());
-	auto r = e.begin();
-	for (auto it = v.end() - e.size(); it != v.end(); it++)
-		*it = *r++;
-}

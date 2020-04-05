@@ -1,6 +1,5 @@
 #pragma once
-#include <vector>
-#include <core/span.h>
+#include <core/std.h>
 
 template<typename A, typename B>
 class zip {
