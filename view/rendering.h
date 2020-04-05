@@ -1,11 +1,12 @@
 #pragma once
 
+#include <core/std.h>
+#include <core/format.h>
+
 #include <string>
-#include <vector>
 #include <mutex>
 
 #include <view/opengl.h>
-#include <core/format.h>
 
 void Error(const char* name);
 

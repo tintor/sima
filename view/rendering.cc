@@ -1,7 +1,7 @@
 #include <view/rendering.h>
+#include <core/std.h>
 #include <core/range.h>
 
-#include <vector>
 #include <iostream>
 #include <fstream>
 
