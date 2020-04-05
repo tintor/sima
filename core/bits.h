@@ -474,7 +474,7 @@ class Bits {
 
 	// TESTED
 	size_t hash() const {
-		return MurmurHash3_x64_128(&_words, size_words() * WordBytes, 0);
+		return MurmurHash3_x64_128(_words, size_words() * WordBytes, 0);
 	}
 
   private:
