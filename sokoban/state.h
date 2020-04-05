@@ -1,5 +1,6 @@
 #pragma once
 #include "core/std.h"
+#include "core/exception.h"
 #include "core/bits.h"
 #include "core/hash.h"
 #include "core/array_bool.h"

@@ -6,3 +6,5 @@
 using Solution = vector<DynamicState>;
 
 Solution Solve(const Level* level);
+
+void GenerateDeadlocks(const Level* level);

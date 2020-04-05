@@ -9,7 +9,7 @@
 #include "core/timestamp.h"
 #include "core/thread.h"
 
-#include "sokoban/level.h"
+#include <sokoban/solver.h>
 #include "sokoban/frozen.h"
 #include "sokoban/util.h"
 #include "sokoban/hungarian.h"
@@ -751,4 +751,24 @@ Solution Solve(const Level* level) {
 #else
 	return InternalSolve<DynamicBoxes>(level);
 #endif
+}
+
+template<typename Cell>
+void InternalGenerateDeadlocks(const Level* level) {
+	const int MaxBoxes = 4;
+	Timestamp ts;
+	using State = TState<DynamicBoxes>;
+	//using State = TState<SparseBoxes<Cell, MaxBoxes>>;
+	Solver<State> solver(level);
+	vector<State> deadlocks;
+	for (auto boxes : range(1, MaxBoxes + 1))
+		solver.generate_deadlocks(boxes, deadlocks);
+	print("found deadlocks %s in %T\n", deadlocks.size(), ts.elapsed());
+}
+
+void GenerateDeadlocks(const Level* level) {
+	if (level->num_alive < 256)
+		InternalGenerateDeadlocks<uchar>(level);
+	else
+		InternalGenerateDeadlocks<ushort>(level);
 }
