@@ -2,35 +2,14 @@
 #include "core/std.h"
 #include "core/small_bfs.h"
 #include "core/thread.h"
+#include "core/format.h"
 #include "core/exception.h"
 #include "phmap/phmap.h"
 
+#include "sokoban/code.h"
+#include "sokoban/cell.h"
 #include "sokoban/state.h"
-
-struct Level;
-
-struct Cell {
-	const Level* level;
-	int id;
-	int xy;
-	bool goal;
-	bool sink;
-	bool alive;
-
-	array<Cell*, 4> _dir;
-	Cell* dir(int d) { return _dir[d & 3]; }
-
-	dynamic_array<pair<int, Cell*>> moves;
-	dynamic_array<pair<Cell*, Cell*>> pushes; // (box_dest, agent_src)
-
-	array<Cell*, 8> dir8;
-
-	constexpr static uint Inf = numeric_limits<int>::max();
-	dynamic_array<uint> push_distance; // from any alive cell to any goal cell (or Inf if not reachable)
-	uint min_push_distance; // min(push_distance)
-
-	bool straight() const { return moves.size() == 2 && (moves[0].first ^ 2) == moves[1].first; }
-};
+#include "sokoban/util.h"
 
 struct Level {
 	string name;
@@ -39,17 +18,67 @@ struct Level {
 
 	// TODO unique_ptr<Cell>
 	vector<Cell*> cells; // ordinal -> Cell*, goals first, then alive, then dead cells
-	auto alive() const { return span(cells.data(), num_alive); }
-	auto goals() const { return span(cells.data(), num_goals); }
+	cspan<Cell*> alive() const { return cspan<Cell*>(cells.data(), num_alive); }
+	cspan<Cell*> goals() const { return cspan<Cell*>(cells.data(), num_goals); }
 
 	int num_goals;
 	int num_alive;
 	int num_boxes;
-	State start;
+
+	DynamicState start;
 };
+
+inline Cell* GetCell(const Level* level, uint xy) {
+	for (Cell* c : level->cells)
+		if (c->xy == xy)
+			return c;
+	THROW(runtime_error, "xy = %s", xy);
+}
+
+template<typename Boxes>
+string_view Emoji(
+		const Level* level,
+		Agent agent,
+		const Boxes& boxes,
+		uint xy,
+		const Boxes& frozen,
+		std::function<string_view(Cell*)> fn) {
+	if (level->buffer[xy] == Code::Wall)
+		return "✴️ ";
+	if (level->buffer[xy] == 'e')
+		return "  ";
+
+	Cell* c = GetCell(level, xy);
+	string_view e = fn(c);
+	if (e != "")
+		return e;
+
+	if (c->id == agent)
+		return c->goal ? "😎" : "😀";
+	if (!c->alive)
+	 	return "🌀";
+	if (boxes[c->id]) {
+		if (c->goal)
+			return frozen[c->id] ? "Ⓜ️ " : "🔵";
+		return "🔴";
+	}
+	if (c->goal)
+		return "🏳 ";
+	return "🕸️ ";
+}
+
+template<typename State>
+void Print(const Level* level, const State& key, std::function<string_view(Cell*)> fn = []LAMBDA("")) {
+	small_bfs<const Cell*> visitor(level->cells.size());
+	auto frozen = goals_with_frozen_boxes(level->cells[key.agent], key.boxes, level->goals(), visitor);
+	for (uint xy = 0; xy < level->buffer.size(); xy++) {
+		print("%s", Emoji(level, key.agent, key.boxes, xy, frozen, fn));
+		if (xy % level->width == level->width - 1)
+			print("\n");
+	}
+}
 
 int NumberOfLevels(string_view filename);
 const Level* LoadLevel(string_view filename);
 uint CellCount(string_view filename);
 void PrintInfo(const Level* level);
-void Print(const Level* level, const State& key, std::function<string_view(Cell*)> fn = [](Cell*) {return "";});

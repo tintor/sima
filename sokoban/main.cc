@@ -1,3 +1,4 @@
+#include "core/range.h"
 #include "core/auto.h"
 #include "core/util.h"
 #include "core/string_util.h"
@@ -17,6 +18,7 @@
 #include "phmap/phmap.h"
 using namespace std::chrono_literals;
 
+template<typename State>
 struct StateMap {
 	constexpr static int SHARDS = 64;
 	array<mutex, SHARDS> locks;
@@ -99,6 +101,7 @@ void ensure_size(vector<T>& vec, size_t s) {
 		vec.resize(round_up_power2(s));
 }
 
+template<typename State>
 class StateQueue {
 public:
 	StateQueue() {
@@ -161,6 +164,7 @@ public:
 		}
 		State s = queue[min_queue].pop_front();
 		queue_size -= 1;
+
 		return s;
 	}
 
@@ -252,12 +256,22 @@ struct Counters {
 	}
 };
 
+using Solution = vector<DynamicState>;
+
+bool IsValidSolution(const Level* level, const Solution& solution) {
+	// TODO implement
+	return true;
+}
+
+template<typename State>
 struct Solver {
+	using Boxes = typename State::Boxes;
+
 	const Level* level;
-	StateMap states;
-	StateQueue queue;
+	StateMap<State> states;
+	StateQueue<State> queue;
 	vector<Counters> counters;
-	small_bfs<Cell*> visitor;
+	small_bfs<const Cell*> visitor;
 	Boxes goals;
 
 	Solver(const Level* level)
@@ -286,7 +300,7 @@ public:
 	// TODO move to utils
 	// Note: uses visitor
 	bool contains_deadlock(const State& s, const State& deadlock) {
-		return s.boxes.contains(deadlock.boxes) && is_cell_reachable(level->cells[s.agent], deadlock, visitor);
+		return s.boxes.contains(deadlock.boxes) && is_cell_reachable(level->cells[s.agent], level->cells[deadlock.agent], deadlock.boxes, visitor);
 	}
 
 	// TODO move to utils
@@ -353,7 +367,7 @@ public:
 			if (!s)
 				return nullopt;
 
-			int shard = StateMap::shard(*s);
+			int shard = StateMap<State>::shard(*s);
 			states.lock2(shard);
 			StateInfo* q = states.query(*s, shard);
 			if (!q || q->closed)  {
@@ -367,11 +381,11 @@ public:
 		}
 	}
 
-	void normalize(State& s, small_bfs<Cell*>& visitor, bool clear = true) {
+	void normalize(State& s, small_bfs<const Cell*>& visitor, bool clear = true) {
 		if (clear)
 			visitor.clear();
 		visitor.add(level->cells[s.agent], s.agent);
-		for (Cell* a : visitor) {
+		for (const Cell* a : visitor) {
 			if (a->id < s.agent)
 				s.agent = a->id;
 			for (auto [_, b] : a->moves)
@@ -390,12 +404,11 @@ public:
 
 	// excludes frozen goals from costs
 	uint heuristic(const Boxes& boxes) {
-		array<uint, Boxes::size()> goal;
-		int goals = 0;
+		vector<uint> goal; // TODO avoid this alloc
 		for (Cell* g : level->goals())
 			if (!boxes[g->id] || !is_frozen_on_goal_simple(g, boxes))
-				goal[goals++] = g->id;
-		if (goals == level->num_goals)
+				goal.push_back(g->id);
+		if (goal.size() == level->num_goals)
 			return heuristic_simple(boxes);
 
 		uint cost = 0;
@@ -403,7 +416,7 @@ public:
 			if (boxes[box->id] && !box->goal) {
 				// min push distance out of all non-frozen goals
 				uint dist = Cell::Inf;
-				for (uint i = 0; i < goals; i++)
+				for (uint i = 0; i < goal.size(); i++)
 					minimize(dist, box->push_distance[goal[i]]);
 				cost += dist;
 			}
@@ -428,7 +441,7 @@ public:
 		Timestamp start_ts;
 		if (pre_normalize)
 			normalize(start, visitor);
-		states.add(start, StateInfo(), StateMap::shard(start));
+		states.add(start, StateInfo(), StateMap<State>::shard(start));
 		queue.push(start, 0);
 
 		if (start.boxes == goals)
@@ -439,7 +452,7 @@ public:
 
 		counters.resize(thread::hardware_concurrency());
 		thread monitor([verbosity, this, &result_lock, start_ts]() {
-			Corrals corrals(level);
+			Corrals<State> corrals(level);
 			bool running = verbosity > 0;
 			if (!running)
 				return;
@@ -493,7 +506,7 @@ public:
 					if (ss.has_value()) {
 						State s = ss->first;
 
-						int shard = StateMap::shard(s);
+						int shard = StateMap<State>::shard(s);
 						states.lock(shard);
 						StateInfo* q = states.query(s, shard);
 						states.unlock(shard);
@@ -505,11 +518,11 @@ public:
 			}
 		});
 
-		parallel([&](size_t thread_id) {
+		parallel(1, [&](size_t thread_id) {
 			Counters& q = counters[thread_id];
-			small_bfs<Cell*> agent_visitor(level->cells.size());
-			small_bfs<Cell*> tmp_visitor(level->cells.size());
-			Corrals corrals(level);
+			small_bfs<const Cell*> agent_visitor(level->cells.size());
+			small_bfs<const Cell*> tmp_visitor(level->cells.size());
+			Corrals<State> corrals(level);
 
 			while (true) {
 				Timestamp queue_pop_ts;
@@ -537,14 +550,14 @@ public:
 
 				agent_visitor.clear();
 				agent_visitor.add(level->cells[s.agent], s.agent);
-				for (Cell* a : agent_visitor) {
+				for (const Cell* a : agent_visitor) {
 					for (auto [d, b] : a->moves) {
 						if (!s.boxes[b->id]) {
 							agent_visitor.add(b, b->id);
 							continue;
 						}
 						// push
-						Cell* c = b->dir(d);
+						const Cell* c = b->dir(d);
 						if (!c || !c->alive || s.boxes[c->id])
 							continue;
 						if (corrals.has_picorral() && !corrals.picorral()[c->id]) {
@@ -562,8 +575,8 @@ public:
 						}
 						auto dd = d;
 						auto bb = b;
-						if (TIMER(!is_reversible_push(ns, dd, level, tmp_visitor), q.is_reversible_push_ticks)
-								&& TIMER(contains_frozen_boxes(bb, ns.boxes, tmp_visitor), q.contains_frozen_boxes_ticks)) {
+						if (TIMER(!is_reversible_push(level->cells[ns.agent], ns.boxes, dd, tmp_visitor), q.is_reversible_push_ticks)
+								&& TIMER(contains_frozen_boxes(bb, ns.boxes, level->num_goals, level->num_alive, tmp_visitor), q.contains_frozen_boxes_ticks)) {
 							q.frozen_box_deadlocks += 1;
 							continue;
 						}
@@ -574,7 +587,7 @@ public:
 						Timestamp states_query_ts;
 						q.norm_ticks += norm_ts.elapsed(states_query_ts);
 
-						int shard = StateMap::shard(ns);
+						int shard = StateMap<State>::shard(ns);
 						states.lock(shard);
 
 						constexpr int Overestimate = 2;
@@ -651,25 +664,25 @@ public:
 		State ps;
 		ps.agent = si.prev_agent;
 		ps.boxes = s.boxes;
-		Cell* a = level->cells[ps.agent];
+		const Cell* a = level->cells[ps.agent];
 		if (!a)
 			THROW(runtime_error);
-		Cell* b = a->dir(si.dir);
+		const Cell* b = a->dir(si.dir);
 		if (!b)
 			THROW(runtime_error);
 		if (ps.boxes[b->id])
 			THROW(runtime_error);
-		Cell* c = b->dir(si.dir);
+		const Cell* c = b->dir(si.dir);
 		if (!c || !ps.boxes[c->id])
 			THROW(runtime_error);
 		ps.boxes.reset(c->id);
 		ps.boxes.set(b->id);
 		normalize(ps, visitor);
-		return { ps, states.get(ps, StateMap::shard(s)) };
+		return { ps, states.get(ps, StateMap<State>::shard(ps)) };
 	}
 
-	vector<State> solution(pair<State, StateInfo> s) {
-		vector<State> result;
+	Solution solution(pair<State, StateInfo> s) {
+		vector<DynamicState> result;
 		while (true) {
 			result.push_back(s.first);
 			if (s.second.distance == 0)
@@ -677,9 +690,70 @@ public:
 			s = previous(s);
 		}
 		std::reverse(result.begin(), result.end());
+		if (!IsValidSolution(level, result))
+			THROW(runtime_error, "solution is not valid");
 		return result;
 	}
 };
+
+template<typename Boxes>
+Solution InternalSolve(const Level* level) {
+	Solver<TState<Boxes>> solver(level);
+	auto solution = solver.solve(level->start, 2);
+	if (solution)
+		return solver.solution(*solution);
+	return {};
+}
+
+auto Solve(const Level* level) {
+#if OPTIMIZE_MEMORY
+	const int dense_size = (level->num_alive + 31) / 32;
+
+	double f = (level->num_alive <= 256) ? 1 : 2;
+	const int sparse_size = ceil(ceil(level->num_boxes * f) / 4);
+
+	if (dense_size <= sparse_size && dense_size <= 32) {
+		#define DENSE(N) if (level->num_alive <= 32 * N) return InternalSolve<DenseBoxes<32 * N>>(level)
+		DENSE(1);
+		DENSE(2);
+		DENSE(3);
+		DENSE(4);
+		DENSE(5);
+		DENSE(6);
+		DENSE(7);
+		DENSE(8);
+		THROW(not_implemented);
+		#undef DENSE
+	}
+
+	if (level->num_alive < 256) {
+		#define SPARSE(N) if (level->num_boxes <= 4 * N) return InternalSolve<SparseBoxes<uchar, 4 * N>>(level)
+		SPARSE(1);
+		SPARSE(2);
+		SPARSE(3);
+		THROW(not_implemented);
+		#undef SPARSE
+	}
+
+	if (level->num_alive < 256 * 256) {
+		#define SPARSE(N) if (level->num_boxes <= 2 * N) return InternalSolve<SparseBoxes<ushort, 2 * N>>(level)
+		SPARSE(1);
+		SPARSE(2);
+		SPARSE(3);
+		SPARSE(4);
+		SPARSE(5);
+		SPARSE(6);
+		SPARSE(7);
+		SPARSE(8);
+		THROW(not_implemented);
+		#undef SPARSE
+	}
+
+	THROW(not_implemented);
+#else
+	return InternalSolve<DynamicBoxes>(level);
+#endif
+}
 
 const cspan<string_view> Blacklist = {
 	"original:24", // syntax?
@@ -696,7 +770,7 @@ const cspan<string_view> Blacklist = {
 
 constexpr string_view prefix = "sokoban/levels/";
 
-string solve(string_view file) {
+string Solve(string_view file) {
 	Timestamp start_ts;
 	atomic<int> total = 0;
 	atomic<int> completed = 0;
@@ -714,7 +788,7 @@ string solve(string_view file) {
 			skipped.emplace_back(split(file, {':', '/'}).back());
 	} else {
 		auto num = NumberOfLevels(cat(prefix, file));
-		parallel_for(num, [&](size_t task) {
+		parallel_for(num, 1, [&](size_t task) {
 			string name = format("%s:%d", file, task + 1);
 			if (contains(Blacklist, string_view(name)) || CellCount(cat(prefix, name)) > 256) {
 				unique_lock g(levels_lock);
@@ -732,7 +806,7 @@ string solve(string_view file) {
 			unique_lock g(levels_lock);
 			levels.push_back(level);
 		});
-		sort(levels, [](const Level* a, const Level* b) { return !natural_less(a->name, b->name); });
+		sort(levels, [](const Level* a, const Level* b) { return natural_less(a->name, b->name); });
 	}
 
 	parallel_for(levels.size(), 1, [&](size_t task) {
@@ -741,18 +815,13 @@ string solve(string_view file) {
 		PrintInfo(level);
 		total += 1;
 
-		Solver solver(level);
-		auto solved = solver.solve(level->start, 2);
-		if (solved) {
+		const auto solution = Solve(level); // TODO pass option 2
+		if (!solution.empty()) {
 			completed += 1;
-			print("%s: solved in %d pushes!\n", level->name, solved->second.distance);
+			print("%s: solved in %d pushes!\n", level->name, solution.size());
 			if (false) {
-				State s = solved->first;
-				StateInfo si = solved->second;
-				while (solved->second.distance > 0) {
-					Print(level, solved->first);
-					*solved = solver.previous(*solved);
-				}
+				for (const auto& s : solution)
+					Print(level, s);
 			}
 		} else {
 			print("%s: no solution!\n", level->name);
@@ -772,18 +841,28 @@ string solve(string_view file) {
 	return result;
 }
 
-void run(cspan<string_view> args) {
+template<typename Cell>
+void GenerateDeadlocks(const Level* level) {
+	const int MaxBoxes = 4;
+	Timestamp ts;
+	using State = TState<DynamicBoxes>;
+	//using State = TState<SparseBoxes<Cell, MaxBoxes>>;
+	Solver<State> solver(level);
+	vector<State> deadlocks;
+	for (auto boxes : range(1, MaxBoxes + 1))
+		solver.generate_deadlocks(boxes, deadlocks);
+	print("found deadlocks %s in %T\n", deadlocks.size(), ts.elapsed());
+}
+
+int Main(cspan<string_view> args) {
 	if (args.size() == 2 && args[0] == "dbox2") {
-		Timestamp ts;
 		auto level = LoadLevel(cat(prefix, args[1]));
 		PrintInfo(level);
-		Solver solver(level);
-		vector<State> deadlocks;
-		solver.generate_deadlocks(2, deadlocks);
-		solver.generate_deadlocks(3, deadlocks);
-		solver.generate_deadlocks(4, deadlocks);
-		print("found deadlocks %s in %T\n", deadlocks.size(), ts.elapsed());
-		return;
+		if (level->num_alive <= 256)
+			GenerateDeadlocks<uchar>(level);
+		else
+			GenerateDeadlocks<ushort>(level);
+		return 0;
 	}
 	if (args.size() == 2 && args[0] == "scan") {
 		auto num = NumberOfLevels(cat(prefix, args[1]));
@@ -793,29 +872,30 @@ void run(cspan<string_view> args) {
 			if (level)
 				PrintInfo(level);
 		}
-		return;
+		return 0;
 	}
 	if (args.size() == 0) {
 		vector<string> results;
 		for (auto file : {"microban1", "microban2", "microban3", "microban4", "microban5"})
-			results.emplace_back(solve(file));
+			results.emplace_back(Solve(file));
 		for (auto result : results)
 			print("%s\n", result);
-		return;
+		return 0;
 	}
 	if (args.size() == 1) {
-		print("%s\n", solve(args[0]));
-		return;
+		print("%s\n", Solve(args[0]));
+		return 0;
 	}
+	return 0;
 }
 
+// TODO move to core/main.h
 int main(int argc, char** argv) {
 	InitSegvHandler();
-	Timestamp::init();
+	//Timestamp::init();
 
 	vector<string_view> args;
 	for (int i = 1; i < argc; i++)
 		args.push_back(argv[i]);
-	run(args);
-	return 0;
+	return Main(args);
 }

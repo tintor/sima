@@ -49,9 +49,8 @@ public:
 				m_data.resize(4);
 			} else {
 				vector<T> data(m_data.size() * 2);
-				for (uint i = 0; i < m_size; i++) {
-					data[i] = std::move(operator[](i));
-				}
+				for (uint i = 0; i < m_size; i++)
+					std::swap(data[i], operator[](i));
 				m_data.swap(data);
 			}
 			m_start = 0;

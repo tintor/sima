@@ -1,7 +1,6 @@
 #include "core/file.h"
 #include "core/util.h"
 #include "core/range.h"
-#include "core/format.h"
 #include "core/exception.h"
 #include "core/string_util.h"
 #include "core/small_bfs.h"
@@ -10,17 +9,6 @@
 
 #include "sokoban/level.h"
 #include "sokoban/util.h"
-
-namespace Code {
-	constexpr char Box = '$';
-	constexpr char Wall = '#';
-	constexpr char BoxGoal = '*';
-	constexpr char AgentGoal = '+';
-	constexpr char Goal = '.';
-	constexpr char Agent = '@';
-	constexpr char Space = ' ';
-	constexpr char Dead = ':';
-};
 
 int NumberOfLevels(string_view filename) {
 	int currentLevelNo = 0;
@@ -318,13 +306,6 @@ struct Minimal {
 	}
 };
 
-static Cell* GetCell(const Level* level, uint xy) {
-	for (Cell* c : level->cells)
-		if (c->xy == xy)
-			return c;
-	THROW(runtime_error, "xy = %s", xy);
-}
-
 uint CellCount(string_view name) {
 	Minimal m;
 	m.init(loadLevelLines(name));
@@ -366,9 +347,8 @@ private:
 
 void ComputePushDistances(Level* level) {
 	for (Cell* c : level->cells)
-		if (c->alive) {
+		if (c->alive)
 			c->push_distance.resize(level->num_goals, Cell::Inf);
-		}
 
 	matrix<uint> distance;
 	distance.resize(level->cells.size(), level->num_alive);
@@ -401,7 +381,7 @@ void ComputePushDistances(Level* level) {
 		b->min_push_distance = min(b->push_distance);
 }
 
-void assign(Boxes& b, int index, bool value) {
+void assign(DynamicBoxes& b, int index, bool value) {
 	if (value)
 		b.set(index);
 	else
@@ -435,10 +415,6 @@ const Level* LoadLevel(string_view name) {
 	level->num_alive = m.cell_count - num_dead;
 	level->start.agent = GetCell(level, m.agent)->id;
 
-	if (level->num_alive > Boxes::size()) {
-		print("level %s, alive(%s) > max_boxes(%s)\n", level->name, level->num_alive, Boxes::size());
-		return nullptr;
-	}
 	for (Cell* c : level->cells)
 		if (c->alive)
 			assign(level->start.boxes, c->id, m.box[c->xy]);
@@ -448,41 +424,6 @@ const Level* LoadLevel(string_view name) {
 
 	ComputePushDistances(level);
 	return level;
-}
-
-static string_view Emoji(const Level* level, const State& key, uint xy,
-		const Boxes& frozen, std::function<string_view(Cell*)> fn) {
-	if (level->buffer[xy] == Code::Wall)
-		return "✴️ ";
-	if (level->buffer[xy] == 'e')
-		return "  ";
-
-	Cell* c = GetCell(level, xy);
-	string_view e = fn(c);
-	if (e != "")
-		return e;
-
-	if (c->id == key.agent)
-		return c->goal ? "😎" : "😀";
-	if (!c->alive)
-	 	return "🌀";
-	if (key.boxes[c->id]) {
-		if (c->goal)
-			return frozen[c->id] ? "Ⓜ️ " : "🔵";
-		return "🔴";
-	}
-	if (c->goal)
-		return "🏳 ";
-	return "🕸️ ";
-}
-
-void Print(const Level* level, const State& key, std::function<string_view(Cell*)> fn) {
-	auto frozen = goals_with_frozen_boxes(level->cells[key.agent], key.boxes);
-	for (uint xy = 0; xy < level->buffer.size(); xy++) {
-		print("%s", Emoji(level, key, xy, frozen, fn));
-		if (xy % level->width == level->width - 1)
-			print("\n");
-	}
 }
 
 inline double Choose(uint a, uint b) {

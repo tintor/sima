@@ -16,7 +16,7 @@ add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
 # 14.7s for -O3 -DNDEBUG -mavx2
 # 16.1s for -O3 -DNDEBUG -mavx2 -flto
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
 # GLM
 # ---

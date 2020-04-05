@@ -19,13 +19,13 @@ public:
 private:
 	int dim;
 
-	matrix<bool> primes;
-	matrix<bool> stars;
-	dynamic_array<bool> rowsCovered;
-	dynamic_array<bool> colsCovered;
-	dynamic_array<int> result;
-	dynamic_array<int> primeLocations;
-	dynamic_array<int> starLocations;
+	matrix<uchar> primes;
+	matrix<uchar> stars;
+	vector<uchar> rowsCovered;
+	vector<uchar> colsCovered;
+	vector<int> result;
+	vector<int> primeLocations;
+	vector<int> starLocations;
 
 public:
 	// Note: costs must be range [0, std::numeric_limits<int>::max() / 2]
@@ -54,7 +54,7 @@ public:
 		return (loc << 16) >> 16;
 	}
 
-	dynamic_array<int>& execute() {
+	vector<int>& execute() {
 		resetPrimes();
 		subtractRowColMins();
 		findStars(); // O(n^2)
@@ -89,7 +89,7 @@ public:
 	}
 
 	// the starred 0's in each column are the assignments. O(n^2)
-	dynamic_array<int>& starsToAssignments() {
+	vector<int>& starsToAssignments() {
 		for (int j = 0; j < dim; j++)
 			result[j] = findStarRowInCol(j); // O(n)
 		return result;
@@ -100,8 +100,8 @@ public:
 	}
 
 	void resetCovered() {
-		rowsCovered.fill(false);
-		colsCovered.fill(false);
+		for (auto& e : rowsCovered) e = false;
+		for (auto& e : colsCovered) e = false;
 	}
 
 	// get the first zero in each column, star it if there isn't already a star in that row
@@ -206,7 +206,7 @@ private:
 		doStarLocations(primeLocations, primeLocationsSize);
 	}
 
-	void doStarLocations(dynamic_array<int>& locations, int size) {
+	void doStarLocations(vector<int>& locations, int size) {
 		for (int k = 0; k < size; k++) {
 			int row = rowFromLocation(locations[k]);
 			int col = colFromLocation(locations[k]);
@@ -214,7 +214,7 @@ private:
 		}
 	}
 
-	void unStarLocations(dynamic_array<int>& locations, int size) {
+	void unStarLocations(vector<int>& locations, int size) {
 		for (int k = 0; k < size; k++) {
 			int row = rowFromLocation(locations[k]);
 			int col = colFromLocation(locations[k]);

@@ -1,83 +1,205 @@
 #pragma once
 #include "core/std.h"
+#include "core/bits.h"
+#include "core/hash.h"
 #include "core/array_bool.h"
 #include "core/murmur3.h"
 
 using Agent = uint;
 
-struct Boxes : public array_bool<32 * 4> {
-	bool operator[](int index) const {
-		return index < size() && array_bool::operator[](index);
+struct DynamicBoxes {
+	bool operator[](uint index) const { return data[index]; }
+	void set(uint index) { data.set(index); }
+	void reset(uint index) { data.reset(index); }
+	void reset() { data.clear(); }
+	auto hash() const { return data.hash(); }
+	bool operator==(const DynamicBoxes& o) const { return data == o.data; }
+	bool contains(const DynamicBoxes& o) const { return data.contains(o.data); }
+	template<typename Boxes>
+	operator Boxes() const {
+		Boxes out;
+		for (uint i = 0; i < data.size(); i++)
+			if (data[i])
+				out.set(i);
+		return out;
 	}
 
-	void set(int index) {
-		if (index >= size())
-			THROW(runtime_error, "boxes out of range");
-		array_bool::set(index);
+private:
+	Bits data;
+};
+
+template<int Words>
+struct DenseBoxes {
+	operator DynamicBoxes() {
+		DynamicBoxes out;
+		for (uint i = 0; i < data.size(); i++)
+			if (data[i])
+				out.set(i);
+		return out;
 	}
 
-	void reset(int index) {
-		if (index >= size())
-			THROW(runtime_error, "boxes out of range");
-		array_bool::reset(index);
+	bool operator[](uint index) const {
+		return index < data.size() && data[index];
+	}
+
+	void set(uint index) {
+		if (index >= data.size())
+			THROW(runtime_error, "out of range");
+		data.set(index);
+	}
+
+	void reset(uint index) {
+		if (index >= data.size())
+			THROW(runtime_error, "out of range");
+		data.reset(index);
 	}
 
 	void reset() {
-		array_bool::reset();
+		data.reset();
+	}
+
+	bool operator==(const DenseBoxes& o) const {
+		return data == o.data;
 	}
 
 	auto hash() const {
-		return std::hash<array_bool<size()>>()(*this);
+		return std::hash<decltype(data)>()(data);
+	}
+
+	bool contains(const DenseBoxes& o) const {
+		return data.contains(o.data);
+	}
+
+private:
+	array_bool<32 * Words> data;
+};
+
+namespace std {
+
+template<typename T, size_t Size>
+struct hash<array<T, Size>> {
+	size_t operator()(const array<T, Size>& a) const {
+		return MurmurHash3_x64_128(&a, sizeof(a), 0);
 	}
 };
 
-// TODO save space by combining State and StateInfo into one struct
+}
 
-// TODO save space by allocating minimal space for agent and boxes
+template<typename T, int Capacity>
+struct SparseBoxes {
+	static constexpr int MaxBoxes = std::min(2, Capacity);
+	static constexpr ulong MaxIndex = std::numeric_limits<T>::max() - 1;
+	static constexpr T Empty = ~T(0);
+	static_assert(MaxIndex < Empty);
 
-// TODO save space by having separate maps for open and closed states
+	operator DynamicBoxes() {
+		DynamicBoxes out;
+		for (uint i = 0; i < data.size(); i++)
+			if (data[i])
+				out.set(i);
+		return out;
+	}
 
-// TODO save space by keeping agent outside of state
+	SparseBoxes() { reset(); }
+	
+	bool operator[](uint index) const {
+		if (index > MaxIndex)
+			return false;
+		for (T a : data)
+			if (a >= index)
+				return a == index;
+		return false;
+	}
 
-// with State of 16 bytes and StateInfo of 8 bytes, solver lasted until 1265M states
+	void set(uint index) {
+		if (index > MaxIndex)
+			THROW(runtime_error, "out of range");
 
-// sizeof 16 bytes
-struct State {
+		for (int i = 0; i < MaxBoxes; i++)
+			if (data[i] >= index) {
+				if (data[i] > index) {
+					if (data[MaxBoxes - 1] != Empty)
+						THROW(runtime_error, "out of capacity");
+					memmove(data.data() + i + 1, data.data() + i, (MaxBoxes - i - 1) * sizeof(T));
+					data[i] = index;
+				}
+				return;
+			}
+	}
+
+	void reset(int index) {
+		if (index > MaxIndex)
+			THROW(runtime_error, "out of range");
+
+		for (int i = 0; i < MaxBoxes; i++)
+			if (data[i] >= index) {
+				if (data[i] > index)
+					return;
+				memmove(data.data() + i, data.data() + i + 1, (MaxBoxes - i - 1) * sizeof(T));
+				data[MaxBoxes - 1] = Empty;
+				return;
+			}
+	}
+
+	bool operator==(const SparseBoxes& o) const { return data == o.data; }
+	bool empty() const { return data[0] == Empty; }
+	void reset() { for (auto& e : data) e = Empty; }
+	auto hash() const { return std::hash<decltype(data)>()(data); }
+	
+	bool contains(const SparseBoxes& o) const {
+		int sa = 0, sb = 0;
+		while (true) {
+			if (sa == MaxBoxes || data[sa] == Empty)
+				return false;
+			if (sb == MaxBoxes || o.data[sb] == Empty)
+				return true;
+			if (data[sa] > o.data[sb])
+				return false;
+			if (data[sa] == o.data[sb])
+				sb += 1;
+			sa += 1;
+		}
+	}
+
+private:
+	array<T, MaxBoxes> data; // in non-decreasing order
+};
+
+// TODO get rid of State!
+template<typename TBoxes>
+struct TState {
+	using Boxes = TBoxes;
+
 	Boxes boxes;
 	Agent agent;
 
-	State() {}
-	State(Agent agent, const Boxes& boxes) : agent(agent), boxes(boxes) {}
+	TState() {}
+	TState(Agent agent, const Boxes& boxes) : agent(agent), boxes(boxes) {}
+
+	template<typename Boxes2>
+	operator TState<Boxes2>() const {
+		return {agent, static_cast<Boxes>(boxes)};
+	}
 };
 
-inline bool operator==(const State& a, const State& b) {
+template<typename TBoxes>
+inline bool operator==(const TState<TBoxes>& a, const TState<TBoxes>& b) {
 	return a.agent == b.agent && a.boxes == b.boxes;
 }
 
 namespace std {
-	template<> struct hash<State> {
-		size_t operator()(const State& a) const {
-			return a.boxes.hash() ^ fmix64(a.agent);
-		}
-	};
+
+template<typename TBoxes>
+struct hash<TState<TBoxes>> {
+	size_t operator()(const TState<TBoxes>& a) const {
+		return a.boxes.hash() ^ fmix64(a.agent);
+	}
+};
+
 }
 
-// TODO save space by not storing heuristic
-// TODO save space by not storing distance (can be recomputed by backtracking)
-// TODO remaining are:
-//      - 1 bit - closed
-//      - 2 bit - dir
-//      - 7-8 bit - prev_agent
+using DynamicState = TState<DynamicBoxes>;
 
-// original2 level with 70 cells, and 46 alive
-// agent 7bit
-// boxes 46bit
-// closed 1bit
-// dir 2bit
-// prev_agent 7bit
-// TOTAL 63 -> 8bytes!
-
-// sizeof 8 bytes
 struct StateInfo {
 	ushort distance = 0; // pushes so far
 	ushort heuristic = 0; // estimated pushes remaining
