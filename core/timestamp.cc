@@ -3,6 +3,16 @@
 #include <chrono>
 #include <unistd.h>
 
+#include <core/format.h>
+
+double Timestamp::_ms_per_tick = std::numeric_limits<double>::signaling_NaN();
+
+static struct Init {
+	Init() {
+		Timestamp::init();
+	}
+} init;
+
 void Timestamp::init() {
 	auto p = std::chrono::high_resolution_clock::period();
 
@@ -37,4 +47,3 @@ void Timestamp::init() {
 	_ms_per_tick = median(cax.count() / dbx, cay.count() / dby, caz.count() / dbz);
 }
 
-double Timestamp::_ms_per_tick = 0;
