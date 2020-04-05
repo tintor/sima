@@ -34,10 +34,17 @@ void Callstack::write(string& out, const std::initializer_list<string_view>& exc
 
 	for (int i = 0; i < _size; ++i) {
 		auto sp = split(strs[i]);
+		if (sp.size() <= 3) {
+			out += strs[i];
+			out += '\n';
+			continue;
+		}
+
 		char* symbol = const_cast<char*>(sp[3].data());
 		symbol[sp[3].size()] = '\0';
-		int status;
-		char* new_buffer = abi::__cxa_demangle(symbol, buffer, &length, &status);
+		int status = 1;
+		char* new_buffer = nullptr;
+		new_buffer = abi::__cxa_demangle(symbol, buffer, &length, &status);
 		if (new_buffer)
 			buffer = new_buffer;
 		if (status != 0 || (buffer != "Callstack::Callstack()"sv && !matches(exclude, buffer))) {
@@ -59,6 +66,33 @@ static void sigsegv_handler(int sig) {
 	exit(1);
 }
 
+#include <iostream>
+#include <exception>
+
+static const char* CurrentExceptionTypeName() {
+	int status;
+	return abi::__cxa_demangle(abi::__cxa_current_exception_type()->name(), 0, 0, &status);
+}
+	
+namespace std {
+
+void terminate() noexcept {
+    auto eptr = std::current_exception();
+    try {
+        if (eptr)
+            std::rethrow_exception(eptr);
+		std::cout << "terminate() called without exception" << std::endl;
+    } catch(const std::exception& e) {
+        std::cout << "Caught exception:" << std::endl << e.what() << std::endl;
+    } catch(...) {
+		std::cout << "Unhandled exception of type: " << CurrentExceptionTypeName() << std::endl;
+	}
+	std::abort();
+}
+
+};
+
 void InitSegvHandler() {
 	signal(SIGSEGV, sigsegv_handler);
+	signal(SIGILL, sigsegv_handler);
 }
