@@ -221,3 +221,14 @@ TEST_CASE("Bits(string_view)") {
 	REQUIRE(Bits(s).get_word(1) == 0xf);
 	REQUIRE(Bits(s).get_word(0) == 0xa);
 }
+
+TEST_CASE("Bits hash") {
+	Bits a;
+	REQUIRE(a.capacity() == 0);
+	Bits b(uint(1));
+	b.reset(0);
+	REQUIRE(b.capacity() == 1);
+	REQUIRE(a == b);
+	REQUIRE(Bits::compare(a, b) == 0);
+	REQUIRE(a.hash() == b.hash());
+}

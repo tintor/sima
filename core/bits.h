@@ -445,8 +445,7 @@ class Bits {
 		if (!is_zero(a.data() + b.capacity(), a.capacity() - b.capacity()))
 			return 1;
 
-		for (Capacity w = a.capacity() - 1; w != static_cast<Capacity>(-1);
-			 w--) {
+		for (Capacity w = b.capacity() - 1; w != static_cast<Capacity>(-1); w--) {
 			if (a.data()[w] < b.data()[w])
 				return -1;
 			if (a.data()[w] > b.data()[w])
@@ -472,8 +471,9 @@ class Bits {
 		return hex;
 	}
 
+	// TESTED
 	size_t hash() const {
-		return MurmurHash3_x64_128(&_words, _capacity * WordBytes, 0);
+		return MurmurHash3_x64_128(&_words, size_words() * WordBytes, 0);
 	}
 
   private:
