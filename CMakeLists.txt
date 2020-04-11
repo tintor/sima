@@ -26,6 +26,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 # Freetype
 # --------
 # Apple: brew install freetype
+# Linux: sudo apt install libfreetype6-dev
 find_package(Freetype REQUIRED)
 if (APPLE)
 	include_directories(/usr/local/Cellar/freetype/2.10.1/include/freetype2)
