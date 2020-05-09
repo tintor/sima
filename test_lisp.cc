@@ -1,36 +1,36 @@
-#include <lisp.h>
 #include <core/format.h>
 #include <core/string_util.h>
+#include <lisp.h>
+
 #include <catch.hpp>
 
 void test(bool identical, string_view cases) {
-	for (auto line : split(cases, '\n')) {
-		if (line.size() == 0)
-			continue;
-		auto parts = split(line, '\t');
-		Lisp lisp;
+    for (auto line : split(cases, '\n')) {
+	if (line.size() == 0) continue;
+	auto parts = split(line, '\t');
+	Lisp lisp;
 
-		auto ap = lisp.parse(parts[0]);
-		auto a = lisp.eval(ap);
-		auto bp = lisp.parse(parts.back());
-		auto b = lisp.eval(bp);
+	auto ap = lisp.parse(parts[0]);
+	auto a = lisp.eval(ap);
+	auto bp = lisp.parse(parts.back());
+	auto b = lisp.eval(bp);
 
-		bool result = identical ? a == b : Lisp::equal(a, b);
-		if (!result) {
-			print("as = %s\n", parts[0]);
-			print("bs = %s\n", parts.back());
-			print("ap = %s\n", lisp.format(ap));
-			print("bp = %s\n", lisp.format(bp));
-			print("a = %s\n", lisp.format(a));
-			print("b = %s\n", lisp.format(b));
-			print("a not %s to b\n", identical ? "identical" : "equal");
-		}
-		REQUIRE(result);
+	bool result = identical ? a == b : Lisp::equal(a, b);
+	if (!result) {
+	    print("as = %s\n", parts[0]);
+	    print("bs = %s\n", parts.back());
+	    print("ap = %s\n", lisp.format(ap));
+	    print("bp = %s\n", lisp.format(bp));
+	    print("a = %s\n", lisp.format(a));
+	    print("b = %s\n", lisp.format(b));
+	    print("a not %s to b\n", identical ? "identical" : "equal");
 	}
+	REQUIRE(result);
+    }
 }
 
 TEST_CASE("lisp identical", "[lisp]") {
-test(true, R"""(
+    test(true, R"""(
 (# (+ 2 1) This is comment)		()
 
 0			0
@@ -149,7 +149,7 @@ false		false
 }
 
 TEST_CASE("lisp equal", "[lisp]") {
-	test(false, R"""(
+    test(false, R"""(
 (> "e" 0)		(error "(>) arg not int" "e")
 (not 0)			(error "(not) arg not bool" 0)
 (and 0 true)	(error "(and) arg not bool" 0)
@@ -160,17 +160,17 @@ TEST_CASE("lisp equal", "[lisp]") {
 }
 
 static string eval(string_view s) {
-	Lisp lisp;
-	auto a = lisp.eval(lisp.parse(s));
-	return lisp.format(a);
+    Lisp lisp;
+    auto a = lisp.eval(lisp.parse(s));
+    return lisp.format(a);
 }
 
 TEST_CASE("lisp format", "[lisp]") {
-	REQUIRE(eval("(map)") == "(map)");
-	REQUIRE(eval("(map 7 10)") == "(map 7 10)");
-	auto s = eval("(map 3 4 () -2)");
-	REQUIRE((s == "(map 3 4 () -2)" || s == "(map () -2 3 4)"));
+    REQUIRE(eval("(map)") == "(map)");
+    REQUIRE(eval("(map 7 10)") == "(map 7 10)");
+    auto s = eval("(map 3 4 () -2)");
+    REQUIRE((s == "(map 3 4 () -2)" || s == "(map () -2 3 4)"));
 
-	REQUIRE(eval("((= m (1 2 3)) (set m 0 10) m)") == "(10 2 3)");
-	REQUIRE(eval("((= m (1 2 3)) (set m -1 40) m)") == "(error \"(set) index out of bounds\" -1)");
+    REQUIRE(eval("((= m (1 2 3)) (set m 0 10) m)") == "(10 2 3)");
+    REQUIRE(eval("((= m (1 2 3)) (set m -1 40) m)") == "(error \"(set) index out of bounds\" -1)");
 }
