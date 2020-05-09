@@ -77,7 +77,10 @@ set(LIBRARIES ${LIBRARIES} Eigen3::Eigen)
 # -----
 # Apple: brew install boost
 # Linux: sudo apt install libboost-all-dev
-find_package(Boost 1.67 REQUIRED)
+find_package(Boost 1.72 REQUIRED)
+if (Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+endif()
 
 # ---------------------
 

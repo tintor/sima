@@ -3,5 +3,9 @@ add_library(view
 	font.cc
 	rendering.cc
 	shader.cc
-	../glad/src/glad.c
 	../lodepng/lodepng.cc)
+
+if (NOT APPLE)
+    add_library(view ../glad/src/glad.c)
+endif()
+
