@@ -12,6 +12,7 @@ Makefile
 */*_test
 arena
 santorini
+santorini2
 main
 run_gravity
 test

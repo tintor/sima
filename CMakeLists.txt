@@ -99,6 +99,7 @@ add_executable(test
 target_link_libraries(test core ${LIBRARIES})
 
 add_executable(santorini santorini.cc)
+add_executable(santorini2 santorini2.cc)
 add_executable(arena arena.cc)
 add_executable(main main.cc)
 add_executable(piano_mover piano_mover.cc)
@@ -107,6 +108,7 @@ add_executable(run_gravity run_gravity.cc)
 add_executable(pid pid.cc)
 
 target_link_libraries(santorini   ${LIBRARIES} core)
+target_link_libraries(santorini2  ${LIBRARIES} core view)
 target_link_libraries(arena       ${LIBRARIES} core view)
 target_link_libraries(main        ${LIBRARIES} core geom view)
 target_link_libraries(piano_mover ${LIBRARIES} core geom view)
