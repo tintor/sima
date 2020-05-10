@@ -151,33 +151,40 @@ Figure Winner(const Board& board) {
 std::random_device rd;
 thread_local std::mt19937 g_random(rd());
 
-int RandomInt(int count) { return std::uniform_int_distribution<int>(0, count - 1)(g_random); }
+int RandomInt(int count, std::mt19937& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
 
-Coord RandomCoord() {
-    std::uniform_int_distribution<int> dis(0, 4);
-    return Coord{dis(g_random), dis(g_random)};
-}
+struct ReservoirSampler {
+    std::uniform_real_distribution<double> dis;
+    size_t count = 0;
 
-Coord MyRandomFigure(const Board& board) {
+    ReservoirSampler() : dis(0.0, 1.0) {}
+
+    template<typename Random>
+    bool operator()(Random& random) {
+        return dis(random) * ++count <= 1.0;
+    }
+};
+
+Coord MyRandomFigure(const Board& board, std::mt19937& random) {
     Coord out;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
-    int count = 0;
+    ReservoirSampler sampler;
     for (Coord e : kAll)
-        if (board(e).figure == board.player && dis(g_random) <= 1.0 / ++count) out = e;
+        if (board(e).figure == board.player && sampler(random)) out = e;
     return out;
 }
 
 Action RandomAction(const Board& board) {
+    std::mt19937& random = g_random;
     if (board.setup) {
-        int c = RandomInt(1 + 8);
+        int c = RandomInt(1 + 8, random);
         if (c == 0) return NextAction{};
-        return PlaceAction{.dest = RandomCoord()};
+        return PlaceAction{Coord::Random(random)};
     }
 
-    int c = RandomInt(1 + 2 * 4);
+    int c = RandomInt(1 + 2 * 4, random);
     if (c == 0) return NextAction{};
-    if (c <= 4) return MoveAction{MyRandomFigure(board), RandomCoord()};
-    return BuildAction{RandomCoord(), bool(RandomInt(2))};
+    if (c <= 4) return MoveAction{MyRandomFigure(board, random), Coord::Random(random)};
+    return BuildAction{Coord::Random(random), bool(RandomInt(2, random))};
 }
 
 template <typename Visitor>
@@ -249,21 +256,21 @@ Action AutoRandom(const Board& board) {
 }
 
 Action AutoGreedy(const Board& board) {
+    auto& random = g_random;
     vector<Action> temp;
     Action choice;
-    size_t count = 0;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    ReservoirSampler sampler;
     AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
         // Print(actions);
         if (winner == board.player) {
             choice = actions[0];
-            count = 1;
+            sampler.count = 1;
             return false;
         }
-        if (winner == Figure::None && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        if (winner == Figure::None && sampler(random)) choice = actions[0];
         return true;
     });
-    Check(count > 0);
+    Check(sampler.count > 0);
     return choice;
 }
 
@@ -279,31 +286,31 @@ double ClimbRank(Figure player, const Board& board) {
 }
 
 Action AutoClimber(const Board& board) {
+    auto& random = g_random;
     vector<Action> temp;
     Action choice;
-    size_t count = 0;
+    ReservoirSampler sampler;
     double best_rank = -1e100;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
     AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
         // Print(actions);
         if (winner == board.player) {
             choice = actions[0];
             best_rank = 1e100;
-            count = 1;
+            sampler.count = 1;
             return false;
         }
         if (winner != Figure::None) return true;
 
         double rank = ClimbRank(board.player, new_board);
-        if (rank == best_rank && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        if (rank == best_rank && sampler(random)) choice = actions[0];
         if (rank > best_rank) {
             best_rank = rank;
             choice = actions[0];
-            count = 1;
+            sampler.count = 1;
         }
         return true;
     });
-    Check(count > 0);
+    Check(sampler.count > 0);
     return choice;
 }
 
@@ -376,7 +383,7 @@ size_t MCTS_Iteration(size_t N, Figure player, std::unique_ptr<Node>& node) {
     Expand(node->board, node->children);
     Check(node->children.size() > 0);
 
-    auto& child = node->children[RandomInt(node->children.size())];
+    auto& child = node->children[RandomInt(node->children.size(), g_random)];
     size_t e = MCTS_Iteration(N, player, child);
     node->w += e;
     node->n += 1;
@@ -454,12 +461,12 @@ Action AutoMiniMax(const Board& board, const int depth) {
     });
     if (count == 1) return best_action;
 
+    auto& random = g_random;
     double best_score = -1e100;
-    count = 0;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    ReservoirSampler sampler;
     AllValidActions(board, [&](const Board& new_board, const Action& action) {
         double m = MiniMax(board.player, new_board, depth);
-        if (m == best_score && dis(g_random) <= 1.0 / ++count) best_action = action;
+        if (m == best_score && sampler(random)) best_action = action;
         if (m > best_score) {
             count = 1;
             best_action = action;
