@@ -140,7 +140,11 @@ public:
         std::ofstream os((string(filename)));
         for (const auto& [board, wins] : m_data) {
             double w = wins.player1 / double(wins.player1 + wins.player2);
-            os << board << ' ' << std::setprecision(10) << w << '\n';
+            for (int transform = 0; transform < 8; transform++) {
+                Board out;
+                out.cell = Transform(board.cell, transform);
+                os << out << ' ' << std::setprecision(10) << w << '\n';
+            }
         }
     }
 
