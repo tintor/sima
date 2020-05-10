@@ -23,3 +23,11 @@ void Print(const Action& action) {
                           [&](BuildAction a) { print("build:%s%s:%s", a.dest.x(), a.dest.y(), a.dome ? 'D' : 'T'); }},
                action);
 }
+
+void Print(const vector<Action>& actions) {
+    for (const Action& action : actions) {
+        Print(action);
+        print(" ");
+    }
+    print("\n");
+}

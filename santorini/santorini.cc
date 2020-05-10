@@ -132,13 +132,6 @@ Coord RandomCoord() {
     return Coord{dis(g_random), dis(g_random)};
 }
 
-vector<Coord> MyFigures(const Board& board) {
-    vector<Coord> out;
-    for (Coord e : kAll)
-        if (board(e).figure == board.player) out.push_back(e);
-    return out;
-}
-
 Coord MyRandomFigure(const Board& board) {
     Coord out;
     std::uniform_real_distribution<double> dis(0.0, 1.0);
@@ -167,11 +160,6 @@ Action RandomAction(const Board& board) {
             return BuildAction{.dest = RandomCoord(), .dome = bool(RandomInt(2))};
     }
     throw std::runtime_error("unreachable");
-}
-
-bool IsValid(const Board& board, const Action& action) {
-    Board my_board = board;
-    return Execute(my_board, action) == nullopt;
 }
 
 template <typename Visitor>
@@ -230,12 +218,9 @@ bool AllValidActionSequences(const Board& board, vector<Action>& temp, const Vis
     });
 }
 
-void Print(const vector<Action>& actions) {
-    for (const Action& action : actions) {
-        Print(action);
-        print(" ");
-    }
-    print("\n");
+bool IsValid(const Board& board, const Action& action) {
+    Board my_board = board;
+    return Execute(my_board, action) == nullopt;
 }
 
 Action AutoRandom(const Board& board) {
