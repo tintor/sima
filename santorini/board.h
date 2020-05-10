@@ -4,17 +4,43 @@
 #include <santorini/cell.h>
 #include <santorini/coord.h>
 
+using Cells = array<Cell, 25>;
+
 struct Board {
     bool setup = true;
     Figure player = Figure::Player1;
     optional<Coord> moved;
     bool built = false;
 
-    array<Cell, 25> cell;
+    Cells cell;
 
     const Cell& operator()(Coord c) const { return cell[c.v]; }
     Cell& operator()(Coord c) { return cell[c.v]; }
 };
+
+bool Less(const Cells& a, const Cells& b) {
+    for (int i = 0; i < 25; i++) {
+        if (a[i] != b[i]) return Less(a[i], b[i]);
+    }
+    return false;
+}
+
+Cells Transform(const Cells& cell, int transform) {
+    Cells out;
+    for (Coord e : kAll) out[e.v] = cell[Transform(e, transform).v];
+    return out;
+}
+
+// Returns the same board for all symmetry variations!
+Board Normalize(const Board& board) {
+    // generate all 8 transforms and return the smallest one
+    Board out = board;
+    for (int transform = 1; transform < 8; transform++) {
+        Cells m = Transform(board.cell, transform);
+        if (Less(m, out.cell)) out.cell = m;
+    }
+    return out;
+}
 
 // Symmetrical boards are equal!
 bool Equal(const Board& a, const Board& b) {

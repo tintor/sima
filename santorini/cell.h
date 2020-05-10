@@ -9,6 +9,12 @@ struct Cell {
 };
 
 inline bool operator==(Cell a, Cell b) { return a.level == b.level && a.figure == b.figure; }
+inline bool operator!=(Cell a, Cell b) { return !(a == b); }
+
+inline bool Less(Cell a, Cell b) {
+    if (a.level != b.level) return a.level < b.level;
+    return a.figure < b.figure;
+}
 
 inline size_t Hash(Cell a) { return int(a.figure) + (a.level << 2); }
 
