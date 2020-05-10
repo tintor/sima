@@ -23,19 +23,51 @@ void Check(bool value, string_view message = "", const char* file = __builtin_FI
 
 enum class Figure : char { None, Dome, Player1, Player2 };
 
+Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
+
 struct Cell {
     char level = 0; // 2 bits
     Figure figure = Figure::None; // 2 bits
 };
 
 struct Coord {
-    char x, y;
+    constexpr Coord() : v(-1) {}
+    constexpr Coord(int x, int y) : v((x >= 0 && y >= 0 && x < 5 && y < 5) ? y * 5 + x : -1) {}
+
+    Coord(const Coord& e) : v(e.v) {}
+    Coord(Coord&& e) : v(e.v) {}
+
+    void operator=(const Coord& e) { v = e.v; }
+    void operator=(Coord&& e) { v = e.v; }
+
+    char v;
+    int x() const { return v % 5; }
+    int y() const { return v / 5; }
 };
 
-bool operator==(Coord a, Coord b) { return a.x == b.x && a.y == b.y; }
+bool operator==(Coord a, Coord b) { return a.v == b.v; }
 bool operator!=(Coord a, Coord b) { return !(a == b); }
-bool Nearby(Coord src, Coord dest) { return abs(src.x - dest.x) <= 1 && abs(src.y - dest.y) <= 1; }
-bool IsValid(Coord a) { return a.x >= 0 && a.x < 5 && a.y >= 0 && a.y < 5; }
+
+bool IsValid(Coord a) { return a.v != -1; }
+
+constexpr bool Nearby(Coord src, Coord dest) {
+    int x = src.v % 5 - dest.v % 5;
+    int y = src.v / 5 - dest.v / 5;
+    return -1 <= x && x <= 1 && -1 <= y && y <= 1;
+}
+
+static_assert(Nearby({1, 1}, {2, 2}));
+static_assert(Nearby({2, 1}, {1, 2}));
+
+vector<Coord> All() {
+    vector<Coord> out;
+    out.reserve(25);
+    for (int x = 0; x < 5; x++)
+        for (int y = 0; y < 5; y++) out.emplace_back(x, y);
+    return out;
+}
+
+const vector<Coord> kAll = All();
 
 struct Board {
     bool setup = true;
@@ -43,10 +75,10 @@ struct Board {
     optional<Coord> moved;
     bool built = false;
 
-    std::array<std::array<Cell, 5>, 5> cell;
+    std::array<Cell, 25> cell;
 
-    const Cell& operator()(Coord c) const { return cell[c.x][c.y]; }
-    Cell& operator()(Coord c) { return cell[c.x][c.y]; }
+    const Cell& operator()(Coord c) const { return cell[c.v]; }
+    Cell& operator()(Coord c) { return cell[c.v]; }
 };
 
 // Network input description:
@@ -66,18 +98,6 @@ struct Board {
 // 0..1 - value function
 
 Board g_board;
-
-Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
-
-vector<Coord> All() {
-    vector<Coord> out;
-    out.reserve(25);
-    for (int x = 0; x < 5; x++)
-        for (int y = 0; y < 5; y++) out.push_back({x, y});
-    return out;
-}
-
-const vector<Coord> kAll = All();
 
 template <typename Fn>
 int Count(const Board& board, const Fn& fn) {
@@ -179,9 +199,9 @@ optional<string_view> Execute(Board& board, const Action& action) {
 
 void Print(const Action& action) {
     std::visit(overloaded{[&](NextAction a) { print("next"); },
-                          [&](PlaceAction a) { print("place:%s%s", a.dest.x, a.dest.y); },
-                          [&](MoveAction a) { print("move:%s%s:%s%s", a.src.x, a.src.y, a.dest.x, a.dest.y); },
-                          [&](BuildAction a) { print("build:%s%s:%s", a.dest.x, a.dest.y, a.dome ? 'D' : 'T'); }},
+                          [&](PlaceAction a) { print("place:%s%s", a.dest.x(), a.dest.y()); },
+                          [&](MoveAction a) { print("move:%s%s:%s%s", a.src.x(), a.src.y(), a.dest.x(), a.dest.y()); },
+                          [&](BuildAction a) { print("build:%s%s:%s", a.dest.x(), a.dest.y(), a.dome ? 'D' : 'T'); }},
                action);
 }
 
@@ -219,7 +239,7 @@ Figure Winner(const Board& board) {
 // ==================
 
 std::random_device rd;
-std::mt19937 g_random(rd());
+thread_local std::mt19937 g_random(rd());
 
 int RandomInt(int count) { return std::uniform_int_distribution<int>(0, count - 1)(g_random); }
 
@@ -726,9 +746,10 @@ void Render(const Board& board, View& view) {
             const double s = 160;
             const double px = 100 + x * s + s / 2;
             const double py = 100 + y * s + s / 2;
-            const auto cell = board.cell[x][y];
+            const Coord c(x, y);
+            const auto cell = board(c);
 
-            if (g_selected && x == g_selected->x && y == g_selected->y) {
+            if (g_selected && c == *g_selected) {
                 double a = 80;
                 const uint64_t color = 0xFF00FFFF;
                 view.add({px - a, py - a}, color);
