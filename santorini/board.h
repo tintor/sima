@@ -47,6 +47,9 @@ size_t Hash(const Board& a) {
     return h.seed;
 }
 
+template<typename Fn>
+int Count(const Board& board, const Fn& fn) { return CountIf(kAll, L(fn(board(e)))); }
+
 // Network input description:
 // Board:
 // 0/1 - setup

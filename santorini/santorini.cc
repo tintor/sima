@@ -26,16 +26,6 @@ void Check(bool value, string_view message = "", const char* file = __builtin_FI
 
 Board g_board;
 
-template <typename Fn>
-int Count(const Board& board, const Fn& fn) {
-    int c = 0;
-    for (Coord e : kAll)
-        if (fn(board(e))) c += 1;
-    return c;
-}
-
-#define L(A) [&](const auto& e) { return A; }
-
 struct NextAction {};
 struct PlaceAction {
     Coord dest;

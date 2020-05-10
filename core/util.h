@@ -154,6 +154,16 @@ Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accum
     return acc;
 }
 
+template<typename Iterable, typename UnaryPredicate>
+size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
+    size_t count = 0;
+    for (const auto& e : iterable)
+        if (predicate(e)) count += 1;
+    return count;
+}
+
+#define L(A) [&](const auto& e) { return A; }
+
 template <typename T, typename P>
 size_t IndexOfMax(cspan<T> s, P measure) {
     auto mv = measure(s[0]);
