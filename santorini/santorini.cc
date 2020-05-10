@@ -99,13 +99,6 @@ optional<string_view> Build(Board& board, Coord dest, bool dome) {
     return nullopt;
 }
 
-template <class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
-
 optional<string_view> Execute(Board& board, const Action& action) {
     return std::visit(
         overloaded{[&](NextAction a) { return Next(board); }, [&](PlaceAction a) { return Place(board, a.dest); },

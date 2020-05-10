@@ -15,7 +15,9 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <variant>
 
+using std::variant;
 using std::complex;
 using std::pair;
 using std::regex;
@@ -71,6 +73,14 @@ template <typename T, typename M>
 void operator<<(vector<T>& v, span<M> e) {
     v.insert(v.end(), e.begin(), e.end());
 }
+
+// for std::visit and std::variant
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 
 constexpr double PI = M_PI;
 constexpr double INF = numeric_limits<double>::infinity();
