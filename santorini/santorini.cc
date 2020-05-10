@@ -24,6 +24,11 @@ struct Coord {
     int x, y;
 };
 
+bool operator==(Coord a, Coord b) { return a.x == b.x && a.y == b.y; }
+bool operator!=(Coord a, Coord b) { return !(a == b); }
+bool Nearby(Coord src, Coord dest) { return abs(src.x - dest.x) <= 1 && abs(src.y - dest.y) <= 1; }
+bool IsValid(Coord a) { return a.x >= 0 && a.x < 5 && a.y >= 0 && a.y < 5; }
+
 struct Board {
     bool setup = true;
     Figure player = Figure::Player1;
@@ -85,30 +90,28 @@ optional<string_view> Next(Board& board) {
     board.player = Other(board.player);
     board.moved = std::nullopt;
     board.built = false;
-    if (board.setup) {
-        if (Count(board, L(e.figure != Figure::None)) == 4) board.setup = false;
-    }
+    if (board.setup && Count(board, L(e.figure != Figure::None)) == 4) board.setup = false;
     return nullopt;
 }
 
 optional<string_view> Place(Board& board, Coord dest) {
-    if (!board.setup) return "can't place after setup is complete"sv;
-    if (board(dest).figure != Figure::None) return "occupied"sv;
-    if (Count(board, L(e.figure == board.player)) == 2) return "can't place anymore"sv;
+    if (!IsValid(dest)) return "invalid coord";
+    if (!board.setup) return "can't place after setup is complete";
+    if (board(dest).figure != Figure::None) return "occupied";
+    if (Count(board, L(e.figure == board.player)) == 2) return "can't place anymore";
 
     board(dest).figure = board.player;
     return nullopt;
 }
 
-bool Nearby(Coord src, Coord dest) { return abs(src.x - dest.x) <= 1 && abs(src.y - dest.y) <= 1; }
-
 optional<string_view> Move(Board& board, Coord src, Coord dest) {
-    if (board.setup) return "can't move during setup"sv;
-    if (board.moved) return "moved already"sv;
-    if (board(src).figure != board.player) return "player doesn't have figure at src"sv;
+    if (!IsValid(src) || !IsValid(dest)) return "invalid coord";
+    if (board.setup) return "can't move during setup";
+    if (board.moved) return "moved already";
+    if (board(src).figure != board.player) return "player doesn't have figure at src";
     if (board(dest).figure != Figure::None) return "dest isn't empty";
-    if (!Nearby(src, dest)) return "src and dest aren't nearby"sv;
-    if (board(dest).level - board(src).level > 1) return "dest is too high"sv;
+    if (!Nearby(src, dest)) return "src and dest aren't nearby";
+    if (board(dest).level - board(src).level > 1) return "dest is too high";
 
     board(dest).figure = board.player;
     board(src).figure = Figure::None;
@@ -117,12 +120,14 @@ optional<string_view> Move(Board& board, Coord src, Coord dest) {
 }
 
 optional<string_view> Build(Board& board, Coord dest, bool dome) {
-    if (board.setup) return "can't build during setup"sv;
-    if (!board.moved) return "need to move"sv;
-    if (board(dest).figure != Figure::None) return "can only build on empty space"sv;
-    if (dome && board(dest).level != 3) return "dome can only be built on level 3"sv;
-    if (!dome && board(dest).level == 3) return "floor can only be built on levels 0, 1 and 2"sv;
-    if (!Nearby(*board.moved, dest)) return "can only build near moved figure"sv;
+    if (!IsValid(dest)) return "invalid coord";
+    if (board.setup) return "can't build during setup";
+    if (!board.moved) return "need to move";
+    if (board.built) return "already built";
+    if (board(dest).figure != Figure::None) return "can only build on empty space";
+    if (dome && board(dest).level != 3) return "dome can only be built on level 3";
+    if (!dome && board(dest).level == 3) return "floor can only be built on levels 0, 1 and 2";
+    if (!Nearby(*board.moved, dest)) return "can only build near moved figure";
 
     if (dome) {
         board(dest).figure = Figure::Dome;
@@ -140,12 +145,20 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 
-optional<string_view> Execute(Board& board, Action action) {
+optional<string_view> Execute(Board& board, const Action& action) {
     return std::visit(
         overloaded{[&](NextAction a) { return Next(board); }, [&](PlaceAction a) { return Place(board, a.dest); },
                    [&](MoveAction a) { return Move(board, a.src, a.dest); },
                    [&](BuildAction a) { return Build(board, a.dest, a.dome); }},
         action);
+}
+
+void Print(const Action& action) {
+    std::visit(overloaded{[&](NextAction a) { print("next"); },
+                          [&](PlaceAction a) { print("place:%s%s", a.dest.x, a.dest.y); },
+                          [&](MoveAction a) { print("move:%s%s:%s%s", a.src.x, a.src.y, a.dest.x, a.dest.y); },
+                          [&](BuildAction a) { print("build:%s%s:%s", a.dest.x, a.dest.y, a.dome ? 'D' : 'T'); }},
+               action);
 }
 
 bool IsMoveBlocked(const Board& board) {
@@ -191,8 +204,8 @@ Coord RandomCoord() {
     return Coord{dis(g_random), dis(g_random)};
 }
 
-std::vector<Coord> MyFigures(const Board& board) {
-    std::vector<Coord> out;
+vector<Coord> MyFigures(const Board& board) {
+    vector<Coord> out;
     for (Coord e : kAll)
         if (board(e).figure == board.player) out.push_back(e);
     return out;
@@ -208,12 +221,14 @@ Coord MyRandomFigure(const Board& board) {
 }
 
 Action RandomAction(const Board& board) {
-    if (board.setup) switch (RandomInt(2)) {
+    if (board.setup) {
+        switch (RandomInt(2)) {
             case 0:
                 return NextAction{};
             case 1:
                 return PlaceAction{.dest = RandomCoord()};
         }
+    }
 
     switch (RandomInt(3)) {
         case 0:
@@ -226,17 +241,84 @@ Action RandomAction(const Board& board) {
     throw std::runtime_error("unreachable");
 }
 
-std::vector<Action> RandomPlayer(const Board& board) {
-    std::vector<Action> actions;
+bool IsValid(const Board& board, const Action& action) {
     Board my_board = board;
-    while (true) {
-        Action action = RandomAction(my_board);
-        if (Execute(my_board, action) == nullopt) {
-            actions.push_back(action);
-            if (std::holds_alternative<NextAction>(action) || Winner(my_board) != Figure::None) break;
+    return Execute(my_board, action) == nullopt;
+}
+
+template <typename Visitor>
+bool Visit(const Board& board, const Action& action, const Visitor& visit) {
+    Board my_board = board;
+    if (Execute(my_board, action) != nullopt) return true;
+    return visit(my_board, action);
+}
+
+#define VISIT(A) \
+    if (!Visit(board, A, visit)) return false;
+
+template <typename Visitor>
+bool AllValidActions(const Board& board, const Visitor& visit) {
+    VISIT(NextAction{});
+    if (board.setup) {
+        for (Coord e : kAll) VISIT(PlaceAction{e});
+        return true;
+    }
+    for (Coord e : kAll) {
+        if (board(e).figure == board.player) {
+            for (Coord d : kAll)
+                if (d != e) VISIT((MoveAction{e, d}));
         }
     }
-    return actions;
+    for (bool dome : {false, true})
+        for (Coord e : kAll) VISIT((BuildAction{e, dome}));
+    return true;
+}
+
+template <typename Visitor>
+bool AllValidActionSequences(const Board& board, vector<Action>& temp, const Visitor& visit) {
+    return AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        temp.push_back(action);
+        auto winner = Winner(new_board);
+        if (std::holds_alternative<NextAction>(action) || winner != Figure::None) {
+            if (!visit(temp, winner)) return false;
+        } else {
+            if (!AllValidActionSequences(new_board, temp, visit)) return false;
+        }
+        temp.pop_back();
+        return true;
+    });
+}
+
+void Print(const vector<Action>& actions) {
+    for (const Action& action : actions) {
+        Print(action);
+        print(" ");
+    }
+    print("\n");
+}
+
+Action AutoGreedy(const Board& board) {
+    vector<Action> temp;
+    Action choice;
+    size_t count = 0;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, Figure winner) {
+        Print(actions);
+        if (winner == board.player) {
+            choice = actions[0];
+            return false;
+        }
+        if (winner == Figure::None && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        return true;
+    });
+    return choice;
+}
+
+Action AutoRandom(const Board& board) {
+    while (true) {
+        Action action = RandomAction(board);
+        if (IsValid(board, action)) return action;
+    }
 }
 
 // Human interface
@@ -244,7 +326,7 @@ std::vector<Action> RandomPlayer(const Board& board) {
 
 constexpr int Width = 1000, Height = 1000;
 
-std::vector<Board> g_history;
+vector<Board> g_history;
 Board g_board_copy;
 optional<Coord> g_selected;
 
@@ -278,14 +360,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             g_history.pop_back();
         }
     }
-    if (action == GLFW_PRESS && key == GLFW_KEY_SPACE) {
+    if (action == GLFW_PRESS && key == GLFW_KEY_1) {
         g_board_copy = g_board;
-        while (true) {
-            Action action = RandomAction(g_board);
-            auto status = Execute(g_board, action);
-            Play(status);
-            if (status == nullopt) break;
-        }
+        Action action = AutoRandom(g_board);
+        Play(Execute(g_board, action));
+    }
+    if (action == GLFW_PRESS && key == GLFW_KEY_2) {
+        g_board_copy = g_board;
+        print("auto greedy begin\n");
+        Action action = AutoGreedy(g_board);
+        print("auto greedy end\n");
+        Play(Execute(g_board, action));
     }
 }
 
