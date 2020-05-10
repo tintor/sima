@@ -3,6 +3,8 @@
 #include <core/hash.h>
 #include <core/thread.h>
 #include <core/util.h>
+#include <santorini/action.h>
+#include <santorini/board.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -11,9 +13,6 @@
 
 #include <random>
 #include <variant>
-
-#include <santorini/action.h>
-#include <santorini/board.h>
 
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
            unsigned line = __builtin_LINE()) {
@@ -91,6 +90,7 @@ optional<string_view> CanBuild(const Board& board, Coord dest, bool dome) {
     if (!Nearby(*board.moved, dest)) return "can only build near moved figure";
     return nullopt;
 }
+
 optional<string_view> Build(Board& board, Coord dest, bool dome) {
     auto s = CanBuild(board, dest, dome);
     if (s != nullopt) return s;
@@ -159,7 +159,7 @@ struct ReservoirSampler {
 
     ReservoirSampler() : dis(0.0, 1.0) {}
 
-    template<typename Random>
+    template <typename Random>
     bool operator()(Random& random) {
         return dis(random) * ++count <= 1.0;
     }

@@ -1,5 +1,6 @@
 #pragma once
 #include <core/std.h>
+
 #include <random>
 
 struct Coord {
