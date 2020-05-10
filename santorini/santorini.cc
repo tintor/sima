@@ -11,6 +11,9 @@
 #include <random>
 #include <variant>
 
+#include <santorini/cell.h>
+#include <santorini/coord.h>
+
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
            unsigned line = __builtin_LINE()) {
     if (value) return;
@@ -20,54 +23,6 @@ void Check(bool value, string_view message = "", const char* file = __builtin_FI
 
 // Board and judge
 // ===============
-
-enum class Figure : char { None, Dome, Player1, Player2 };
-
-Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
-
-struct Cell {
-    char level = 0; // 2 bits
-    Figure figure = Figure::None; // 2 bits
-};
-
-struct Coord {
-    constexpr Coord() : v(-1) {}
-    constexpr Coord(int x, int y) : v((x >= 0 && y >= 0 && x < 5 && y < 5) ? y * 5 + x : -1) {}
-
-    Coord(const Coord& e) : v(e.v) {}
-    Coord(Coord&& e) : v(e.v) {}
-
-    void operator=(const Coord& e) { v = e.v; }
-    void operator=(Coord&& e) { v = e.v; }
-
-    char v;
-    int x() const { return v % 5; }
-    int y() const { return v / 5; }
-};
-
-bool operator==(Coord a, Coord b) { return a.v == b.v; }
-bool operator!=(Coord a, Coord b) { return !(a == b); }
-
-bool IsValid(Coord a) { return a.v != -1; }
-
-constexpr bool Nearby(Coord src, Coord dest) {
-    int x = src.v % 5 - dest.v % 5;
-    int y = src.v / 5 - dest.v / 5;
-    return -1 <= x && x <= 1 && -1 <= y && y <= 1;
-}
-
-static_assert(Nearby({1, 1}, {2, 2}));
-static_assert(Nearby({2, 1}, {1, 2}));
-
-vector<Coord> All() {
-    vector<Coord> out;
-    out.reserve(25);
-    for (int x = 0; x < 5; x++)
-        for (int y = 0; y < 5; y++) out.emplace_back(x, y);
-    return out;
-}
-
-const vector<Coord> kAll = All();
 
 struct Board {
     bool setup = true;
@@ -80,6 +35,14 @@ struct Board {
     const Cell& operator()(Coord c) const { return cell[c.v]; }
     Cell& operator()(Coord c) { return cell[c.v]; }
 };
+
+bool RawEqual(const Board& a, const Board& b) {
+    return a.setup == b.setup && a.player == b.player && a.moved == b.moved && a.built == b.built && a.cell == b.cell;
+}
+
+size_t RawHash(const Board& a) {
+    return 0;
+}
 
 // Network input description:
 // Board:
@@ -578,8 +541,6 @@ constexpr int Width = 1000, Height = 1000;
 vector<Board> g_history;
 Board g_board_copy;
 optional<Coord> g_selected;
-
-string_view PlayerName(Figure player) { return (player == Figure::Player1) ? "yellow"sv : "red"sv; }
 
 bool IsEndOfTurn(const Board& board) {
     bool next = false;
