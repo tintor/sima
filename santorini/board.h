@@ -1,9 +1,10 @@
 #pragma once
-#include <fstream>
 #include <core/hash.h>
 #include <core/std.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
+
+#include <fstream>
 
 using Cells = array<Cell, 25>;
 
@@ -62,11 +63,11 @@ size_t Hash(const Board& a) {
 }
 
 namespace std {
-    template<>
-    struct hash<Board> {
-        size_t operator()(const Board& b) const { return Hash(b); }
-    };
-}
+template <>
+struct hash<Board> {
+    size_t operator()(const Board& b) const { return Hash(b); }
+};
+}  // namespace std
 
 template <typename Fn>
 int Count(const Board& board, const Fn& fn) {
@@ -104,22 +105,20 @@ ostream& operator<<(ostream& os, Cell cell) {
 
 ostream& operator<<(ostream& os, const Board& board) {
     os << Bit(board.setup);
-    for (Coord e : kAll)
-        os << Bit(board.moved && *board.moved == e);
+    for (Coord e : kAll) os << Bit(board.moved && *board.moved == e);
     os << Bit(board.built);
     os << Bit(board.player == Figure::Player1);
-    for (Coord e : kAll)
-        os << board(e);
+    for (Coord e : kAll) os << board(e);
     return os;
 }
 
 class Values {
-private:
+   private:
     struct Wins {
         uint32_t player1, player2;
     };
 
-public:
+   public:
     size_t Size() const { return m_data.size(); }
 
     void Add(const Board& board, uint32_t wins1, uint32_t wins2) {
@@ -148,6 +147,6 @@ public:
         }
     }
 
-private:
+   private:
     unordered_map<Board, Wins> m_data;
 };
