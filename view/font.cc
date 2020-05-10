@@ -57,7 +57,7 @@ FontRenderer::FontRenderer(double width, double height)
     glBindVertexArray(0);
 }
 
-Font::Font(string_view name, int resolution, FontRenderer *renderer) {
+Font::Font(string_view name, int resolution, FontRenderer *renderer) : m_color("FFFFFF") {
     m_renderer = renderer;
 
     FT_Library ft;

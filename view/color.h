@@ -10,5 +10,5 @@ constexpr float HexFloat(const char hex[2]) {
 
 struct Color {
     constexpr Color(const char code[6]) : r(HexFloat(code)), g(HexFloat(code + 2)), b(HexFloat(code + 4)) {}
-    const float r, g, b;
+    float r, g, b;
 };

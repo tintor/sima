@@ -44,6 +44,13 @@ class Font {
         render(text, scale, color);
     }
 
+    double m_scale;
+    Color m_color;
+
+    void render(string_view text) {
+        render(text, m_scale, m_color);
+    }
+
    private:
     FontRenderer* m_renderer = nullptr;
     int m_max_size_y = 0;
