@@ -315,8 +315,17 @@ Action AutoClimber(const Board& board) {
 }
 
 size_t Rollout(Figure player, Board board) {
+    auto& random = g_random;
     while (true) {
-        if (Execute(board, RandomAction(board)) != nullopt) continue;
+        // Select action uniformly out of all possible actions!
+        Action random_action;
+        ReservoirSampler sampler;
+        AllValidActions(board, [&](const Board& new_board, const Action& action) {
+            if (sampler(random)) random_action = action;
+            return true;
+        });
+
+        Check(Execute(board, random_action) == nullopt);
         auto w = Winner(board);
         if (w != Figure::None) return (w == player) ? 1 : 0;
     }
