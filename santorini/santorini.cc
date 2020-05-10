@@ -10,6 +10,13 @@
 #include <random>
 #include <variant>
 
+void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
+           unsigned line = __builtin_LINE()) {
+    if (value) return;
+    print("Check failed at %s:%s with message: %s\n", file, line, message);
+    exit(0);
+}
+
 // Board and judge
 // ===============
 
@@ -40,6 +47,22 @@ struct Board {
     const Cell& operator()(Coord c) const { return cell[c.x][c.y]; }
     Cell& operator()(Coord c) { return cell[c.x][c.y]; }
 };
+
+// Network input description:
+// Board:
+// 0/1 - setup
+// 0/1 - moved
+// 0/1 - built
+// 0/1 - player
+// 25x - cell
+// Cell:
+// 0/3 - level
+// 0/1 - dome
+// 0/1 - player1
+// 0/1 - player2
+
+// Output:
+// 0..1 - value function
 
 Board g_board;
 
@@ -319,7 +342,7 @@ Action AutoGreedy(const Board& board) {
         if (winner == Figure::None && dis(g_random) <= 1.0 / ++count) choice = actions[0];
         return true;
     });
-    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
+    Check(count > 0);
     return choice;
 }
 
@@ -359,46 +382,145 @@ Action AutoClimber(const Board& board) {
         }
         return true;
     });
-    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
+    Check(count > 0);
     return choice;
 }
 
-double MCTSRank(Figure player, Board board) {
+size_t Rollout(Figure player, Board board) {
     while (true) {
         if (Execute(board, RandomAction(board)) != nullopt) continue;
-
         auto w = Winner(board);
-        if (w != Figure::None) return (w == player) ? 1 : -1;
+        if (w != Figure::None) return (w == player) ? 1 : 0;
     }
 }
 
-Action AutoMCTS(const Board& board) {
-    vector<Action> temp;
-    Action choice;
-    size_t count = 0;
-    double best_rank = -1e100;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
-    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
-        // Print(actions);
-        if (winner == board.player) {
-            choice = actions[0];
-            best_rank = 1e100;
-            count = 1;
-            return false;
-        }
-        if (winner != Figure::None) return true;
+struct Node {
+    Action action;
+    Board board;  // board state post-action
+    Figure winner;
+    size_t w = 0;  // number of wins
+    size_t n = 0;  // total number of rollouts (w/n is win ratio)
+    vector<std::unique_ptr<Node>> children;
+};
 
-        double rank = MCTSRank(board.player, new_board);
-        if (rank == best_rank && dis(g_random) <= 1.0 / ++count) choice = actions[0];
-        if (rank > best_rank) {
-            best_rank = rank;
-            choice = actions[0];
+size_t ChooseChild(size_t N, const vector<std::unique_ptr<Node>>& children) {
+    size_t best_i = 0;
+    double best_ucb1 = 0;
+    for (size_t i = 0; i < children.size(); i++) {
+        const auto& child = children[i];
+        double ucb1 = (child->n == 0) ? std::numeric_limits<double>::infinity()
+                                      : (child->w / child->n + 2 * sqrt(log(N) / child->n));
+        if (ucb1 > best_ucb1) {
+            best_ucb1 = ucb1;
+            best_i = i;
+        }
+    }
+    return best_i;
+}
+
+void Expand(const Board& board, vector<std::unique_ptr<Node>>& out) {
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        auto node = std::make_unique<Node>();
+        node->action = action;
+        node->board = new_board;
+        node->winner = Winner(new_board);
+        out.push_back(std::move(node));
+        return true;
+    });
+}
+
+size_t MCTS_Iteration(size_t N, Figure player, std::unique_ptr<Node>& node) {
+    if (node->winner != Figure::None) {
+        size_t e = (player == node->winner) ? 1 : 0;
+        node->w += e;
+        node->n += 1;
+        return e;
+    }
+
+    if (node->children.size() > 0) {
+        size_t i = ChooseChild(N, node->children);
+        size_t e = MCTS_Iteration(N, player, node->children[i]);
+        node->w += e;
+        node->n += 1;
+        return e;
+    }
+
+    if (node->n == 0) {
+        size_t e = Rollout(player, node->board);
+        node->w += e;
+        node->n += 1;
+        return e;
+    }
+
+    Expand(node->board, node->children);
+    Check(node->children.size() > 0);
+
+    auto& child = node->children[RandomInt(node->children.size())];
+    size_t e = MCTS_Iteration(N, player, child);
+    node->w += e;
+    node->n += 1;
+    return e;
+}
+
+Action AutoMCTS(const Board& board, size_t iterations) {
+    vector<std::unique_ptr<Node>> children;
+    Expand(board, children);
+    if (children.size() == 1) return children[0]->action;
+
+    for (size_t i = 0; i < iterations; i++) {
+        size_t ci = ChooseChild(i, children);
+        MCTS_Iteration(i, board.player, children[ci]);
+    }
+
+    double best_v = 0;
+    size_t best_i = 0;
+    for (size_t i = 0; i < children.size(); i++) {
+        double v = double(children[i]->w) / children[i]->n;
+        if (v > best_v) {
+            best_v = v;
+            best_i = i;
+        }
+    }
+    return children[best_i]->action;
+}
+
+double MiniMax(Figure player, const Board& board, int depth) {
+    if (depth == 0) return ClimbRank(player, board);
+
+    double best_m = (board.player == player) ? -1e100 : 1e100;
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        double m = MiniMax(player, new_board, depth - 1);
+        if (board.player == player && m > best_m) best_m = m;
+        if (board.player != player && m < best_m) best_m = m;
+        return true;
+    });
+    return best_m;
+}
+
+Action AutoMiniMax(const Board& board, const int depth) {
+    Action best_action;
+    size_t count = 0;
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        best_action = action;
+        count += 1;
+        return count < 2;
+    });
+    if (count == 1) return best_action;
+
+    double best_score = -1e100;
+    count = 0;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        double m = MiniMax(board.player, new_board, depth);
+        if (m == best_score && dis(g_random) <= 1.0 / ++count) best_action = action;
+        if (m > best_score) {
             count = 1;
+            best_action = action;
+            best_score = m;
         }
         return true;
     });
-    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
-    return choice;
+    return best_action;
 }
 
 // Human interface
@@ -412,16 +534,41 @@ optional<Coord> g_selected;
 
 string_view PlayerName(Figure player) { return (player == Figure::Player1) ? "yellow"sv : "red"sv; }
 
+bool IsEndOfTurn(const Board& board) {
+    bool next = false;
+    bool other = false;
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        if (std::holds_alternative<NextAction>(action))
+            next = true;
+        else
+            other = true;
+        return !other;
+    });
+    return next && !other;
+}
+
 void Play(optional<string_view> status) {
     if (status) {
         print("%s\n", *status);
-    } else {
-        g_history.push_back(g_board_copy);
-        g_selected = nullopt;
-        auto w = Winner(g_board);
-        if (w != Figure::None) {
-            print("Player %s wins!\n", PlayerName(w));
-        }
+        return;
+    }
+
+    g_history.push_back(g_board_copy);
+    g_selected = nullopt;
+    auto w = Winner(g_board);
+    if (w != Figure::None) {
+        print("Player %s wins!\n", PlayerName(w));
+        return;
+    }
+
+    if (!IsEndOfTurn(g_board)) return;
+
+    g_history.push_back(g_board);
+    Check(Next(g_board) == nullopt);
+    w = Winner(g_board);
+    if (w != Figure::None) {
+        print("Player %s wins!\n", PlayerName(w));
+        return;
     }
 }
 
@@ -430,7 +577,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
         return;
     }
-    if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) {
+    if (action == GLFW_PRESS && key == GLFW_KEY_SPACE) {
         g_board_copy = g_board;
         Play(Next(g_board));
     }
@@ -447,9 +594,22 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_2) {
         g_board_copy = g_board;
-        print("auto greedy begin\n");
         Action action = AutoGreedy(g_board);
-        print("auto greedy end\n");
+        Play(Execute(g_board, action));
+    }
+    if (action == GLFW_PRESS && key == GLFW_KEY_3) {
+        g_board_copy = g_board;
+        Action action = AutoClimber(g_board);
+        Play(Execute(g_board, action));
+    }
+    if (action == GLFW_PRESS && key == GLFW_KEY_4) {
+        g_board_copy = g_board;
+        Action action = AutoMCTS(g_board, 10000);
+        Play(Execute(g_board, action));
+    }
+    if (action == GLFW_PRESS && key == GLFW_KEY_5) {
+        g_board_copy = g_board;
+        Action action = AutoMiniMax(g_board, 12);
         Play(Execute(g_board, action));
     }
 }
@@ -621,7 +781,7 @@ void Render(const Board& board, View& view) {
 // move worker - left click
 // build tower - right click
 // build dome - shift + right click
-// Enter - done
+// Space - next player
 
 using Policy = std::function<Action(const Board&)>;
 
@@ -639,33 +799,54 @@ Figure Battle(const Policy& policy_a, const Policy& policy_b) {
     }
 }
 
-const std::unordered_map<string_view, Policy> g_policies = {{"random", AutoRandom}, {"greedy", AutoGreedy}, {"climber", AutoClimber}, {"mcts", AutoMCTS}};
+const std::unordered_map<string_view, Policy> g_policies = {
+    {"greedy", AutoGreedy},
+    {"climber", AutoClimber},
+    {"mcts100", [](const auto& e) { return AutoMCTS(e, 100); }},
+    {"mcts200", [](const auto& e) { return AutoMCTS(e, 200); }},
+    {"mcts400", [](const auto& e) { return AutoMCTS(e, 400); }},
+    {"minimax6", [](const auto& e) { return AutoMiniMax(e, 6); }},
+    {"minimax9", [](const auto& e) { return AutoMiniMax(e, 9); }}};
 
 void AutoBattle(int count, string_view name_a, string_view name_b) {
     const Policy& policy_a = g_policies.at(name_a);
     const Policy& policy_b = g_policies.at(name_b);
 
     int wins_a = 0;
-    for (int i = 0; i < count; i++)
-        if (Battle(policy_a, policy_b) == Figure::Player1) wins_a += 1;
-    print("%s %s : %s %s\n", name_a, wins_a, count - wins_a, name_b);
+    for (int i = 0; i < count; i++) {
+        if (Battle(policy_a, policy_b) == Figure::Player1) {
+            wins_a += 1;
+            print("a");
+        } else
+            print("b");
+        cout.flush();
+    }
+    print("\r%s %s : %s %s   \n", name_a, wins_a, count - wins_a, name_b);
 
     int wins_b = 0;
-    for (int i = 0; i < count; i++)
-        if (Battle(policy_b, policy_a) == Figure::Player1) wins_b += 1;
-    print("%s %s : %s %s\n", name_b, wins_b, count - wins_b, name_a);
+    for (int i = 0; i < count; i++) {
+        if (Battle(policy_b, policy_a) == Figure::Player1) {
+            wins_b += 1;
+            print("b");
+        } else
+            print("a");
+        cout.flush();
+    }
+    print("\r%s %s : %s %s   \n", name_b, wins_b, count - wins_b, name_a);
 }
 
 int main(int argc, char** argv) {
     InitSegvHandler();
-    AutoBattle(100, "random", "greedy");
-    AutoBattle(100, "random", "climber");
-    AutoBattle(100, "greedy", "climber");
 
-    AutoBattle(100, "random", "mcts");
-    AutoBattle(100, "greedy", "mcts");
-    AutoBattle(100, "climber", "mcts");
-    return 0;
+    if (argc > 1) {
+        AutoBattle(100, "minimax6", "minimax9");
+        AutoBattle(100, "climber", "minimax9");
+        AutoBattle(100, "climber", "minimax6");
+        AutoBattle(100, "climber", "mcts100");
+        AutoBattle(100, "climber", "mcts200");
+        AutoBattle(100, "climber", "mcts400");
+        return 0;
+    }
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
