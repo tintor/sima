@@ -1,5 +1,6 @@
 #include <core/callstack.h>
 #include <core/format.h>
+#include <core/hash.h>
 #include <core/util.h>
 #include <core/thread.h>
 #include <view/font.h>
@@ -30,18 +31,40 @@ struct Board {
     optional<Coord> moved;
     bool built = false;
 
-    std::array<Cell, 25> cell;
+    array<Cell, 25> cell;
 
     const Cell& operator()(Coord c) const { return cell[c.v]; }
     Cell& operator()(Coord c) { return cell[c.v]; }
 };
 
-bool RawEqual(const Board& a, const Board& b) {
-    return a.setup == b.setup && a.player == b.player && a.moved == b.moved && a.built == b.built && a.cell == b.cell;
+// Symmetrical boards are equal!
+bool Equal(const Board& a, const Board& b) {
+    if (a.setup != b.setup || a.player != b.player || a.moved != b.moved || a.built != b.built) return false;
+    for (int t = 0; t < 8; t++) {
+        if (All(kAll, [&](Coord e) { return a.cell[e.v] == b.cell[Transform(e, t).v]; }))
+            return true;
+    }
+    return false;
 }
 
-size_t RawHash(const Board& a) {
-    return 0;
+size_t Hash(const array<Cell, 25>& cell, int transform) {
+    hash h;
+    for (Coord e : kAll)
+        h << Hash(cell[Transform(e, transform).v]);
+    return h.seed;
+}
+
+// Symmetrical boards will have the same hash!
+size_t Hash(const Board& a) {
+    hash h;
+    h << a.setup << int(a.player) << a.moved.has_value();
+    if (a.moved.has_value()) h << a.moved->v;
+    h << a.built;
+
+    size_t m = 0;
+    for (int t = 0; t < 8; t++) m ^= Hash(a.cell, t);
+    h << m;
+    return h.seed;
 }
 
 // Network input description:

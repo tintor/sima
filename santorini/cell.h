@@ -10,6 +10,8 @@ struct Cell {
 
 inline bool operator==(Cell a, Cell b) { return a.level == b.level && a.figure == b.figure; }
 
+inline size_t Hash(Cell a) { return int(a.figure) + (a.level << 2); }
+
 inline Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
 
 inline string_view PlayerName(Figure player) { return (player == Figure::Player1) ? "yellow" : "red"; }
