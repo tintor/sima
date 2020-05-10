@@ -79,31 +79,51 @@ class VertexBuffer_vec2_rgba {
 };
 
 class VertexBuffer_vec2 {
-   public:
+public:
+	struct Vertex {
+		vec2 pos;
+	};
+
+	vector<Vertex> data;
+
     VertexBuffer_vec2(uint count) {
-	glGenVertexArrays(1, &m_vao);
-	glGenBuffers(1, &m_vbo);
+		glGenVertexArrays(1, &m_vao);
+		glGenBuffers(1, &m_vbo);
 
-	glBindVertexArray(m_vao);
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vec2) * count, nullptr, GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vec2), 0);
-    }
+		glBindVertexArray(m_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vec2) * count, nullptr, GL_DYNAMIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vec2), 0);
+	}
 
-    void write(cspan<vec2> vertices) {
-	glBindVertexArray(m_vao);
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(vec2), vertices.data());
-    }
+	void write(cspan<vec2> vertices) {
+		glBindVertexArray(m_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(vec2), vertices.data());
+	}
 
-    void draw(uint type, cspan<vec2> vertices) {
-	write(vertices);
-	glDrawArrays(type, 0, vertices.size());
-    }
+	void draw(uint type, cspan<vec2> vertices) {
+		write(vertices);
+		glDrawArrays(type, 0, vertices.size());
+	}
 
-    void bind() { glBindVertexArray(m_vao); }
+    void add(vec2 pos) {
+		data.push_back(Vertex{pos});
+	}
 
-   private:
-    uint m_vbo, m_vao;
+	void draw(uint type) {
+		glBindVertexArray(m_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, data.size() * sizeof(Vertex), data.data());
+		glDrawArrays(type, 0, data.size());
+		data.clear();
+	}
+
+	void bind() {
+		glBindVertexArray(m_vao);
+	}
+
+private:
+	uint m_vbo, m_vao;
 };

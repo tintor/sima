@@ -350,9 +350,10 @@ int main(int argc, char** argv) {
 
     VertexBuffer_vec2 buffer(25);
 
-    Font timesNewRoman("Times New Roman");
-    Font arial("Arial");
-    Font monaco("/System/Library/Fonts/Monaco.dfont");
+    FontRenderer renderer(800, 600);
+    Font timesNewRoman("Times New Roman", 48, &renderer);
+    Font arial("Arial", 48, &renderer);
+    Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
 
     std::array<vec2, 25> v;
     for (int i = 0; i < v.size() - 1; i++) {

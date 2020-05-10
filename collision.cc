@@ -101,9 +101,10 @@ int main(int argc, char** argv) {
 
     VertexBuffer_double2 buffer(25);
 
-    Font timesNewRoman("Times New Roman");
-    Font arial("Arial");
-    Font monaco("/System/Library/Fonts/Monaco.dfont");
+    FontRenderer renderer(800, 600);
+	Font timesNewRoman("Times New Roman", 48, &renderer);
+	Font arial("Arial", 48, &renderer);
+	Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 

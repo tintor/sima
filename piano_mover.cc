@@ -284,7 +284,8 @@ int main(int argc, char** argv) {
 	)END");
     UNIFORM(mat3, transform);
 
-    Font monaco("/System/Library/Fonts/Monaco.dfont");
+    FontRenderer renderer(800, 600);
+	Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
 
     mat3 ortho;
     ortho[0][0] = 2.0f / Width;

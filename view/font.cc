@@ -11,19 +11,7 @@
 #include <core/format.h>
 #include <view/shader.h>
 
-constexpr int CharsPerBuffer = 100;
-
-struct Renderer {
-    uint VAO, VBO;
-    Shader shader;
-    int textColorLocation;
-    float vertices[6 * 4 * CharsPerBuffer];
-
-    Renderer();
-};
-
-Renderer::Renderer()
-    : shader(R"END(
+FontRenderer::FontRenderer(double width, double height) : shader(R"END(
 		#version 330 core
 		layout (location = 0) in vec4 vertex; // <vec2 pos, vec2 tex>
 		out vec2 TexCoords;
@@ -47,66 +35,29 @@ Renderer::Renderer()
 			color = vec4(textColor, 1.0) * sampled;
 		}
 	)END") {
-    glm::mat4 projection = glm::ortho(0.0, 800.0, 0.0, 600.0);
-    shader.use();
-    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-    textColorLocation = glGetUniformLocation(shader, "textColor");
+	glm::mat4 projection = glm::ortho(0.0, width, 0.0, height);
+	shader.use();
+	glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+	textColorLocation = glGetUniformLocation(shader, "textColor");
 
-    // Disable byte-alignment restriction
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	// Disable byte-alignment restriction
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    // Configure VAO/VBO for texture quads
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+	// Configure VAO/VBO for texture quads
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * CharsPerBuffer, nullptr, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * CharsPerBuffer, nullptr, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 }
 
-static Renderer* s_renderer = nullptr;
-
-Font::Font(string_view name, int resolution) {
-    if (s_renderer == nullptr) {
-	s_renderer = new Renderer();
-    }
-
-    FT_Library ft;
-    if (FT_Init_FreeType(&ft)) {
-	std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
-	exit(0);
-    }
-    ON_SCOPE_EXIT(FT_Done_FreeType(ft));
-
-    // Load font as face
-    // TODO do search in both: /System/Library/Fonts and /Library/Fonts with various extensions
-    const char* fmt = name.find('.') != string_view::npos ? "%s" : "/Library/Fonts/%s.ttf";
-    FT_Face face;
-    if (FT_New_Face(ft, format(fmt, name).c_str(), 0, &face)) {
-	std::cout << "ERROR::FREETYPE: Failed to load font: " << format(fmt, name) << std::endl;
-	exit(0);
-    }
-    ON_SCOPE_EXIT(FT_Done_Face(face));
-
-    // Set size to load glyphs as
-    FT_Set_Pixel_Sizes(face, 0, resolution);
-
-    ON_SCOPE_EXIT(glBindTexture(GL_TEXTURE_2D, 0));
-    glGenTextures(1, &m_texture);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    int texture_width = 1;
-    int texture_height = 0;
-
-    for (int c = 0; c < m_characters.size(); c++) {
-	// Load character glyph
-	if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
-	    printf("ERROR::FREETYTPE: Failed to load Glyph '%c' (%d)\n", c, c);
-	    exit(0);
-	}
+Font::Font(string_view name, int resolution, FontRenderer* renderer) {
+    m_renderer = renderer;
 
 	// TODO check if rendering will be faster if letters are placed vertically instead of
 	// horisontaly in the texture (to keep all texels for single char close)
@@ -174,21 +125,21 @@ Font::~Font() {
 }
 
 void Font::render(string_view text, double scale, Color color) {
-    s_renderer->shader.use();
-    glUniform3f(s_renderer->textColorLocation, color.r, color.g, color.b);
-    glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(s_renderer->VAO);
+	m_renderer->shader.use();
+	glUniform3f(m_renderer->textColorLocation, color.r, color.g, color.b);
+	glActiveTexture(GL_TEXTURE0);
+	glBindVertexArray(m_renderer->VAO);
 
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    glBindBuffer(GL_ARRAY_BUFFER, s_renderer->VBO);
+	glBindTexture(GL_TEXTURE_2D, m_texture);
+	glBindBuffer(GL_ARRAY_BUFFER, m_renderer->VBO);
 
-    int offset = 0;
-    for (char c : text) {
-	if (c == '\n') {
-	    m_x = m_left;
-	    m_y -= m_max_size_y * scale * 1.2;
-	    continue;
-	}
+	int offset = 0;
+	for (char c : text) {
+		if (c == '\n') {
+			m_x = m_left;
+			m_y -= m_max_size_y * scale * 1.2;
+			continue;
+		}
 
 	Character ch = m_characters[c];
 	if (ch.size_x == 0 || ch.size_y == 0) {
@@ -211,21 +162,21 @@ void Font::render(string_view text, double scale, Color color) {
 
 	m_x += ch.advance * scale;
 
-	memcpy(s_renderer->vertices + offset * 6 * 4, vertices, 6 * 4 * sizeof(float));
-	offset += 1;
+		memcpy(m_renderer->vertices + offset * 6 * 4, vertices, 6 * 4 * sizeof(float));
+		offset += 1;
 
-	if (offset == CharsPerBuffer) {
-	    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, s_renderer->vertices);
-	    glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
-	    offset = 0;
+		if (offset == CharsPerBuffer) {
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, m_renderer->vertices);
+			glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
+			offset = 0;
+		}
 	}
-    }
-    if (offset > 0) {
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, s_renderer->vertices);
-	glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
-	offset = 0;
-    }
+	if (offset > 0) {
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, m_renderer->vertices);
+		glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
+		offset = 0;
+	}
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }

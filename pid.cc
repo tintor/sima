@@ -340,9 +340,10 @@ int main(int argc, char** argv) {
     VertexBuffer_vec2 buffer(500);
     std::array<vec2, 500> v;
 
-    Font timesNewRoman("Times New Roman");
-    Font arial("Arial");
-    Font monaco("/System/Library/Fonts/Monaco.dfont");
+    FontRenderer renderer(800, 600);
+	Font timesNewRoman("Times New Roman", 48, &renderer);
+	Font arial("Arial", 48, &renderer);
+	Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
 
     glClearColor(0, 0, 0, 1.0f);
 
