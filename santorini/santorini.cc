@@ -303,7 +303,7 @@ Action AutoGreedy(const Board& board) {
     size_t count = 0;
     std::uniform_real_distribution<double> dis(0.0, 1.0);
     AllValidActionSequences(board, temp, [&](const vector<Action>& actions, Figure winner) {
-        Print(actions);
+        // Print(actions);
         if (winner == board.player) {
             choice = actions[0];
             return false;
@@ -543,8 +543,34 @@ void Render(const Board& board, View& view) {
 // build dome - shift + right click
 // Enter - done
 
+using Policy = std::function<Action(const Board&)>;
+
+Figure Battle(const Policy& policy_a, const Policy& policy_b) {
+    Board board;
+    while (true) {
+        auto w = Winner(board);
+        if (w != Figure::None) return w;
+        const Policy& policy = (board.player == Figure::Player1) ? policy_a : policy_b;
+        auto s = Execute(board, policy(board));
+        if (s != nullopt) {
+            print("faul\n");
+            return Other(board.player);
+        }
+    }
+}
+
+void AutoBattle(int count, string_view name_a, const Policy& policy_a, string_view name_b, const Policy& policy_b) {
+    int wins_a = 0;
+    for (int i = 0; i < count; i++)
+        if (Battle(policy_a, policy_b) == Figure::Player1) wins_a += 1;
+    print("%s %s : %s %s\n", name_a, wins_a, count - wins_a, name_b);
+}
+
 int main(int argc, char** argv) {
     InitSegvHandler();
+    AutoBattle(100, "random", AutoRandom, "greedy", AutoGreedy);
+    AutoBattle(100, "greedy", AutoGreedy, "random", AutoRandom);
+    return 0;
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
