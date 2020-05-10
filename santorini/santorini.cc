@@ -280,7 +280,7 @@ bool AllValidActionSequences(const Board& board, vector<Action>& temp, const Vis
         temp.push_back(action);
         auto winner = Winner(new_board);
         if (std::holds_alternative<NextAction>(action) || winner != Figure::None) {
-            if (!visit(temp, winner)) return false;
+            if (!visit(temp, new_board, winner)) return false;
         } else {
             if (!AllValidActionSequences(new_board, temp, visit)) return false;
         }
@@ -297,28 +297,70 @@ void Print(const vector<Action>& actions) {
     print("\n");
 }
 
-Action AutoGreedy(const Board& board) {
-    vector<Action> temp;
-    Action choice;
-    size_t count = 0;
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
-    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, Figure winner) {
-        // Print(actions);
-        if (winner == board.player) {
-            choice = actions[0];
-            return false;
-        }
-        if (winner == Figure::None && dis(g_random) <= 1.0 / ++count) choice = actions[0];
-        return true;
-    });
-    return choice;
-}
-
 Action AutoRandom(const Board& board) {
     while (true) {
         Action action = RandomAction(board);
         if (IsValid(board, action)) return action;
     }
+}
+
+Action AutoGreedy(const Board& board) {
+    vector<Action> temp;
+    Action choice;
+    size_t count = 0;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
+        // Print(actions);
+        if (winner == board.player) {
+            choice = actions[0];
+            count = 1;
+            return false;
+        }
+        if (winner == Figure::None && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        return true;
+    });
+    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
+    return choice;
+}
+
+const double Pow10[] = {1, 10, 100, 1000};
+
+double ClimbRank(Figure player, const Board& board) {
+    double rank = 0;
+    for (Coord e : kAll) {
+        if (board(e).figure == player) rank += Pow10[board(e).level];
+        if (board(e).figure == Other(player)) rank -= Pow10[board(e).level];
+    }
+    return rank;
+}
+
+Action AutoClimber(const Board& board) {
+    vector<Action> temp;
+    Action choice;
+    size_t count = 0;
+    double best_rank = -1e100;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
+        // Print(actions);
+        if (winner == board.player) {
+            choice = actions[0];
+            best_rank = 1e100;
+            count = 1;
+            return false;
+        }
+        if (winner != Figure::None) return true;
+
+        double rank = ClimbRank(board.player, new_board);
+        if (rank == best_rank && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        if (rank > best_rank) {
+            best_rank = rank;
+            choice = actions[0];
+            count = 1;
+        }
+        return true;
+    });
+    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
+    return choice;
 }
 
 // Human interface
@@ -559,17 +601,28 @@ Figure Battle(const Policy& policy_a, const Policy& policy_b) {
     }
 }
 
-void AutoBattle(int count, string_view name_a, const Policy& policy_a, string_view name_b, const Policy& policy_b) {
+const std::unordered_map<string_view, Policy> g_policies = {{"random", AutoRandom}, {"greedy", AutoGreedy}, {"climber", AutoClimber}};
+
+void AutoBattle(int count, string_view name_a, string_view name_b) {
+    const Policy& policy_a = g_policies.at(name_a);
+    const Policy& policy_b = g_policies.at(name_b);
+
     int wins_a = 0;
     for (int i = 0; i < count; i++)
         if (Battle(policy_a, policy_b) == Figure::Player1) wins_a += 1;
     print("%s %s : %s %s\n", name_a, wins_a, count - wins_a, name_b);
+
+    int wins_b = 0;
+    for (int i = 0; i < count; i++)
+        if (Battle(policy_b, policy_a) == Figure::Player1) wins_b += 1;
+    print("%s %s : %s %s\n", name_b, wins_b, count - wins_b, name_a);
 }
 
 int main(int argc, char** argv) {
     InitSegvHandler();
-    AutoBattle(100, "random", AutoRandom, "greedy", AutoGreedy);
-    AutoBattle(100, "greedy", AutoGreedy, "random", AutoRandom);
+    AutoBattle(100, "random", "greedy");
+    AutoBattle(100, "random", "climber");
+    AutoBattle(100, "greedy", "climber");
     return 0;
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});
