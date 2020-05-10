@@ -7,7 +7,11 @@
 #include <view/vertex_buffer.h>
 #include <view/window.h>
 
-// ================
+#include <random>
+#include <variant>
+
+// Board and judge
+// ===============
 
 enum class Figure : char { None, Dome, Player1, Player2 };
 
@@ -16,7 +20,9 @@ struct Cell {
     Figure figure = Figure::None;
 };
 
-struct Coord { int x, y; };
+struct Coord {
+    int x, y;
+};
 
 struct Board {
     bool setup = true;
@@ -32,80 +38,77 @@ struct Board {
 
 Board g_board;
 
-Figure Other(Figure player) {
-    return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1;
-}
+Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
 
 vector<Coord> All() {
     vector<Coord> out;
     out.reserve(25);
-    for (int x = 0; x < 5; x++) for (int y = 0; y < 5; y++) out.push_back({x, y});
+    for (int x = 0; x < 5; x++)
+        for (int y = 0; y < 5; y++) out.push_back({x, y});
     return out;
 }
 
 const vector<Coord> kAll = All();
 
-template<typename Fn>
+template <typename Fn>
 int Count(const Board& board, const Fn& fn) {
     int c = 0;
     for (Coord e : kAll)
-    if (fn(board(e)))
-        c += 1;
+        if (fn(board(e))) c += 1;
     return c;
 }
 
-#define L(A) [&](const auto& e) {return A;}
+#define L(A) [&](const auto& e) { return A; }
+
+struct NextAction {};
+struct PlaceAction {
+    Coord dest;
+};
+struct MoveAction {
+    Coord src, dest;
+};
+struct BuildAction {
+    Coord dest;
+    bool dome;
+};
+
+using Action = std::variant<NextAction, PlaceAction, MoveAction, BuildAction>;
 
 optional<string_view> Next(Board& board) {
     if (board.setup) {
-        if (Count(board, L(e.figure == board.player)) != 2)
-            return "need to place worker";
+        if (Count(board, L(e.figure == board.player)) != 2) return "need to place worker";
     } else {
-        if (!board.moved)
-            return "need to move";
-        if (!board.built)
-            return "need to build";
+        if (!board.moved) return "need to move";
+        if (!board.built) return "need to build";
     }
 
     board.player = Other(board.player);
     board.moved = std::nullopt;
     board.built = false;
     if (board.setup) {
-        if (Count(board, L(e.figure != Figure::None)) == 4)
-            board.setup = false;
+        if (Count(board, L(e.figure != Figure::None)) == 4) board.setup = false;
     }
     return nullopt;
 }
 
 optional<string_view> Place(Board& board, Coord dest) {
-    if (!board.setup)
-        return "can't place after setup is complete"sv;
-    if (board(dest).figure != Figure::None)
-        return "occupied"sv;
-    if (Count(board, L(e.figure == board.player)) == 2)
-        return "can't place anymore"sv;
+    if (!board.setup) return "can't place after setup is complete"sv;
+    if (board(dest).figure != Figure::None) return "occupied"sv;
+    if (Count(board, L(e.figure == board.player)) == 2) return "can't place anymore"sv;
 
     board(dest).figure = board.player;
     return nullopt;
 }
 
-bool Nearby(Coord src, Coord dest) {
-    return abs(src.x - dest.x) <= 1 && abs(src.y - dest.y) <= 1;
-}
+bool Nearby(Coord src, Coord dest) { return abs(src.x - dest.x) <= 1 && abs(src.y - dest.y) <= 1; }
 
 optional<string_view> Move(Board& board, Coord src, Coord dest) {
-    if (board.setup)
-        return "can't move during setup"sv;
-    if (board.moved)
-        return "moved already"sv;
-    if (board(src).figure != board.player)
-        return "player doesn't have figure at src"sv;
-    if (board(dest).figure != Figure::None)
-        return "dest isn't empty";
-    if (!Nearby(src, dest))
-        return "src and dest aren't nearby"sv;
-    if (board(dest).level - board(src).level > 1)
-        return "dest is too high"sv;
+    if (board.setup) return "can't move during setup"sv;
+    if (board.moved) return "moved already"sv;
+    if (board(src).figure != board.player) return "player doesn't have figure at src"sv;
+    if (board(dest).figure != Figure::None) return "dest isn't empty";
+    if (!Nearby(src, dest)) return "src and dest aren't nearby"sv;
+    if (board(dest).level - board(src).level > 1) return "dest is too high"sv;
 
     board(dest).figure = board.player;
     board(src).figure = Figure::None;
@@ -114,18 +117,12 @@ optional<string_view> Move(Board& board, Coord src, Coord dest) {
 }
 
 optional<string_view> Build(Board& board, Coord dest, bool dome) {
-    if (board.setup)
-        return "can't build during setup"sv;
-    if (!board.moved)
-        return "need to move"sv;
-    if (board(dest).figure != Figure::None)
-        return "can only build on empty space"sv;
-    if (dome && board(dest).level != 3)
-        return "dome can only be built on level 3"sv;
-    if (!dome && board(dest).level == 3)
-        return "floor can only be built on levels 0, 1 and 2"sv;
-    if (!Nearby(*board.moved, dest))
-        return "can only build near moved figure"sv;
+    if (board.setup) return "can't build during setup"sv;
+    if (!board.moved) return "need to move"sv;
+    if (board(dest).figure != Figure::None) return "can only build on empty space"sv;
+    if (dome && board(dest).level != 3) return "dome can only be built on level 3"sv;
+    if (!dome && board(dest).level == 3) return "floor can only be built on levels 0, 1 and 2"sv;
+    if (!Nearby(*board.moved, dest)) return "can only build near moved figure"sv;
 
     if (dome) {
         board(dest).figure = Figure::Dome;
@@ -136,15 +133,28 @@ optional<string_view> Build(Board& board, Coord dest, bool dome) {
     return nullopt;
 }
 
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
+
+optional<string_view> Execute(Board& board, Action action) {
+    return std::visit(
+        overloaded{[&](NextAction a) { return Next(board); }, [&](PlaceAction a) { return Place(board, a.dest); },
+                   [&](MoveAction a) { return Move(board, a.src, a.dest); },
+                   [&](BuildAction a) { return Build(board, a.dest, a.dome); }},
+        action);
+}
+
 bool IsMoveBlocked(const Board& board) {
     for (Coord a : kAll)
         if (board(a).figure == board.player) {
             Board board2 = board;
             for (Coord b : kAll) {
-                if (Move(board2, a, b) == nullopt)
-                    return false;
+                if (Move(board2, a, b) == nullopt) return false;
             }
-
         }
     return true;
 }
@@ -153,14 +163,11 @@ bool IsBuildBlocked(const Board& board) {
     if (!board.moved) return false;
     Board board2 = board;
     for (Coord b : kAll)
-        if (Build(board2, b, false) == nullopt || Build(board2, b, true) == nullopt)
-            return false;
+        if (Build(board2, b, false) == nullopt || Build(board2, b, true) == nullopt) return false;
     return true;
 }
 
-bool OnThirdLevel(const Board& board) {
-    return Count(board, L(e.figure == board.player && e.level == 3)) > 0;
-}
+bool OnThirdLevel(const Board& board) { return Count(board, L(e.figure == board.player && e.level == 3)) > 0; }
 
 Figure Winner(const Board& board) {
     if (board.setup) return Figure::None;
@@ -171,7 +178,69 @@ Figure Winner(const Board& board) {
     return Figure::None;
 }
 
-// ================
+// Computer interface
+// ==================
+
+std::random_device rd;
+std::mt19937 g_random(rd());
+
+int RandomInt(int count) { return std::uniform_int_distribution<int>(0, count - 1)(g_random); }
+
+Coord RandomCoord() {
+    std::uniform_int_distribution<int> dis(0, 4);
+    return Coord{dis(g_random), dis(g_random)};
+}
+
+std::vector<Coord> MyFigures(const Board& board) {
+    std::vector<Coord> out;
+    for (Coord e : kAll)
+        if (board(e).figure == board.player) out.push_back(e);
+    return out;
+}
+
+Coord MyRandomFigure(const Board& board) {
+    Coord out;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    int count = 0;
+    for (Coord e : kAll)
+        if (board(e).figure == board.player && dis(g_random) <= 1.0 / ++count) out = e;
+    return out;
+}
+
+Action RandomAction(const Board& board) {
+    if (board.setup) switch (RandomInt(2)) {
+            case 0:
+                return NextAction{};
+            case 1:
+                return PlaceAction{.dest = RandomCoord()};
+        }
+
+    switch (RandomInt(3)) {
+        case 0:
+            return NextAction{};
+        case 1:
+            return MoveAction{.src = MyRandomFigure(board), .dest = RandomCoord()};
+        case 2:
+            return BuildAction{.dest = RandomCoord(), .dome = bool(RandomInt(2))};
+    }
+    throw std::runtime_error("unreachable");
+}
+
+std::vector<Action> RandomPlayer(const Board& board) {
+    std::vector<Action> actions;
+    Board my_board = board;
+    while (true) {
+        Action action = RandomAction(my_board);
+        if (Execute(my_board, action) == nullopt) {
+            actions.push_back(action);
+            if (std::holds_alternative<NextAction>(action) || Winner(my_board) != Figure::None) break;
+        }
+    }
+    return actions;
+}
+
+// Human interface
+// ===============
 
 constexpr int Width = 1000, Height = 1000;
 
@@ -179,9 +248,7 @@ std::vector<Board> g_history;
 Board g_board_copy;
 optional<Coord> g_selected;
 
-string_view PlayerName(Figure player) {
-    return (player == Figure::Player1) ? "yellow"sv : "red"sv;
-}
+string_view PlayerName(Figure player) { return (player == Figure::Player1) ? "yellow"sv : "red"sv; }
 
 void Play(optional<string_view> status) {
     if (status) {
@@ -196,7 +263,7 @@ void Play(optional<string_view> status) {
     }
 }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
         glfwSetWindowShouldClose(window, GL_TRUE);
         return;
@@ -209,6 +276,15 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
         if (g_history.size() > 0) {
             g_board = g_history.back();
             g_history.pop_back();
+        }
+    }
+    if (action == GLFW_PRESS && key == GLFW_KEY_SPACE) {
+        g_board_copy = g_board;
+        while (true) {
+            Action action = RandomAction(g_board);
+            auto status = Execute(g_board, action);
+            Play(status);
+            if (status == nullopt) break;
         }
     }
 }
@@ -226,7 +302,7 @@ void OnClick(Coord dest, bool left, bool shift) {
     }
 }
 
-void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (action == GLFW_PRESS) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
@@ -237,9 +313,9 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
     }
 }
 
-void scroll_callback(GLFWwindow *window, double x, double y) {}
+void scroll_callback(GLFWwindow* window, double x, double y) {}
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) { glViewport(0, 0, width, height); }
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
 
 struct View : public VertexBuffer_vec2_rgba {
     Shader shader;
@@ -277,7 +353,7 @@ struct View : public VertexBuffer_vec2_rgba {
           transform("transform") {}
 };
 
-void Render(const Board &board, View &view) {
+void Render(const Board& board, View& view) {
     glUseProgram(view.shader);
     view.bind();
     view.transform = view.ortho;
@@ -382,7 +458,7 @@ void Render(const Board &board, View &view) {
 // build dome - shift + right click
 // Enter - done
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     InitSegvHandler();
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});

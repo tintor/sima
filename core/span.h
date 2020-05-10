@@ -1,6 +1,6 @@
 #pragma once
-#include <core/vector.h>
 #include <core/int.h>
+#include <core/vector.h>
 
 #include <array>
 #include <cassert>

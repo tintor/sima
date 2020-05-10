@@ -1,6 +1,6 @@
 #pragma once
-#include "core/std.h"
 #include "core/auto.h"
+#include "core/std.h"
 #include "core/thread.h"
 #include "phmap/phmap.h"
 

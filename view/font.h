@@ -47,9 +47,7 @@ class Font {
     double m_scale;
     Color m_color;
 
-    void render(string_view text) {
-        render(text, m_scale, m_color);
-    }
+    void render(string_view text) { render(text, m_scale, m_color); }
 
    private:
     FontRenderer* m_renderer = nullptr;

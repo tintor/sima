@@ -1,5 +1,6 @@
 #pragma once
 #include <stdlib.h>
+
 #include <new>
 
 template <typename T, std::size_t N = sizeof(T)>

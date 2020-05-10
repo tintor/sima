@@ -48,8 +48,8 @@ using std::atomic;
 
 using namespace std::literals;
 
-#include <core/vector.h>
 #include <core/span.h>
+#include <core/vector.h>
 
 #ifdef NDEBUG
 constexpr bool debug = false;
