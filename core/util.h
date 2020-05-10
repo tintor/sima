@@ -128,18 +128,30 @@ bool contains(const array<T, M>& container, T element) {
     return contains(cspan<T>(container), element);
 }
 
-template <typename Container, typename Func>
-bool All(const Container& s, const Func& func) {
-    for (const auto& e : s)
-        if (!func(e)) return false;
+template<typename Iterable, typename UnaryPredicate>
+bool All(const Iterable& iterable, const UnaryPredicate& predicate) {
+    for (const auto& e : iterable) if (!predicate(e)) return false;
     return true;
 }
 
-template <typename Container, typename Func>
-bool Any(const Container& s, const Func& func) {
-    for (const auto& e : s)
-        if (func(e)) return true;
+template<typename Iterable, typename UnaryPredicate>
+bool Any(const Iterable& iterable, const UnaryPredicate& predicate) {
+    for (const auto& e : iterable) if (predicate(e)) return true;
     return false;
+}
+
+template<typename Iterable, typename UnaryPredicate>
+bool None(const Iterable& iterable, const UnaryPredicate& predicate) {
+    for (const auto& e : iterable) if (predicate(e)) return false;
+    return true;
+}
+
+template<typename Iterable, typename Value, typename Accumulate>
+Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accumulate) {
+    Value acc = init;
+    for (const auto& e : iterable)
+        accumulate(acc, e);
+    return acc;
 }
 
 template <typename T, typename P>
