@@ -3,7 +3,6 @@
 #include <core/hash.h>
 #include <core/thread.h>
 #include <core/util.h>
-#include <santorini/board.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -12,6 +11,9 @@
 
 #include <random>
 #include <variant>
+
+#include <santorini/action.h>
+#include <santorini/board.h>
 
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
            unsigned line = __builtin_LINE()) {
@@ -22,22 +24,6 @@ void Check(bool value, string_view message = "", const char* file = __builtin_FI
 
 // Board and judge
 // ===============
-
-Board g_board;
-
-struct NextAction {};
-struct PlaceAction {
-    Coord dest;
-};
-struct MoveAction {
-    Coord src, dest;
-};
-struct BuildAction {
-    Coord dest;
-    bool dome;
-};
-
-using Action = std::variant<NextAction, PlaceAction, MoveAction, BuildAction>;
 
 optional<string_view> Next(Board& board) {
     if (board.setup) {
@@ -89,11 +75,8 @@ optional<string_view> Build(Board& board, Coord dest, bool dome) {
     if (!dome && board(dest).level == 3) return "floor can only be built on levels 0, 1 and 2";
     if (!Nearby(*board.moved, dest)) return "can only build near moved figure";
 
-    if (dome) {
-        board(dest).figure = Figure::Dome;
-    } else {
-        board(dest).level += 1;
-    }
+    if (dome) board(dest).figure = Figure::Dome;
+    if (!dome) board(dest).level += 1;
     board.built = true;
     return nullopt;
 }
@@ -104,14 +87,6 @@ optional<string_view> Execute(Board& board, const Action& action) {
                    [&](MoveAction a) { return Move(board, a.src, a.dest); },
                    [&](BuildAction a) { return Build(board, a.dest, a.dome); }},
         action);
-}
-
-void Print(const Action& action) {
-    std::visit(overloaded{[&](NextAction a) { print("next"); },
-                          [&](PlaceAction a) { print("place:%s%s", a.dest.x(), a.dest.y()); },
-                          [&](MoveAction a) { print("move:%s%s:%s%s", a.src.x(), a.src.y(), a.dest.x(), a.dest.y()); },
-                          [&](BuildAction a) { print("build:%s%s:%s", a.dest.x(), a.dest.y(), a.dome ? 'D' : 'T'); }},
-               action);
 }
 
 bool IsMoveBlocked(const Board& board) {
@@ -225,6 +200,19 @@ bool AllValidActions(const Board& board, const Visitor& visit) {
     for (bool dome : {false, true})
         for (Coord e : kAll) VISIT((BuildAction{e, dome}));
     return true;
+}
+
+bool IsEndOfTurn(const Board& board) {
+    bool next = false;
+    bool other = false;
+    AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        if (std::holds_alternative<NextAction>(action))
+            next = true;
+        else
+            other = true;
+        return !other;
+    });
+    return next && !other;
 }
 
 template <typename Visitor>
@@ -488,18 +476,7 @@ vector<Board> g_history;
 Board g_board_copy;
 optional<Coord> g_selected;
 
-bool IsEndOfTurn(const Board& board) {
-    bool next = false;
-    bool other = false;
-    AllValidActions(board, [&](const Board& new_board, const Action& action) {
-        if (std::holds_alternative<NextAction>(action))
-            next = true;
-        else
-            other = true;
-        return !other;
-    });
-    return next && !other;
-}
+Board g_board;
 
 void Play(optional<string_view> status) {
     if (status) {
