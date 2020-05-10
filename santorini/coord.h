@@ -20,17 +20,11 @@ struct Coord {
 inline bool operator==(Coord a, Coord b) { return a.v == b.v; }
 inline bool operator!=(Coord a, Coord b) { return !(a == b); }
 
-inline Coord Transpose(Coord e) {
-    return {e.y(), e.x()};
-}
+inline Coord Transpose(Coord e) { return {e.y(), e.x()}; }
 
-inline Coord FlipX(Coord e) {
-    return {4 - e.x(), e.y()};
-}
+inline Coord FlipX(Coord e) { return {4 - e.x(), e.y()}; }
 
-inline Coord FlipY(Coord e) {
-    return {e.x(), 4 - e.y()};
-}
+inline Coord FlipY(Coord e) { return {e.x(), 4 - e.y()}; }
 
 inline Coord Transform(Coord e, int code) {
     if (code & 1) e = FlipX(e);

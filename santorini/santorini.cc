@@ -1,8 +1,9 @@
 #include <core/callstack.h>
 #include <core/format.h>
 #include <core/hash.h>
-#include <core/util.h>
 #include <core/thread.h>
+#include <core/util.h>
+#include <santorini/board.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -11,8 +12,6 @@
 
 #include <random>
 #include <variant>
-
-#include <santorini/board.h>
 
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
            unsigned line = __builtin_LINE()) {
@@ -772,7 +771,7 @@ void AutoBattle(int count, string_view name_a, string_view name_b) {
     atomic<int> wins_a = 0, wins_b = 0;
 
     atomic<bool> stop = false;
-    thread monitor([&](){
+    thread monitor([&]() {
         string message;
         while (!stop) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -785,8 +784,14 @@ void AutoBattle(int count, string_view name_a, string_view name_b) {
     });
 
     parallel_for(count, [&](size_t i) {
-        if (Battle(policy_a, policy_b) == Figure::Player1) wins_a += 1; else wins_b += 1;
-        if (Battle(policy_b, policy_a) == Figure::Player1) wins_b += 1; else wins_a += 1;
+        if (Battle(policy_a, policy_b) == Figure::Player1)
+            wins_a += 1;
+        else
+            wins_b += 1;
+        if (Battle(policy_b, policy_a) == Figure::Player1)
+            wins_b += 1;
+        else
+            wins_a += 1;
     });
 
     stop = true;

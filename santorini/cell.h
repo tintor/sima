@@ -4,8 +4,8 @@
 enum class Figure : char { None, Dome, Player1, Player2 };
 
 struct Cell {
-    char level = 0; // 2 bits
-    Figure figure = Figure::None; // 2 bits
+    char level = 0;                // 2 bits
+    Figure figure = Figure::None;  // 2 bits
 };
 
 inline bool operator==(Cell a, Cell b) { return a.level == b.level && a.figure == b.figure; }

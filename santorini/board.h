@@ -1,7 +1,6 @@
 #pragma once
-#include <core/std.h>
 #include <core/hash.h>
-
+#include <core/std.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
 
@@ -21,16 +20,14 @@ struct Board {
 bool Equal(const Board& a, const Board& b) {
     if (a.setup != b.setup || a.player != b.player || a.moved != b.moved || a.built != b.built) return false;
     for (int t = 0; t < 8; t++) {
-        if (All(kAll, [&](Coord e) { return a.cell[e.v] == b.cell[Transform(e, t).v]; }))
-            return true;
+        if (All(kAll, [&](Coord e) { return a.cell[e.v] == b.cell[Transform(e, t).v]; })) return true;
     }
     return false;
 }
 
 size_t Hash(const array<Cell, 25>& cell, int transform) {
     hash h;
-    for (Coord e : kAll)
-        h << Hash(cell[Transform(e, transform).v]);
+    for (Coord e : kAll) h << Hash(cell[Transform(e, transform).v]);
     return h.seed;
 }
 
@@ -47,8 +44,10 @@ size_t Hash(const Board& a) {
     return h.seed;
 }
 
-template<typename Fn>
-int Count(const Board& board, const Fn& fn) { return CountIf(kAll, L(fn(board(e)))); }
+template <typename Fn>
+int Count(const Board& board, const Fn& fn) {
+    return CountIf(kAll, L(fn(board(e))));
+}
 
 // Network input description:
 // Board:

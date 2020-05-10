@@ -128,33 +128,35 @@ bool contains(const array<T, M>& container, T element) {
     return contains(cspan<T>(container), element);
 }
 
-template<typename Iterable, typename UnaryPredicate>
+template <typename Iterable, typename UnaryPredicate>
 bool All(const Iterable& iterable, const UnaryPredicate& predicate) {
-    for (const auto& e : iterable) if (!predicate(e)) return false;
+    for (const auto& e : iterable)
+        if (!predicate(e)) return false;
     return true;
 }
 
-template<typename Iterable, typename UnaryPredicate>
+template <typename Iterable, typename UnaryPredicate>
 bool Any(const Iterable& iterable, const UnaryPredicate& predicate) {
-    for (const auto& e : iterable) if (predicate(e)) return true;
+    for (const auto& e : iterable)
+        if (predicate(e)) return true;
     return false;
 }
 
-template<typename Iterable, typename UnaryPredicate>
+template <typename Iterable, typename UnaryPredicate>
 bool None(const Iterable& iterable, const UnaryPredicate& predicate) {
-    for (const auto& e : iterable) if (predicate(e)) return false;
+    for (const auto& e : iterable)
+        if (predicate(e)) return false;
     return true;
 }
 
-template<typename Iterable, typename Value, typename Accumulate>
+template <typename Iterable, typename Value, typename Accumulate>
 Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accumulate) {
     Value acc = init;
-    for (const auto& e : iterable)
-        accumulate(acc, e);
+    for (const auto& e : iterable) accumulate(acc, e);
     return acc;
 }
 
-template<typename Iterable, typename UnaryPredicate>
+template <typename Iterable, typename UnaryPredicate>
 size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
     size_t count = 0;
     for (const auto& e : iterable)

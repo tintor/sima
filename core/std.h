@@ -14,15 +14,15 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include <vector>
 #include <variant>
+#include <vector>
 
-using std::variant;
 using std::complex;
 using std::pair;
 using std::regex;
 using std::string;
 using std::string_view;
+using std::variant;
 
 using std::array;
 
