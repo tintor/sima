@@ -53,27 +53,27 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     print("key_callback [%s] key:%s scancode:%s action:%s mods:%s\n", key_name, key, scancode, action, mods);
 
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE) {
-	gSpaceKey = true;
+        gSpaceKey = true;
     }
     if (action == GLFW_RELEASE && key == GLFW_KEY_SPACE) {
-	gSpaceKey = false;
+        gSpaceKey = false;
     }
 
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
-	glfwSetWindowShouldClose(window, GL_TRUE);
-	return;
+        glfwSetWindowShouldClose(window, GL_TRUE);
+        return;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == 0) {
-	gSimulate ^= 1;
+        gSimulate ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
-	gSimulateTick ^= 1;
+        gSimulateTick ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_G && mods == 0) {
-	gGravity ^= 1;
+        gGravity ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_A && mods == 0) {
-	gAirDrag ^= 1;
+        gAirDrag ^= 1;
     }
 }
 
@@ -107,19 +107,19 @@ struct Body {
 
 void SaveStates(vector<Body>& bodies) {
     for (Body& body : bodies) {
-	body.saved_pos = body.pos;
-	body.saved_vel = body.vel;
-	body.saved_ang_pos = body.ang_pos;
-	body.saved_ang_vel = body.ang_vel;
+        body.saved_pos = body.pos;
+        body.saved_vel = body.vel;
+        body.saved_ang_pos = body.ang_pos;
+        body.saved_ang_vel = body.ang_vel;
     }
 }
 
 void RestoreStates(vector<Body>& bodies) {
     for (Body& body : bodies) {
-	body.pos = body.saved_pos;
-	body.vel = body.saved_vel;
-	body.ang_pos = body.saved_ang_pos;
-	body.ang_vel = body.saved_ang_vel;
+        body.pos = body.saved_pos;
+        body.vel = body.saved_vel;
+        body.ang_pos = body.saved_ang_pos;
+        body.ang_vel = body.saved_ang_vel;
     }
 }
 
@@ -135,46 +135,46 @@ void Interact(Body& a, Body& b, polygon2& temp, vector<IContact2>& contacts) {
     int c = Classify(a.shape, temp, &contacts);
     if (c > 0) return;
     if (c < 0) {
-	print("penetrating objects in Interact()\n");
-	exit(1);
-	// TODO classify will not return contacts when there is penetration! :(
-	// TODO there could be multiple contacts with different levels (or none) of penetration
-	// TODO move objects slightly away to prevent penetration (while keeping total kinetic + potential energy
-	// constant) (just moving objects will not work when rotations are added)
+        print("penetrating objects in Interact()\n");
+        exit(1);
+        // TODO classify will not return contacts when there is penetration! :(
+        // TODO there could be multiple contacts with different levels (or none) of penetration
+        // TODO move objects slightly away to prevent penetration (while keeping total kinetic + potential energy
+        // constant) (just moving objects will not work when rotations are added)
     }
 
     // Translate contacts from A frame to world frame
     for (IContact2& c : contacts) {
-	c.sa -= double2{d.x, d.y};
-	c.sb -= double2{d.x, d.y};
+        c.sa -= double2{d.x, d.y};
+        c.sb -= double2{d.x, d.y};
     }
 
     // Resolve all contacts with dv at once!
     double w = 0;
     for (const IContact2& contact : contacts) {
-	d.x = -contact.normal.x;  // TODO check direction
-	d.y = -contact.normal.y;  // TODO check direction
-	double u = glm::dot(d, a.vel - b.vel);
-	if (u < 0) w += -u;
+        d.x = -contact.normal.x;  // TODO check direction
+        d.y = -contact.normal.y;  // TODO check direction
+        double u = glm::dot(d, a.vel - b.vel);
+        if (u < 0) w += -u;
     }
     if (w == 0) return;
 
     dvec2 wa(0, 0);
     dvec2 wb(0, 0);
     for (const IContact2& contact : contacts) {
-	d.x = -contact.normal.x;  // TODO check direction
-	d.y = -contact.normal.y;  // TODO check direction
-	double ua = glm::dot(d, a.vel);
-	double ub = glm::dot(d, b.vel);
-	double u = ua - ub;
-	if (u < 0) {
-	    auto ma = a.mass;
-	    auto mb = b.mass;
-	    double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
-	    double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
-	    wa += d * (va - ua) * -u;
-	    wb += d * (vb - ub) * -u;
-	}
+        d.x = -contact.normal.x;  // TODO check direction
+        d.y = -contact.normal.y;  // TODO check direction
+        double ua = glm::dot(d, a.vel);
+        double ub = glm::dot(d, b.vel);
+        double u = ua - ub;
+        if (u < 0) {
+            auto ma = a.mass;
+            auto mb = b.mass;
+            double va = (ua * (ma - mb) + 2 * mb * ub) / (ma + mb);
+            double vb = (ub * (mb - ma) + 2 * ma * ua) / (ma + mb);
+            wa += d * (va - ua) * -u;
+            wb += d * (vb - ub) * -u;
+        }
     }
 
     a.vel += wa / w;
@@ -216,31 +216,31 @@ constexpr int Width = 1200, Height = 900;
 int Classify(const vector<Body>& bodies, polygon2& temp) {
     int result = 1;
     for (auto i : range(bodies.size())) {
-	const Body& b = bodies[i];
+        const Body& b = bodies[i];
 
-	// Check against walls
-	int c = Sign(b.pos.y + b.box.min.y, Tolerance);
-	if (c < 0) return -1;
-	if (c == 0) result = 0;
+        // Check against walls
+        int c = Sign(b.pos.y + b.box.min.y, Tolerance);
+        if (c < 0) return -1;
+        if (c == 0) result = 0;
 
-	c = Sign(b.pos.x + b.box.min.x, Tolerance);
-	if (c < 0) return -1;
-	if (c == 0) result = 0;
+        c = Sign(b.pos.x + b.box.min.x, Tolerance);
+        if (c < 0) return -1;
+        if (c == 0) result = 0;
 
-	c = Sign(Width - (b.pos.x + b.box.max.x), Tolerance);
-	if (c < 0) return -1;
-	if (c == 0) result = 0;
+        c = Sign(Width - (b.pos.x + b.box.max.x), Tolerance);
+        if (c < 0) return -1;
+        if (c == 0) result = 0;
 
-	c = Sign(Height - (b.pos.y + b.box.max.y), Tolerance);
-	if (c < 0) return -1;
-	if (c == 0) result = 0;
+        c = Sign(Height - (b.pos.y + b.box.max.y), Tolerance);
+        if (c < 0) return -1;
+        if (c == 0) result = 0;
 
-	// Check against other bodies
-	for (auto j : range(i + 1, bodies.size())) {
-	    c = Classify(b, bodies[j], temp);
-	    if (c < 0) return -1;
-	    if (c == 0) result = 0;
-	}
+        // Check against other bodies
+        for (auto j : range(i + 1, bodies.size())) {
+            c = Classify(b, bodies[j], temp);
+            if (c < 0) return -1;
+            if (c == 0) result = 0;
+        }
     }
     return result;
 }
@@ -250,20 +250,20 @@ const dvec2 gravity(0, -100);  // mVm/s^2
 void InteractWithWalls(Body& body) {
     constexpr double elasticity = 0.5;
     if (body.pos.y + body.box.min.y < 0) {
-	double dip = -(body.pos.y + body.box.min.y);
-	// remove penetration, but preserve total energy (if possible when d >= 0)
-	double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
-	body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
-	body.pos.y = -body.box.min.y;
+        double dip = -(body.pos.y + body.box.min.y);
+        // remove penetration, but preserve total energy (if possible when d >= 0)
+        double d = gravity.y * 2 * dip + body.vel.y * body.vel.y;
+        body.vel.y = (d > 0) ? elasticity * sqrt(d) : 0;
+        body.pos.y = -body.box.min.y;
     }
     if (body.pos.x + body.box.min.x <= 0 && body.vel.x < 0) {
-	body.vel.x = -body.vel.x * elasticity;
+        body.vel.x = -body.vel.x * elasticity;
     }
     if (body.pos.x + body.box.max.x >= Width && body.vel.x > 0) {
-	body.vel.x = -body.vel.x * elasticity;
+        body.vel.x = -body.vel.x * elasticity;
     }
     if (body.pos.y + body.box.max.y >= Height && body.vel.y > 0) {
-	body.vel.y = -body.vel.y * elasticity;
+        body.vel.y = -body.vel.y * elasticity;
     }
 }
 
@@ -299,17 +299,17 @@ void InteractWithWalls(Body& body) {
 
 void Advance(vector<Body>& bodies, double dt) {
     for (Body& body : bodies) {
-	dvec2 acc = gGravity ? gravity : dvec2(0, 0);
-	dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
-	auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) { return dvec4(dvec2(s.z, s.w), acc); });
-	body.pos = dvec2(s1.x, s1.y);
-	body.vel = dvec2(s1.z, s1.w);
+        dvec2 acc = gGravity ? gravity : dvec2(0, 0);
+        dvec4 s0 = dvec4(body.pos.x, body.pos.y, body.vel.x, body.vel.y);
+        auto s1 = RungeKutta4<dvec4, double>(s0, 0, dt, [&](dvec4 s, double t) { return dvec4(dvec2(s.z, s.w), acc); });
+        body.pos = dvec2(s1.x, s1.y);
+        body.vel = dvec2(s1.z, s1.w);
 
-	InteractWithWalls(body);
+        InteractWithWalls(body);
 
-	if (gAirDrag) {
-	    body.vel *= 0.999;
-	}
+        if (gAirDrag) {
+            body.vel *= 0.999;
+        }
     }
 }
 
@@ -357,9 +357,9 @@ int main(int argc, char** argv) {
 
     std::array<vec2, 25> v;
     for (int i = 0; i < v.size() - 1; i++) {
-	auto a = 2 * PI / (v.size() - 1) * i;
-	v[i].x = cos(a);
-	v[i].y = sin(a);
+        auto a = 2 * PI / (v.size() - 1) * i;
+        v[i].x = cos(a);
+        v[i].y = sin(a);
     }
     v[24] = vec2(0, 0);
     std::array<vec2, 25> w;
@@ -383,16 +383,16 @@ int main(int argc, char** argv) {
 
     shape.clear();
     for (int i = 0; i < 24; i++) {
-	auto a = 2 * PI / 24 * i;
-	shape.push_back(double2{cos(a), sin(a)} * 100);
+        auto a = 2 * PI / 24 * i;
+        shape.push_back(double2{cos(a), sin(a)} * 100);
     }
     shape.push_back(double2{0, 0});
     SetShape(bodies[1], shape);
 
     shape.clear();
     for (int i = 0; i < 24; i++) {
-	auto a = 2 * PI / 24 * i;
-	shape.push_back(double2{cos(a), sin(a)} * 50);
+        auto a = 2 * PI / 24 * i;
+        shape.push_back(double2{cos(a), sin(a)} * 50);
     }
     shape.push_back(double2{0, 0});
     SetShape(bodies[2], shape);
@@ -407,7 +407,7 @@ int main(int argc, char** argv) {
     double time = 0;
     double energy = 0;
     for (Body& body : bodies) {
-	energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
+        energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
     }
     double energyMin = energy, energyMax = energy;
 
@@ -415,83 +415,83 @@ int main(int argc, char** argv) {
     vector<IContact2> contacts;
 
     RunEventLoop(window, [&]() {
-	glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	constexpr double dt = 0.01;
-	if (gSimulate || gSimulateTick) {
-	    double remaining_dt = dt;
-	    while (true) {
-		// resolve collisions
-		// TODO Classify() call from prev iteration can tell us pairs and their contacts
-		for (auto i : range(bodies.size()))
-		    for (auto j : range(i + 1, bodies.size())) Interact(bodies[i], bodies[j], temp, contacts);
+        constexpr double dt = 0.01;
+        if (gSimulate || gSimulateTick) {
+            double remaining_dt = dt;
+            while (true) {
+                // resolve collisions
+                // TODO Classify() call from prev iteration can tell us pairs and their contacts
+                for (auto i : range(bodies.size()))
+                    for (auto j : range(i + 1, bodies.size())) Interact(bodies[i], bodies[j], temp, contacts);
 
-		SaveStates(bodies);
-		Advance(bodies, remaining_dt);
-		if (Classify(bodies, temp) >= 0) break;
-		print("collision found!\n");
+                SaveStates(bodies);
+                Advance(bodies, remaining_dt);
+                if (Classify(bodies, temp) >= 0) break;
+                print("collision found!\n");
 
-		// find collision time
-		double min_dt = 0;
-		double max_dt = remaining_dt;
-		int i = 0;
-		while (true) {
-		    if (i >= 20) {
-			gSimulate = false;
-			print("binary search is broken (%s %s) %s\n", min_dt, max_dt, remaining_dt);
-			goto exit;
-		    }
-		    RestoreStates(bodies);
-		    double mid_dt = (min_dt + max_dt) / 2;
-		    Advance(bodies, mid_dt);
-		    int c = Classify(bodies, temp);
-		    if (c == 0) break;
-		    if (c < 0)
-			max_dt = mid_dt;
-		    else
-			min_dt = mid_dt;
-		    i += 1;
-		}
-		double mid_dt = (min_dt + max_dt) / 2;
-		remaining_dt -= mid_dt;
-	    }
-	exit:
+                // find collision time
+                double min_dt = 0;
+                double max_dt = remaining_dt;
+                int i = 0;
+                while (true) {
+                    if (i >= 20) {
+                        gSimulate = false;
+                        print("binary search is broken (%s %s) %s\n", min_dt, max_dt, remaining_dt);
+                        goto exit;
+                    }
+                    RestoreStates(bodies);
+                    double mid_dt = (min_dt + max_dt) / 2;
+                    Advance(bodies, mid_dt);
+                    int c = Classify(bodies, temp);
+                    if (c == 0) break;
+                    if (c < 0)
+                        max_dt = mid_dt;
+                    else
+                        min_dt = mid_dt;
+                    i += 1;
+                }
+                double mid_dt = (min_dt + max_dt) / 2;
+                remaining_dt -= mid_dt;
+            }
+        exit:
 
-	    time += dt;
-	    gSimulateTick = false;
-	}
+            time += dt;
+            gSimulateTick = false;
+        }
 
-	double energy = 0;
-	for (Body& body : bodies) {
-	    energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
-	}
-	minimize(energyMin, energy);
-	maximize(energyMax, energy);
+        double energy = 0;
+        for (Body& body : bodies) {
+            energy += -glm::dot(body.pos, gravity) * body.mass + glm::dot(body.vel, body.vel) * body.mass / 2;
+        }
+        minimize(energyMin, energy);
+        maximize(energyMax, energy);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	for (Body& body : bodies) {
-	    vec2 p = body.pos;
-	    p.x = p.x / Width * 800;
-	    p.y = p.y / Height * 600;
-	    monaco.render(format("pos (%f)\nvec (%f)", body.pos, body.vel), p.x, p.y, 0.3, "7FE030");
-	}
-	monaco.render(format("energy %s, spread %s, time %s", energy, energyMax - energyMin, time), 5, 5, 0.3,
-	              "7FE030");
-	glDisable(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        for (Body& body : bodies) {
+            vec2 p = body.pos;
+            p.x = p.x / Width * 800;
+            p.y = p.y / Height * 600;
+            monaco.render(format("pos (%f)\nvec (%f)", body.pos, body.vel), p.x, p.y, 0.3, "7FE030");
+        }
+        monaco.render(format("energy %s, spread %s, time %s", energy, energyMax - energyMin, time), 5, 5, 0.3,
+                      "7FE030");
+        glDisable(GL_BLEND);
 
-	if (time >= 100) gSimulate = false;
+        if (time >= 100) gSimulate = false;
 
-	glUseProgram(shader);
-	buffer.bind();
-	for (const Body& body : bodies) {
-	    mat3 transform(ortho);
-	    transform = glm::translate(transform, vec2(body.pos));
-	    transform = glm::rotate(transform, float(body.ang_pos));
-	    transformUniform = transform;
-	    buffer.write(cspan<vec2>(body.shapef.data(), body.shapef.size()));
-	    glDrawArrays(GL_LINE_LOOP, 0, body.shapef.size());
-	}
+        glUseProgram(shader);
+        buffer.bind();
+        for (const Body& body : bodies) {
+            mat3 transform(ortho);
+            transform = glm::translate(transform, vec2(body.pos));
+            transform = glm::rotate(transform, float(body.ang_pos));
+            transformUniform = transform;
+            buffer.write(cspan<vec2>(body.shapef.data(), body.shapef.size()));
+            glDrawArrays(GL_LINE_LOOP, 0, body.shapef.size());
+        }
     });
     return 0;
 }

@@ -1,12 +1,11 @@
 #pragma once
 
-#include <core/std.h>
 #include <core/format.h>
-
-#include <string>
-#include <mutex>
-
+#include <core/std.h>
 #include <view/opengl.h>
+
+#include <mutex>
+#include <string>
 
 void Error(const char* name);
 
@@ -16,46 +15,45 @@ void load_png_texture(std::string_view filename);
 
 // TODO make it work for vertical monitor setup
 const int ConsoleWidth = 131;
-const int ConsoleHeight = 40; // TODO: magic numbers?
+const int ConsoleHeight = 40;  // TODO: magic numbers?
 
-class Console
-{
-public:
-	Console();
-	virtual void Execute(std::string_view command) { Print("[%s]\n", command); }
+class Console {
+   public:
+    Console();
+    virtual void Execute(std::string_view command) { Print("[%s]\n", command); }
 
-	template<typename ...Args>
-	void Print(std::string_view fmt, Args... args) {
-		std::lock_guard lock(_mutex);
-		PrintInternal(format(fmt, args...));
-	}
+    template <typename... Args>
+    void Print(std::string_view fmt, Args... args) {
+        std::lock_guard lock(_mutex);
+        PrintInternal(format(fmt, args...));
+    }
 
-	static bool KeyToChar(int key, int mods, char& ch);
-	bool OnKey(int key, int mods);
-	//void Render(Text* text, float time);
+    static bool KeyToChar(int key, int mods, char& ch);
+    bool OnKey(int key, int mods);
+    // void Render(Text* text, float time);
 
-	bool IsVisible() { return _visible; }
-	void Show() { _visible = true; }
-	void Hide() { _visible = false; }
+    bool IsVisible() { return _visible; }
+    void Show() { _visible = true; }
+    void Hide() { _visible = false; }
 
-	//json_t* save();
-	//bool load(json_t* doc);
+    // json_t* save();
+    // bool load(json_t* doc);
 
-private:
-	void PrintInternal(std::string_view s);
+   private:
+    void PrintInternal(std::string_view s);
 
-	bool _visible = false;
-	std::mutex _mutex;
+    bool _visible = false;
+    std::mutex _mutex;
 
-	char _output[ConsoleHeight][ConsoleWidth];
-	int _last_line = 0;
-	int _last_column = 0;
+    char _output[ConsoleHeight][ConsoleWidth];
+    int _last_line = 0;
+    int _last_column = 0;
 
-	struct Input {
-		std::array<char, ConsoleWidth> buffer;
-		int cursor;
-	};
+    struct Input {
+        std::array<char, ConsoleWidth> buffer;
+        int cursor;
+    };
 
-	int _current_input = 0;
-	vector<Input*> _inputs;
+    int _current_input = 0;
+    vector<Input*> _inputs;
 };

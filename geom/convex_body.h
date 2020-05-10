@@ -1,22 +1,22 @@
 #pragma once
 #include <core/std.h>
-#include <geom/mesh.h>
 #include <geom/matrix.h>
+#include <geom/mesh.h>
 
 struct xyz4 {
-	double4 x, y, z;
+    double4 x, y, z;
 };
 
 // mesh3 with extra precomputed fields for faster ClassifyConvexConvex!
 struct cmesh3 {
-	double3 position;
-	double33 orientation_inv = double33_identity;
+    double3 position;
+    double33 orientation_inv = double33_identity;
 
-	mesh3 mesh;
-	vector<double3> vertices;
-	vector<xyz4> vertices4;
-	vector<double3> faceAxis;
-	vector<double3> edgeAxis;
+    mesh3 mesh;
+    vector<double3> vertices;
+    vector<xyz4> vertices4;
+    vector<double3> faceAxis;
+    vector<double3> edgeAxis;
 };
 
 cmesh3 GenerateConvexMesh(cspan<double3> vertices);
@@ -36,12 +36,5 @@ cmesh3 GenerateConvexMesh(cspan<double3> vertices);
 // -1 if overlaping
 // - returns axis of minimal overlap
 // - returns amount of minimal overlap
-int ClassifyConvexConvex(
-	const cmesh3& ca,
-	const cmesh3& cb,
-	bool hasNormal,
-	double3& normal,
-	vector<double3>& contacts,
-	double& overlap,
-	vector<double3>& workA,
-	vector<double3>& workB);
+int ClassifyConvexConvex(const cmesh3& ca, const cmesh3& cb, bool hasNormal, double3& normal, vector<double3>& contacts,
+                         double& overlap, vector<double3>& workA, vector<double3>& workB);

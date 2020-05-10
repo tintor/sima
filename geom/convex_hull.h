@@ -1,6 +1,6 @@
 #pragma once
-#include <geom/mesh.h>
 #include <core/span.h>
+#include <geom/mesh.h>
 
 // Is this valid mesh a convex polyhedron?
 bool is_convex(cspan<triangle3> mesh);
@@ -9,7 +9,7 @@ bool is_convex(cspan<triangle3> mesh);
 void convex_hull(cspan<double3> points, mesh3& hull);
 
 inline mesh3 convex_hull(cspan<double3> points) {
-	mesh3 hull;
-	convex_hull(points, /*out*/hull);
-	return hull;
+    mesh3 hull;
+    convex_hull(points, /*out*/ hull);
+    return hull;
 }

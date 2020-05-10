@@ -1,18 +1,18 @@
 #pragma once
-#include <geom/vector.h>
+#include <geom/plane.h>
 #include <geom/segment.h>
 #include <geom/triangle.h>
-#include <geom/plane.h>
+#include <geom/vector.h>
 
-inline constexpr long double operator "" _deg(long double a) { return a * (PI / 180); }
-inline constexpr long double operator "" _deg(unsigned long long a) { return a * (PI / 180); }
+inline constexpr long double operator"" _deg(long double a) { return a * (PI / 180); }
+inline constexpr long double operator"" _deg(unsigned long long a) { return a * (PI / 180); }
 
 inline string deg(long double r) { return format("%g deg", r * (180 / PI)); }
 
 inline constexpr double clamp(double t, double min = 0, double max = 1) {
-	if (t < min) return min;
-	if (t > max) return max;
-	return t;
+    if (t < min) return min;
+    if (t > max) return max;
+    return t;
 }
 
 // How close a point needs to be to a plane to be considered on the plane?
@@ -41,7 +41,7 @@ double distance(triangle3 m, double3 v);
 
 bool intersects(line3 e, triangle3 m);
 bool intersects2(line3 e, triangle3 m);
-bool intersection(line3 e, triangle3 m, /*out*/double3& result);
+bool intersection(line3 e, triangle3 m, /*out*/ double3& result);
 bool intersects_in_point(segment3 e, triangle3 m);
 bool intersects_in_point(ray3 e, triangle3 m);
 

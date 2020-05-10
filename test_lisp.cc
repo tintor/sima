@@ -6,26 +6,26 @@
 
 void test(bool identical, string_view cases) {
     for (auto line : split(cases, '\n')) {
-	if (line.size() == 0) continue;
-	auto parts = split(line, '\t');
-	Lisp lisp;
+        if (line.size() == 0) continue;
+        auto parts = split(line, '\t');
+        Lisp lisp;
 
-	auto ap = lisp.parse(parts[0]);
-	auto a = lisp.eval(ap);
-	auto bp = lisp.parse(parts.back());
-	auto b = lisp.eval(bp);
+        auto ap = lisp.parse(parts[0]);
+        auto a = lisp.eval(ap);
+        auto bp = lisp.parse(parts.back());
+        auto b = lisp.eval(bp);
 
-	bool result = identical ? a == b : Lisp::equal(a, b);
-	if (!result) {
-	    print("as = %s\n", parts[0]);
-	    print("bs = %s\n", parts.back());
-	    print("ap = %s\n", lisp.format(ap));
-	    print("bp = %s\n", lisp.format(bp));
-	    print("a = %s\n", lisp.format(a));
-	    print("b = %s\n", lisp.format(b));
-	    print("a not %s to b\n", identical ? "identical" : "equal");
-	}
-	REQUIRE(result);
+        bool result = identical ? a == b : Lisp::equal(a, b);
+        if (!result) {
+            print("as = %s\n", parts[0]);
+            print("bs = %s\n", parts.back());
+            print("ap = %s\n", lisp.format(ap));
+            print("bp = %s\n", lisp.format(bp));
+            print("a = %s\n", lisp.format(a));
+            print("b = %s\n", lisp.format(b));
+            print("a not %s to b\n", identical ? "identical" : "equal");
+        }
+        REQUIRE(result);
     }
 }
 

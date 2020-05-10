@@ -1,23 +1,23 @@
 #pragma once
+#include <core/format.h>
 #include <geom/mesh.h>
 #include <geom/polygon.h>
-#include <core/format.h>
 
 bool IsValidPolygon(cspan<double2> poly);
 bool IsValid(const polygon2& poly);
 bool IsValid(const xpolygon2& poly);
 
 enum class Validity {
-	OK = 0,
-	TooFewFaces = 1,
-	InvalidFace = 2,
-	OpenEdge = 3,
-	SeparateComponents = 4,
-	SelfIntersection = 5,
-	NotSealed = 6,
-	Inverted = 7,
-	OverlappingFaces = 8,
-	NonPlanarFace = 9,
+    OK = 0,
+    TooFewFaces = 1,
+    InvalidFace = 2,
+    OpenEdge = 3,
+    SeparateComponents = 4,
+    SelfIntersection = 5,
+    NotSealed = 6,
+    Inverted = 7,
+    OverlappingFaces = 8,
+    NonPlanarFace = 9,
 };
 
 Validity IsValid(const mesh3& mesh);

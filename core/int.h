@@ -17,9 +17,8 @@ using ucent = __uint128_t;
 
 using size_t = ulong;
 
-template<typename Int>
+template <typename Int>
 inline bool add_overflow(Int a, Int b) {
-	if (b >= 0)
-		return std::numeric_limits<Int>::max() - b < a;
-	return a < std::numeric_limits<Int>::min() - b;
+    if (b >= 0) return std::numeric_limits<Int>::max() - b < a;
+    return a < std::numeric_limits<Int>::min() - b;
 }

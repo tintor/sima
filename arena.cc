@@ -24,20 +24,20 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     print("key_callback [%s] key:%s scancode:%s action:%s mods:%s\n", key_name, key, scancode, action, mods);
 
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
-	glfwSetWindowShouldClose(window, GL_TRUE);
-	return;
+        glfwSetWindowShouldClose(window, GL_TRUE);
+        return;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == 0) {
-	gSimulate ^= 1;
+        gSimulate ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
-	gSimulateTick ^= 1;
+        gSimulateTick ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_G && mods == 0) {
-	gGravity ^= 1;
+        gGravity ^= 1;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_A && mods == 0) {
-	gAirDrag ^= 1;
+        gAirDrag ^= 1;
     }
 }
 
@@ -92,22 +92,22 @@ int main(int argc, char** argv) {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
     RunEventLoop(window, [&]() {
-	glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	/*for (Body& body : bodies) {
-	        vec2 p = body.pos;
-	        p.x = p.x / Width * 800;
-	        p.y = p.y / Height * 600;
-	        monaco.render(
-	                format("pos (%f)\nvec (%f)", body.pos, body.vel),
-	                p.x, p.y, 0.3, "7FE030");
-	}
-	monaco.render(
-	        format("energy %s, spread %s, time %s", energy, energyMax - energyMin, time),
-	        5, 5, 0.3, "7FE030");*/
-	glDisable(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        /*for (Body& body : bodies) {
+                vec2 p = body.pos;
+                p.x = p.x / Width * 800;
+                p.y = p.y / Height * 600;
+                monaco.render(
+                        format("pos (%f)\nvec (%f)", body.pos, body.vel),
+                        p.x, p.y, 0.3, "7FE030");
+        }
+        monaco.render(
+                format("energy %s, spread %s, time %s", energy, energyMax - energyMin, time),
+                5, 5, 0.3, "7FE030");*/
+        glDisable(GL_BLEND);
     });
     return 0;
 }

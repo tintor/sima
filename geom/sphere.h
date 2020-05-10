@@ -4,13 +4,14 @@
 #include <geom/vector.h>
 
 class sphere {
-public:
-	sphere(double3 center, double radius) { s = extend(center, radius); }
-	double3 center() const { return s.xyz; }
-	double radius() const { return s.w; }
-	bool contains(double3 p) const { return squared(center() - p) <= squared(radius()); }
-private:
-	double4 s;
+   public:
+    sphere(double3 center, double radius) { s = extend(center, radius); }
+    double3 center() const { return s.xyz; }
+    double radius() const { return s.w; }
+    bool contains(double3 p) const { return squared(center() - p) <= squared(radius()); }
+
+   private:
+    double4 s;
 };
 
 sphere minimal_sphere(sphere a, sphere b);

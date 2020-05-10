@@ -38,8 +38,7 @@ FontRenderer::FontRenderer(double width, double height)
 	)END") {
     glm::mat4 projection = glm::ortho(0.0, width, 0.0, height);
     shader.use();
-    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE,
-                       glm::value_ptr(projection));
+    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     textColorLocation = glGetUniformLocation(shader, "textColor");
 
     // Disable byte-alignment restriction
@@ -51,8 +50,7 @@ FontRenderer::FontRenderer(double width, double height)
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * CharsPerBuffer,
-                 nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * CharsPerBuffer, nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -64,8 +62,7 @@ Font::Font(string_view name, int resolution, FontRenderer *renderer) {
 
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) {
-        std::cout << "ERROR::FREETYPE: Could not init FreeType Library"
-                  << std::endl;
+        std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
         exit(0);
     }
     ON_SCOPE_EXIT(FT_Done_FreeType(ft));
@@ -73,12 +70,10 @@ Font::Font(string_view name, int resolution, FontRenderer *renderer) {
     // Load font as face
     // TODO do search in both: /System/Library/Fonts and /Library/Fonts with
     // various extensions
-    const char *fmt =
-        name.find('.') != string_view::npos ? "%s" : "/Library/Fonts/%s.ttf";
+    const char *fmt = name.find('.') != string_view::npos ? "%s" : "/Library/Fonts/%s.ttf";
     FT_Face face;
     if (FT_New_Face(ft, format(fmt, name).c_str(), 0, &face)) {
-        std::cout << "ERROR::FREETYPE: Failed to load font: "
-                  << format(fmt, name) << std::endl;
+        std::cout << "ERROR::FREETYPE: Failed to load font: " << format(fmt, name) << std::endl;
         exit(0);
     }
     ON_SCOPE_EXIT(FT_Done_Face(face));
@@ -127,15 +122,13 @@ Font::Font(string_view name, int resolution, FontRenderer *renderer) {
         int size_x = face->glyph->bitmap.width;
         int size_y = face->glyph->bitmap.rows;
 
-        m_characters[c] = {
-            texture_offset / tw, (texture_offset + size_x) / tw, 1 / th,
-            (1 + size_y) / th,
+        m_characters[c] = {texture_offset / tw, (texture_offset + size_x) / tw, 1 / th, (1 + size_y) / th,
 
-            size_x, size_y, face->glyph->bitmap_left, face->glyph->bitmap_top,
-            // Advance is number of 1/64 pixels.
-            // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of
-            // 1/64th pixels by 64 to get amount of pixels))
-            int(face->glyph->advance.x >> 6)};
+                           size_x, size_y, face->glyph->bitmap_left, face->glyph->bitmap_top,
+                           // Advance is number of 1/64 pixels.
+                           // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of
+                           // 1/64th pixels by 64 to get amount of pixels))
+                           int(face->glyph->advance.x >> 6)};
 
         int w = face->glyph->bitmap.width;
         int h = face->glyph->bitmap.rows;
@@ -143,16 +136,14 @@ Font::Font(string_view name, int resolution, FontRenderer *renderer) {
         if (w > 0 && h > 0) {
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
-                    data[(y + 1) * texture_width + texture_offset + x] =
-                        buffer[y * w + x];
+                    data[(y + 1) * texture_width + texture_offset + x] = buffer[y * w + x];
                 }
             }
             texture_offset += w + 1;
         }
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texture_width, texture_height, 0,
-                 GL_RED, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texture_width, texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -200,29 +191,24 @@ void Font::render(string_view text, double scale, Color color) {
 
         // Update VBO for each character
         float vertices[6 * 4] = {
-            xpos,  ypos + h, ch.u0,    ch.v0,    xpos,     ypos,
-            ch.u0, ch.v1,    xpos + w, ypos,     ch.u1,    ch.v1,
+            xpos, ypos + h, ch.u0, ch.v0, xpos,     ypos, ch.u0, ch.v1, xpos + w, ypos,     ch.u1, ch.v1,
 
-            xpos,  ypos + h, ch.u0,    ch.v0,    xpos + w, ypos,
-            ch.u1, ch.v1,    xpos + w, ypos + h, ch.u1,    ch.v0,
+            xpos, ypos + h, ch.u0, ch.v0, xpos + w, ypos, ch.u1, ch.v1, xpos + w, ypos + h, ch.u1, ch.v0,
         };
 
         m_x += ch.advance * scale;
 
-        memcpy(m_renderer->vertices + offset * 6 * 4, vertices,
-               6 * 4 * sizeof(float));
+        memcpy(m_renderer->vertices + offset * 6 * 4, vertices, 6 * 4 * sizeof(float));
         offset += 1;
 
         if (offset == CharsPerBuffer) {
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset,
-                            m_renderer->vertices);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, m_renderer->vertices);
             glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
             offset = 0;
         }
     }
     if (offset > 0) {
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset,
-                        m_renderer->vertices);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * 4 * offset, m_renderer->vertices);
         glDrawArrays(GL_TRIANGLES, 0, 6 * offset);
         offset = 0;
     }

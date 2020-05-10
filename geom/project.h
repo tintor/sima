@@ -1,7 +1,7 @@
 #pragma once
-#include <geom/segment.h>
 #include <geom/mesh.h>
 #include <geom/polygon.h>
+#include <geom/segment.h>
 
 // TODO project should preserve distances!!!
 double2 Project(double3 v, int axis);

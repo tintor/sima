@@ -7,24 +7,24 @@
 #include <view/vertex_buffer.h>
 #include <view/window.h>
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    const char* key_name = glfwGetKeyName(key, 0);
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    const char *key_name = glfwGetKeyName(key, 0);
     print("key_callback [%s] key:%s scancode:%s action:%s mods:%s\n", key_name, key, scancode, action, mods);
 
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT) {
-	glfwSetWindowShouldClose(window, GL_TRUE);
-	return;
+        glfwSetWindowShouldClose(window, GL_TRUE);
+        return;
     }
 }
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
     if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT) {
     }
 }
 
-void scroll_callback(GLFWwindow* window, double x, double y) {}
+void scroll_callback(GLFWwindow *window, double x, double y) {}
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
+void framebuffer_size_callback(GLFWwindow *window, int width, int height) { glViewport(0, 0, width, height); }
 
 constexpr int Width = 1000, Height = 1000;
 
@@ -75,88 +75,88 @@ struct View : public VertexBuffer_vec2_rgba {
           transform("transform") {}
 };
 
-void Render(const Board& board, View& view) {
+void Render(const Board &board, View &view) {
     glUseProgram(view.shader);
     view.bind();
     view.transform = view.ortho;
 
     // Frame
     for (int i = 0; i <= 5; i++) {
-	const uint64_t color = 0xFF808080;
-	view.add({100, 100 + i * 160}, color);
-	view.add({100 + 800, 100 + i * 160}, color);
+        const uint64_t color = 0xFF808080;
+        view.add({100, 100 + i * 160}, color);
+        view.add({100 + 800, 100 + i * 160}, color);
 
-	view.add({100 + i * 160, 100}, color);
-	view.add({100 + i * 160, 100 + 800}, color);
+        view.add({100 + i * 160, 100}, color);
+        view.add({100 + i * 160, 100 + 800}, color);
     }
     view.draw(GL_LINES);
 
     for (int y = 0; y < 5; y++) {
-	for (int x = 0; x < 5; x++) {
-	    const double s = 160;
-	    const double px = 100 + x * s + s / 2;
-	    const double py = 100 + y * s + s / 2;
-	    const auto cell = board.cell[x][y];
+        for (int x = 0; x < 5; x++) {
+            const double s = 160;
+            const double px = 100 + x * s + s / 2;
+            const double py = 100 + y * s + s / 2;
+            const auto cell = board.cell[x][y];
 
-	    // Towers
-	    if (cell.level >= 1) {
-		const uint64_t color = 0xFFFFFFFF;
-		double a = 70;
-		view.add({px - a, py - a}, color);
-		view.add({px + a, py - a}, color);
-		view.add({px + a, py + a}, color);
-		view.add({px - a, py + a}, color);
-		view.draw(GL_LINE_LOOP);
-	    }
-	    if (cell.level >= 2) {
-		const uint64_t color = 0xFFFFFFFF;
-		double a = 60;
-		view.add({px - a, py - a}, color);
-		view.add({px + a, py - a}, color);
-		view.add({px + a, py + a}, color);
-		view.add({px - a, py + a}, color);
-		view.draw(GL_LINE_LOOP);
-	    }
-	    if (cell.level >= 3) {
-		const uint64_t color = 0xFFFFFFFF;
-		double a = 50;
-		view.add({px - a, py - a}, color);
-		view.add({px + a, py - a}, color);
-		view.add({px + a, py + a}, color);
-		view.add({px - a, py + a}, color);
-		view.draw(GL_LINE_LOOP);
-	    }
+            // Towers
+            if (cell.level >= 1) {
+                const uint64_t color = 0xFFFFFFFF;
+                double a = 70;
+                view.add({px - a, py - a}, color);
+                view.add({px + a, py - a}, color);
+                view.add({px + a, py + a}, color);
+                view.add({px - a, py + a}, color);
+                view.draw(GL_LINE_LOOP);
+            }
+            if (cell.level >= 2) {
+                const uint64_t color = 0xFFFFFFFF;
+                double a = 60;
+                view.add({px - a, py - a}, color);
+                view.add({px + a, py - a}, color);
+                view.add({px + a, py + a}, color);
+                view.add({px - a, py + a}, color);
+                view.draw(GL_LINE_LOOP);
+            }
+            if (cell.level >= 3) {
+                const uint64_t color = 0xFFFFFFFF;
+                double a = 50;
+                view.add({px - a, py - a}, color);
+                view.add({px + a, py - a}, color);
+                view.add({px + a, py + a}, color);
+                view.add({px - a, py + a}, color);
+                view.draw(GL_LINE_LOOP);
+            }
 
-	    // Domes
-	    if (cell.figure == Figure::Dome) {
-		const uint64_t color = 0xFFFF0000;
-		double a = 40;
-		for (int i = 0; i < 16; i++) {
-		    double k = i * 2 * M_PI / 16;
-		    view.add({px + cos(k) * a, py + sin(k) * a}, color);
-		}
-		view.draw(GL_TRIANGLE_FAN);
-	    }
+            // Domes
+            if (cell.figure == Figure::Dome) {
+                const uint64_t color = 0xFFFF0000;
+                double a = 40;
+                for (int i = 0; i < 16; i++) {
+                    double k = i * 2 * M_PI / 16;
+                    view.add({px + cos(k) * a, py + sin(k) * a}, color);
+                }
+                view.draw(GL_TRIANGLE_FAN);
+            }
 
-	    // Player pieces
-	    if (cell.figure == Figure::Player1 || cell.figure == Figure::Player2) {
-		const uint64_t color = (cell.figure == Figure::Player1) ? 0xFF00FFFF : 0xFF0000FF;
-		double a = 40;
-		view.add({px - a, py - a}, color);
-		view.add({px + a, py - a}, color);
-		view.add({px + a, py + a}, color);
-		view.add({px - a, py + a}, color);
-		/*for (int i = 0; i < 16; i++) {
-		    double k = i * 2 * M_PI / 16;
-		    view.add({px + cos(k) * a, py + sin(k) * a}, color);
-		}*/
-		view.draw(GL_TRIANGLE_FAN);
-	    }
-	}
+            // Player pieces
+            if (cell.figure == Figure::Player1 || cell.figure == Figure::Player2) {
+                const uint64_t color = (cell.figure == Figure::Player1) ? 0xFF00FFFF : 0xFF0000FF;
+                double a = 40;
+                view.add({px - a, py - a}, color);
+                view.add({px + a, py - a}, color);
+                view.add({px + a, py + a}, color);
+                view.add({px - a, py + a}, color);
+                /*for (int i = 0; i < 16; i++) {
+                    double k = i * 2 * M_PI / 16;
+                    view.add({px + cos(k) * a, py + sin(k) * a}, color);
+                }*/
+                view.draw(GL_TRIANGLE_FAN);
+            }
+        }
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     InitSegvHandler();
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});
@@ -179,14 +179,14 @@ int main(int argc, char** argv) {
     board.cell[0][3].figure = Figure::Dome;
 
     RunEventLoop(window, [&]() {
-	glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	view.mono.render(format("Hello world,\nMarko!"), 500, 500, 13.0 / 48, "FFFFFF");
-	glDisable(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        view.mono.render(format("Hello world,\nMarko!"), 500, 500, 13.0 / 48, "FFFFFF");
+        glDisable(GL_BLEND);
 
-	Render(board, view);
+        Render(board, view);
     });
     return 0;
 }

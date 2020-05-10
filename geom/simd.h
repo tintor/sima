@@ -1,7 +1,7 @@
 #pragma once
-#include <core/int.h>
 #include <core/format.h>
 #include <core/hash.h>
+#include <core/int.h>
 #include <immintrin.h>
 
 #define vshuffle __builtin_shufflevector
@@ -47,19 +47,25 @@ inline bool equal(int3 a, int3 b) { return all(a == b); }
 inline bool equal(int4 a, int4 b) { return all(a == b); }
 
 // requires AVX512
-//inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
-//inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
+// inline bool equal(double2 a, double2 b) { return _mm_cmpeq_epu64_mask(a, b) == 0x3; }
+// inline bool equal(double4 a, double4 b) { return _mm256_cmpeq_epu64_mask(a, b) == 0xF; }
 
 inline bool equal(double2 a, double2 b) { return all(a == b); }
 inline bool equal(double3 a, double3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
 inline bool equal(double4 a, double4 b) { return all(a == b); }
 
 inline double2 floor(double2 a) { return _mm_floor_pd(a); }
-inline double3 floor(double3 a) { double4 v = _mm256_floor_pd(cast4(a)); return v.xyz; }
+inline double3 floor(double3 a) {
+    double4 v = _mm256_floor_pd(cast4(a));
+    return v.xyz;
+}
 inline double4 floor(double4 a) { return _mm256_floor_pd(a); }
 
 inline double2 ceil(double2 a) { return _mm_ceil_pd(a); }
-inline double3 ceil(double3 a) { double4 v = _mm256_ceil_pd(cast4(a)); return v.xyz; }
+inline double3 ceil(double3 a) {
+    double4 v = _mm256_ceil_pd(cast4(a));
+    return v.xyz;
+}
 inline double4 ceil(double4 a) { return _mm256_ceil_pd(a); }
 
 inline hash operator<<(hash h, int2 a) { return h << a.x << a.y; }
@@ -68,11 +74,9 @@ inline hash operator<<(hash h, double2 a) { return h << a.x << a.y; }
 inline hash operator<<(hash h, double3 a) { return h << a.x << a.y << a.z; }
 inline hash operator<<(hash h, double4 a) { return h << a.x << a.y << a.z << a.w; }
 
-template<typename T>
+template <typename T>
 struct equal_t {
-	bool operator()(T a, T b) const {
-		return equal(a, b);
-	}
+    bool operator()(T a, T b) const { return equal(a, b); }
 };
 
 inline int8 vmin(int8 a, int8 b) { return _mm256_min_epi32(a, b); }
@@ -82,7 +86,10 @@ inline float8 vmin(float8 a, float8 b) { return _mm256_min_ps(a, b); }
 inline float4 vmin(float4 a, float4 b) { return _mm_min_ps(a, b); }
 
 inline double2 vmin(double2 a, double2 b) { return _mm_min_pd(a, b); }
-inline double3 vmin(double3 a, double3 b) { double4 e = _mm256_min_pd(cast4(a), cast4(b)); return e.xyz; }
+inline double3 vmin(double3 a, double3 b) {
+    double4 e = _mm256_min_pd(cast4(a), cast4(b));
+    return e.xyz;
+}
 inline double4 vmin(double4 a, double4 b) { return _mm256_min_pd(a, b); }
 
 inline int8 vmax(int8 a, int8 b) { return _mm256_max_epi32(a, b); }
@@ -92,35 +99,38 @@ inline float8 vmax(float8 a, float8 b) { return _mm256_max_ps(a, b); }
 inline float4 vmax(float4 a, float4 b) { return _mm_max_ps(a, b); }
 
 inline double2 vmax(double2 a, double2 b) { return _mm_max_pd(a, b); }
-inline double3 vmax(double3 a, double3 b) { double4 e = _mm256_max_pd(cast4(a), cast4(b)); return e.xyz; }
+inline double3 vmax(double3 a, double3 b) {
+    double4 e = _mm256_max_pd(cast4(a), cast4(b));
+    return e.xyz;
+}
 inline double4 vmax(double4 a, double4 b) { return _mm256_max_pd(a, b); }
 
 inline int hmin(int8 a) {
-     auto b = vmin(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
-     auto c = vmin(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
-     auto d = vmin(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
-     return d.x;
+    auto b = vmin(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
+    auto c = vmin(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
+    auto d = vmin(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
+    return d.x;
 }
 
 inline float hmin(float8 a) {
-     auto b = vmin(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
-     auto c = vmin(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
-     auto d = vmin(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
-     return d.x;
+    auto b = vmin(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
+    auto c = vmin(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
+    auto d = vmin(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
+    return d.x;
 }
 
 inline int hmax(int8 a) {
-     auto b = vmax(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
-     auto c = vmax(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
-     auto d = vmax(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
-     return d.x;
+    auto b = vmax(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
+    auto c = vmax(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
+    auto d = vmax(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
+    return d.x;
 }
 
 inline float hmax(float8 a) {
-     auto b = vmax(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
-     auto c = vmax(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
-     auto d = vmax(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
-     return d.x;
+    auto b = vmax(a, vshuffle(a, a, 2, 3, -1, -1, 6, 7, -1, -1));
+    auto c = vmax(b, vshuffle(b, b, 1, -1, -1, -1, 5, -1, -1, -1));
+    auto d = vmax(c, vshuffle(c, c, 4, -1, -1, -1, -1, -1, -1, -1));
+    return d.x;
 }
 
 inline int4 as_int(float4 a) { return _mm_cvtps_epi32(a); }

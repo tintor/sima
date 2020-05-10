@@ -1,11 +1,12 @@
 #pragma once
 #include <core/auto.h>
 #include <core/murmur3.h>
+
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <string>
 #include <string_view>
-#include <cstring>
 
 // clang-format off
 struct prime_number_hash_policy {
@@ -309,9 +310,7 @@ struct prime_number_hash_policy {
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-inline bool aligned(const void* p, size_t a) {
-	return reinterpret_cast<size_t>(p) % a == 0;
-}
+inline bool aligned(const void* p, size_t a) { return reinterpret_cast<size_t>(p) % a == 0; }
 
 #ifdef __clang__
 constexpr bool _clang_ = true;
@@ -320,169 +319,163 @@ constexpr bool _clang_ = false;
 #endif
 
 struct fast_string_view {
-	constexpr static bool special = true;
+    constexpr static bool special = true;
 
-	fast_string_view(const char* s) {
-		uint32_t l = strlen(s);
-		init(l, s, l + 1);
-	}
+    fast_string_view(const char* s) {
+        uint32_t l = strlen(s);
+        init(l, s, l + 1);
+    }
 
-	fast_string_view(const std::string& s) {
-		// clang std::string stores \0 char after the last reserved byte
-		init(s.size(), s.data(), s.capacity() + (_clang_ ? 1 : 0));
-	}
+    fast_string_view(const std::string& s) {
+        // clang std::string stores \0 char after the last reserved byte
+        init(s.size(), s.data(), s.capacity() + (_clang_ ? 1 : 0));
+    }
 
-	fast_string_view(std::string_view s) { init(s.size(), s.data(), s.size()); }
+    fast_string_view(std::string_view s) { init(s.size(), s.data(), s.size()); }
 
-	void init(uint32_t len, const char* data, uint32_t capacity) {
-		assert(data != nullptr);
-		ON_SCOPE_EXIT(assert(hash(0) == MurmurHash3_x64_128(data, len, 0)));
-		_len = len;
-		_data = reinterpret_cast<const uint64_t*>(data);
-		if (_len % 8 == 0) {
-			if (_len == 0) {
-				_b = 0;
-				_a = 0;
-				return;
-			}
-			if (_len == 8) {
-				_b = 0;
-				_a = _data[0];
-				return;
-			}
-			if (special && _len == 16) {
-				_b = _data[0];
-				_a = _data[1];
-				_data = nullptr;
-				return;
-			}
-			_b = _len / 8 - 1;
-			_a = _data[_b];
-			return;
-		}
-		if (aligned(_data, 8)) {
-			_b = _len / 8;
-			if (_b * 8 + 8 <= capacity) {
-				_a = _data[_b]; // safe to read past the end of
-				// string
-				if (special && _len < 16) {
-					_b = _data[0];
-					_data = nullptr;
-				}
-				return;
-			}
-			// fallthrough
-		}
-		if (_len < 8) {
-			_b = 0;
-			_a = load64(data, _len);
-			return;
-		}
-		if (special && _len < 16) {
-			_b = *_data;
-			_a = load64(data + 8, _len);
-			_data = nullptr;
-			return;
-		}
-		_b = _len / 8;
-		_a = load64(data + _b * 8, _len % 8);
-	}
+    void init(uint32_t len, const char* data, uint32_t capacity) {
+        assert(data != nullptr);
+        ON_SCOPE_EXIT(assert(hash(0) == MurmurHash3_x64_128(data, len, 0)));
+        _len = len;
+        _data = reinterpret_cast<const uint64_t*>(data);
+        if (_len % 8 == 0) {
+            if (_len == 0) {
+                _b = 0;
+                _a = 0;
+                return;
+            }
+            if (_len == 8) {
+                _b = 0;
+                _a = _data[0];
+                return;
+            }
+            if (special && _len == 16) {
+                _b = _data[0];
+                _a = _data[1];
+                _data = nullptr;
+                return;
+            }
+            _b = _len / 8 - 1;
+            _a = _data[_b];
+            return;
+        }
+        if (aligned(_data, 8)) {
+            _b = _len / 8;
+            if (_b * 8 + 8 <= capacity) {
+                _a = _data[_b];  // safe to read past the end of
+                // string
+                if (special && _len < 16) {
+                    _b = _data[0];
+                    _data = nullptr;
+                }
+                return;
+            }
+            // fallthrough
+        }
+        if (_len < 8) {
+            _b = 0;
+            _a = load64(data, _len);
+            return;
+        }
+        if (special && _len < 16) {
+            _b = *_data;
+            _a = load64(data + 8, _len);
+            _data = nullptr;
+            return;
+        }
+        _b = _len / 8;
+        _a = load64(data + _b * 8, _len % 8);
+    }
 
-	// safely load first len bytes from s into uint64_t (pad remaining bytes
-	// with zeroes)
-	static uint64_t load64(const char* s, int len) {
-		assert(1 <= len && len <= 7);
-		uint64_t k = 0;
-		switch (len) {
-		case 7:
-			k ^= ((uint64_t)s[6]) << 48;
-		case 6:
-			k ^= ((uint64_t)s[5]) << 40;
-		case 5:
-			k ^= ((uint64_t)s[4]) << 32;
-		case 4:
-			return k ^ *reinterpret_cast<const uint32_t*>(s);
-		case 3:
-			k ^= ((uint64_t)s[2]) << 16;
-		case 2:
-			k ^= ((uint64_t)s[1]) << 8;
-		case 1:
-			k ^= ((uint64_t)s[0]) << 0;
-		};
-		return k;
-	}
+    // safely load first len bytes from s into uint64_t (pad remaining bytes
+    // with zeroes)
+    static uint64_t load64(const char* s, int len) {
+        assert(1 <= len && len <= 7);
+        uint64_t k = 0;
+        switch (len) {
+            case 7:
+                k ^= ((uint64_t)s[6]) << 48;
+            case 6:
+                k ^= ((uint64_t)s[5]) << 40;
+            case 5:
+                k ^= ((uint64_t)s[4]) << 32;
+            case 4:
+                return k ^ *reinterpret_cast<const uint32_t*>(s);
+            case 3:
+                k ^= ((uint64_t)s[2]) << 16;
+            case 2:
+                k ^= ((uint64_t)s[1]) << 8;
+            case 1:
+                k ^= ((uint64_t)s[0]) << 0;
+        };
+        return k;
+    }
 
-	fast_string_view& set_hash(size_t hash) {
-		_hash = hash;
-		return *this;
-	}
+    fast_string_view& set_hash(size_t hash) {
+        _hash = hash;
+        return *this;
+    }
 
-	size_t hash(uint32_t seed) {
-		if (_hash != 0) {
-			return _hash;
-		}
-		Murmur3_x64_128 murmur;
-		murmur.reset(seed);
-		if (special && _data == nullptr) {
-			murmur.tail(_b, _a);
-		} else {
-			for (uint32_t i = 0; i < _b / 2 * 2; i += 2)
-				murmur.append(_data[i], _data[i + 1]);
-			if (_b & 1)
-				murmur.tail(_data[_b - 1], _a);
-			else
-				murmur.tail(_a, 0);
-		}
-		murmur.finalize(_len);
-		return murmur.h1 ^ murmur.h2;
-	}
+    size_t hash(uint32_t seed) {
+        if (_hash != 0) {
+            return _hash;
+        }
+        Murmur3_x64_128 murmur;
+        murmur.reset(seed);
+        if (special && _data == nullptr) {
+            murmur.tail(_b, _a);
+        } else {
+            for (uint32_t i = 0; i < _b / 2 * 2; i += 2) murmur.append(_data[i], _data[i + 1]);
+            if (_b & 1)
+                murmur.tail(_data[_b - 1], _a);
+            else
+                murmur.tail(_a, 0);
+        }
+        murmur.finalize(_len);
+        return murmur.h1 ^ murmur.h2;
+    }
 
-	// key is 8 byte aligned and is allocated with size which is multiple of
-	// 8 bytes
-	bool equals(const uint64_t* key, uint32_t key_len) {
-		if (_len != key_len)
-			return false;
-		if (special && _data == nullptr)
-			return _b == key[0] && _a == key[1];
-		switch (_b) {
-		case 0:
-			return _a == key[0];
-		case 1:
-			return _data[0] == key[0] && _a == key[1];
-		case 2:
-			return _data[0] == key[0] && _data[1] == key[1] && _a == key[2];
-		case 3:
-			return _data[0] == key[0] && _data[1] == key[1] &&
-				   _data[2] == key[2] && _a == key[3];
-		case 4:
-			return _data[0] == key[0] && _data[1] == key[1] &&
-				   _data[2] == key[2] && _data[3] == key[3] && _a == key[4];
-		}
-		for (uint32_t i = 0; i < _b; i++)
-			if (_data[i] != key[i])
-				return false;
-		return _a == key[_b];
-	}
+    // key is 8 byte aligned and is allocated with size which is multiple of
+    // 8 bytes
+    bool equals(const uint64_t* key, uint32_t key_len) {
+        if (_len != key_len) return false;
+        if (special && _data == nullptr) return _b == key[0] && _a == key[1];
+        switch (_b) {
+            case 0:
+                return _a == key[0];
+            case 1:
+                return _data[0] == key[0] && _a == key[1];
+            case 2:
+                return _data[0] == key[0] && _data[1] == key[1] && _a == key[2];
+            case 3:
+                return _data[0] == key[0] && _data[1] == key[1] && _data[2] == key[2] && _a == key[3];
+            case 4:
+                return _data[0] == key[0] && _data[1] == key[1] && _data[2] == key[2] && _data[3] == key[3] &&
+                       _a == key[4];
+        }
+        for (uint32_t i = 0; i < _b; i++)
+            if (_data[i] != key[i]) return false;
+        return _a == key[_b];
+    }
 
-	uint32_t size() { return _len; }
+    uint32_t size() { return _len; }
 
-	void write(uint64_t* key) {
-		if (special && _data == nullptr) {
-			key[0] = _b;
-			key[1] = _a;
-			return;
-		}
-		for (uint32_t i = 0; i < _b; i++)
-			key[0] = _data[i];
-		key[_b] = _a;
-	}
+    void write(uint64_t* key) {
+        if (special && _data == nullptr) {
+            key[0] = _b;
+            key[1] = _a;
+            return;
+        }
+        for (uint32_t i = 0; i < _b; i++) key[0] = _data[i];
+        key[_b] = _a;
+    }
 
-  private:
-	const uint64_t* _data;
-	uint64_t _a, _b;
-	// without special replace _b with uint32_t _blocks
-	uint32_t _len;
-	size_t _hash = 0;
+   private:
+    const uint64_t* _data;
+    uint64_t _a, _b;
+    // without special replace _b with uint32_t _blocks
+    uint32_t _len;
+    size_t _hash = 0;
 };
 
 // similar to std::unordered_map<std::string, V>, but uses less memory
@@ -495,300 +488,264 @@ struct fast_string_view {
 // same key size)
 template <typename V, int milli_load_factor = 1000, uint32_t hash_seed = 0>
 class string_node_hash_map {
-	constexpr static float load_factor = milli_load_factor * 1e-3;
+    constexpr static float load_factor = milli_load_factor * 1e-3;
 
-  public:
-	struct node {
-		node* _next;
-		V _value;
-		uint32_t _key_size;
-		uint64_t _key[1] __attribute__((aligned(8)));
+   public:
+    struct node {
+        node* _next;
+        V _value;
+        uint32_t _key_size;
+        uint64_t _key[1] __attribute__((aligned(8)));
 
-		node(node* next, fast_string_view s, const V& value)
-			: _next(next), _value(value) {
-			_key_size = s.size();
-			s.write(_key);
-		}
-		static void* operator new(size_t sz, size_t key_size) {
-			key_size = (std::max<size_t>(1, key_size) + 7) / 8 * 8;
-			return ::operator new(sz + key_size);
-		}
-		std::string_view key() const {
-			return std::string_view(reinterpret_cast<const char*>(_key),
-									_key_size);
-		}
-		size_t hash() {
-			/*Murmur3_x64_128 murmur;
-			murmur.reset(hash_seed);
-			for (uint32_t i = 0; i < _key_size / 8; i += 2)
-				murmur.append(_key[i], _key[i + 1]);
-			if (_key_size % 16 <= 8)
-				murmur.tail(_key[last], _a);
-			murmur.finalize(_key_size);
-			return murmur.h1 ^ murmur.h2;*/
-			// TODO
-			return 0;
-		}
-	};
+        node(node* next, fast_string_view s, const V& value) : _next(next), _value(value) {
+            _key_size = s.size();
+            s.write(_key);
+        }
+        static void* operator new(size_t sz, size_t key_size) {
+            key_size = (std::max<size_t>(1, key_size) + 7) / 8 * 8;
+            return ::operator new(sz + key_size);
+        }
+        std::string_view key() const { return std::string_view(reinterpret_cast<const char*>(_key), _key_size); }
+        size_t hash() {
+            /*Murmur3_x64_128 murmur;
+            murmur.reset(hash_seed);
+            for (uint32_t i = 0; i < _key_size / 8; i += 2)
+                    murmur.append(_key[i], _key[i + 1]);
+            if (_key_size % 16 <= 8)
+                    murmur.tail(_key[last], _a);
+            murmur.finalize(_key_size);
+            return murmur.h1 ^ murmur.h2;*/
+            // TODO
+            return 0;
+        }
+    };
 
-	class iterator {
-	  public:
-		iterator() {}
-		iterator(node** p, node** e, node* n) : _p(p), _e(e), _n(n) {}
+    class iterator {
+       public:
+        iterator() {}
+        iterator(node** p, node** e, node* n) : _p(p), _e(e), _n(n) {}
 
-		std::pair<std::string_view, V&> operator*() {
-			return {_n->key(), _n->_value};
-		}
-		std::pair<std::string_view, const V&> operator*() const {
-			return {_n->key(), _n->_value};
-		}
+        std::pair<std::string_view, V&> operator*() { return {_n->key(), _n->_value}; }
+        std::pair<std::string_view, const V&> operator*() const { return {_n->key(), _n->_value}; }
 
-		std::string_view key() const { return _n->key(); }
-		const V& value() const { return _n->_value; }
-		V& value() { return _n->_value; }
+        std::string_view key() const { return _n->key(); }
+        const V& value() const { return _n->_value; }
+        V& value() { return _n->_value; }
 
-		void operator++() {
-			_n = _n->_next;
-			if (_n == nullptr) {
-				_p += 1;
-				if (_p == _e)
-					return;
-				_n = *_p;
-			}
-		}
-		void operator++(int) { operator++(); }
-		bool operator!=(const iterator& o) {
-			return _p != o._p || _e != o._e || _n != o._n;
-		}
+        void operator++() {
+            _n = _n->_next;
+            if (_n == nullptr) {
+                _p += 1;
+                if (_p == _e) return;
+                _n = *_p;
+            }
+        }
+        void operator++(int) { operator++(); }
+        bool operator!=(const iterator& o) { return _p != o._p || _e != o._e || _n != o._n; }
 
-	  private:
-		node** _p;
-		node** _e;
-		node* _n;
-	};
+       private:
+        node** _p;
+        node** _e;
+        node* _n;
+    };
 
-	class const_iterator {
-	  public:
-		const_iterator() {}
-		const_iterator(const node** p, const node** e, const node* n)
-			: _p(p), _e(e), _n(n) {}
+    class const_iterator {
+       public:
+        const_iterator() {}
+        const_iterator(const node** p, const node** e, const node* n) : _p(p), _e(e), _n(n) {}
 
-		std::pair<std::string_view, const V&> operator*() const {
-			return {_n->key(), _n->_value};
-		}
+        std::pair<std::string_view, const V&> operator*() const { return {_n->key(), _n->_value}; }
 
-		std::string_view key() const { return _n->key(); }
-		const V& value() const { return _n->_value; }
+        std::string_view key() const { return _n->key(); }
+        const V& value() const { return _n->_value; }
 
-		void operator++() {
-			_n = _n->next;
-			if (_n == nullptr) {
-				_p += 1;
-				if (_p == _e)
-					return;
-				_n = *_p;
-			}
-		}
-		void operator++(int) { operator++(); }
-		bool operator!=(const iterator& o) {
-			return _p != o._p || _e != o._e || _n != o._n;
-		}
+        void operator++() {
+            _n = _n->next;
+            if (_n == nullptr) {
+                _p += 1;
+                if (_p == _e) return;
+                _n = *_p;
+            }
+        }
+        void operator++(int) { operator++(); }
+        bool operator!=(const iterator& o) { return _p != o._p || _e != o._e || _n != o._n; }
 
-	  private:
-		const node** _p;
-		const node** _e;
-		const node* _n;
-	};
+       private:
+        const node** _p;
+        const node** _e;
+        const node* _n;
+    };
 
-	string_node_hash_map() : _size(0), _entries(nullptr) {}
+    string_node_hash_map() : _size(0), _entries(nullptr) {}
 
-	// TODO copy constructor
-	// TODO move constructor
-	// TODO assignment operator
-	// TODO move assignment operator
+    // TODO copy constructor
+    // TODO move constructor
+    // TODO assignment operator
+    // TODO move assignment operator
 
-	~string_node_hash_map() {
-		if (_entries) {
-			size_t capacity = _hash_policy.capacity();
-			for (size_t i = 0; i < capacity; i++) {
-				node* e = _entries[i];
-				while (e) {
-					node* n = e->_next;
-					try {
-						delete e;
-					} catch (...) {
-						// swallow exception to avoid
-						// leaking memory
-					}
-					e = n;
-				}
-			}
-			std::free(_entries);
-		}
-	}
+    ~string_node_hash_map() {
+        if (_entries) {
+            size_t capacity = _hash_policy.capacity();
+            for (size_t i = 0; i < capacity; i++) {
+                node* e = _entries[i];
+                while (e) {
+                    node* n = e->_next;
+                    try {
+                        delete e;
+                    } catch (...) {
+                        // swallow exception to avoid
+                        // leaking memory
+                    }
+                    e = n;
+                }
+            }
+            std::free(_entries);
+        }
+    }
 
-	const_iterator begin() const {
-		return const_iterator(_entries, _entries + capacity(), nullptr);
-	}
-	const_iterator end() const {
-		return const_iterator(_entries + capacity(), _entries + capacity(),
-							  nullptr);
-	}
-	iterator begin() {
-		return iterator(_entries, _entries + capacity(), nullptr);
-	}
-	iterator end() {
-		return iterator(_entries + capacity(), _entries + capacity(), nullptr);
-	}
+    const_iterator begin() const { return const_iterator(_entries, _entries + capacity(), nullptr); }
+    const_iterator end() const { return const_iterator(_entries + capacity(), _entries + capacity(), nullptr); }
+    iterator begin() { return iterator(_entries, _entries + capacity(), nullptr); }
+    iterator end() { return iterator(_entries + capacity(), _entries + capacity(), nullptr); }
 
-	size_t size() const { return size; }
-	size_t capacity() const { return _hash_policy.capacity(); }
+    size_t size() const { return size; }
+    size_t capacity() const { return _hash_policy.capacity(); }
 
-	void reserve(size_t new_capacity) {
-		size_t capacity = _hash_policy.capacity();
-		if (capacity == 0) {
-			shrink_to_fit();
-			return;
-		}
-		auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
-		resize(capacity, new_capacity, new_mod_fn);
-	}
+    void reserve(size_t new_capacity) {
+        size_t capacity = _hash_policy.capacity();
+        if (capacity == 0) {
+            shrink_to_fit();
+            return;
+        }
+        auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
+        resize(capacity, new_capacity, new_mod_fn);
+    }
 
-	void clear() {
-		size_t capacity = _hash_policy.capacity();
-		for (size_t i = 0; i < capacity; i++) {
-			while (_entries[i]) {
-				node* n = _entries[i]->_next;
-				delete _entries[i];
-				_size -= 1;
-				_entries[i] = n;
-			}
-		}
-		assert(_size == 0);
-	}
+    void clear() {
+        size_t capacity = _hash_policy.capacity();
+        for (size_t i = 0; i < capacity; i++) {
+            while (_entries[i]) {
+                node* n = _entries[i]->_next;
+                delete _entries[i];
+                _size -= 1;
+                _entries[i] = n;
+            }
+        }
+        assert(_size == 0);
+    }
 
-	void shrink_to_fit() {
-		if (_size == 0) {
-			_hash_policy.fn = &prime_number_hash_policy::mod0;
-			std::free(_entries);
-			_entries = nullptr;
-			return;
-		}
+    void shrink_to_fit() {
+        if (_size == 0) {
+            _hash_policy.fn = &prime_number_hash_policy::mod0;
+            std::free(_entries);
+            _entries = nullptr;
+            return;
+        }
 
-		size_t capacity = _hash_policy.capacity();
-		size_t new_capacity = _size / load_factor;
-		auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
-		if (new_capacity != capacity) {
-			resize(capacity, new_capacity, new_mod_fn);
-		}
-	}
+        size_t capacity = _hash_policy.capacity();
+        size_t new_capacity = _size / load_factor;
+        auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
+        if (new_capacity != capacity) {
+            resize(capacity, new_capacity, new_mod_fn);
+        }
+    }
 
-	void insert(fast_string_view key, V value) {
-		if (unlikely(_entries == nullptr)) {
-			size_t new_capacity = 4;
-			_hash_policy.fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
-			_entries = reinterpret_cast<node**>(
-				std::calloc(new_capacity, sizeof(node*)));
-			if (_entries == nullptr)
-				throw std::bad_alloc();
-		}
+    void insert(fast_string_view key, V value) {
+        if (unlikely(_entries == nullptr)) {
+            size_t new_capacity = 4;
+            _hash_policy.fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
+            _entries = reinterpret_cast<node**>(std::calloc(new_capacity, sizeof(node*)));
+            if (_entries == nullptr) throw std::bad_alloc();
+        }
 
-		size_t h = index(key.hash(hash_seed));
-		node* e = _entries[h];
-		for (node* n = e; n; n = n->_next)
-			if (key.equals(n->_key, n->_key_size)) {
-				n->_value = value;
-				return;
-			}
-		if (_size + 1 >= load_factor * _hash_policy.capacity())
-			grow();
-		_entries[h] = new (key.size()) node(e, key, value);
-		assert(_entries[h]->hash() == key.hash(hash_seed));
-		// increment size after allocation in case of exception
-		_size += 1;
-	}
+        size_t h = index(key.hash(hash_seed));
+        node* e = _entries[h];
+        for (node* n = e; n; n = n->_next)
+            if (key.equals(n->_key, n->_key_size)) {
+                n->_value = value;
+                return;
+            }
+        if (_size + 1 >= load_factor * _hash_policy.capacity()) grow();
+        _entries[h] = new (key.size()) node(e, key, value);
+        assert(_entries[h]->hash() == key.hash(hash_seed));
+        // increment size after allocation in case of exception
+        _size += 1;
+    }
 
-	bool remove(fast_string_view key) {
-		size_t h = index(key.hash(hash_seed));
-		node* e = _entries[h];
-		if (e == nullptr)
-			return false;
-		if (key.equals(e->_key, e->_key_size)) {
-			_entries[h] = e->next;
-			delete e;
-			_size -= 1;
-			return true;
-		}
-		for (node* n = e->_next; n; e = n, n = n->_next)
-			if (key.equals(n->_key, n->_key_size)) {
-				e->_next = n->_next;
-				delete n;
-				_size -= 1;
-				return true;
-			}
-		return false;
-	}
+    bool remove(fast_string_view key) {
+        size_t h = index(key.hash(hash_seed));
+        node* e = _entries[h];
+        if (e == nullptr) return false;
+        if (key.equals(e->_key, e->_key_size)) {
+            _entries[h] = e->next;
+            delete e;
+            _size -= 1;
+            return true;
+        }
+        for (node* n = e->_next; n; e = n, n = n->_next)
+            if (key.equals(n->_key, n->_key_size)) {
+                e->_next = n->_next;
+                delete n;
+                _size -= 1;
+                return true;
+            }
+        return false;
+    }
 
-	// bool contains(const std::string& key, size_t hash)  {
-	bool contains(fast_string_view s) {
-		size_t h = index(s.hash(hash_seed));
-		for (node* n = _entries[h]; n; n = n->_next)
-			if (s.equals(n->_key, n->_key_size))
-				return true;
-		return false;
-	}
+    // bool contains(const std::string& key, size_t hash)  {
+    bool contains(fast_string_view s) {
+        size_t h = index(s.hash(hash_seed));
+        for (node* n = _entries[h]; n; n = n->_next)
+            if (s.equals(n->_key, n->_key_size)) return true;
+        return false;
+    }
 
-	const V& at(fast_string_view key) const {
-		size_t h = index(key.hash(hash_seed));
-		for (node* n = _entries[h]; n; n = n->_next)
-			if (key.equals(n->_key, n->_key_size))
-				return n->_value;
-		throw std::out_of_range("key");
-	}
+    const V& at(fast_string_view key) const {
+        size_t h = index(key.hash(hash_seed));
+        for (node* n = _entries[h]; n; n = n->_next)
+            if (key.equals(n->_key, n->_key_size)) return n->_value;
+        throw std::out_of_range("key");
+    }
 
-	V& at(fast_string_view key) {
-		size_t h = index(key.hash(hash_seed));
-		for (node* n = _entries[h]; n; n = n->_next)
-			if (key.equals(n->_key, n->_key_size))
-				return n->_value;
-		throw std::out_of_range("key");
-	}
+    V& at(fast_string_view key) {
+        size_t h = index(key.hash(hash_seed));
+        for (node* n = _entries[h]; n; n = n->_next)
+            if (key.equals(n->_key, n->_key_size)) return n->_value;
+        throw std::out_of_range("key");
+    }
 
-  private:
-	void grow() {
-		size_t capacity = _hash_policy.capacity();
-		size_t new_capacity = capacity;
-		auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
-		resize(capacity, new_capacity, new_mod_fn);
-	}
+   private:
+    void grow() {
+        size_t capacity = _hash_policy.capacity();
+        size_t new_capacity = capacity;
+        auto new_mod_fn = _hash_policy.next_size_over(/*ref*/ new_capacity);
+        resize(capacity, new_capacity, new_mod_fn);
+    }
 
-	void resize(size_t capacity, size_t new_capacity,
-				prime_number_hash_policy::mod_function new_mod_fn) {
-		node** new_entries =
-			reinterpret_cast<node**>(std::calloc(new_capacity, sizeof(node*)));
-		if (!new_entries)
-			throw std::bad_alloc();
-		// no exceptions after this line
+    void resize(size_t capacity, size_t new_capacity, prime_number_hash_policy::mod_function new_mod_fn) {
+        node** new_entries = reinterpret_cast<node**>(std::calloc(new_capacity, sizeof(node*)));
+        if (!new_entries) throw std::bad_alloc();
+        // no exceptions after this line
 
-		for (size_t i = 0; i < capacity; i++) {
-			node* p = _entries[i];
-			while (p) {
-				node* n = p->_next;
-				size_t h = new_mod_fn(p->hash());
-				p->_next = new_entries[h];
-				new_entries[h] = p;
-				p = n;
-			}
-		}
+        for (size_t i = 0; i < capacity; i++) {
+            node* p = _entries[i];
+            while (p) {
+                node* n = p->_next;
+                size_t h = new_mod_fn(p->hash());
+                p->_next = new_entries[h];
+                new_entries[h] = p;
+                p = n;
+            }
+        }
 
-		_hash_policy.fn = new_mod_fn;
-		std::free(_entries);
-		_entries = new_entries;
-	}
+        _hash_policy.fn = new_mod_fn;
+        std::free(_entries);
+        _entries = new_entries;
+    }
 
-	size_t index(size_t hash) { return _hash_policy.fn(hash); }
+    size_t index(size_t hash) { return _hash_policy.fn(hash); }
 
-	size_t _size;
-	node** _entries; // uses calloc/free
-	prime_number_hash_policy _hash_policy;
+    size_t _size;
+    node** _entries;  // uses calloc/free
+    prime_number_hash_policy _hash_policy;
 };

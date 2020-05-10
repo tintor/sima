@@ -1,48 +1,42 @@
 #pragma once
 
+#include <geom/convex_hull.h>
 #include <geom/mesh.h>
 #include <geom/polygon.h>
-#include <geom/convex_hull.h>
 #include <geom/primitives.h>
 
 mesh3 generate_box(double3 size);
 
-inline mesh3 generate_box(double sx, double sy, double sz) {
-	return generate_box(double3{sx, sy, sz});
-}
+inline mesh3 generate_box(double sx, double sy, double sz) { return generate_box(double3{sx, sy, sz}); }
 
-template<typename RND>
+template <typename RND>
 mesh3 generate_sphere(uint vertices, double radius, RND& rnd) {
-	// generate N random vertices on sphere
-	vector<double3> V;
-	V.resize(vertices);
-	for (auto i : range(vertices))
-		V[i] = uniform_dir3(rnd);
+    // generate N random vertices on sphere
+    vector<double3> V;
+    V.resize(vertices);
+    for (auto i : range(vertices)) V[i] = uniform_dir3(rnd);
 
-	// increase the distance between the closest two vertices
-	// (as random clumps vertices together)
-	vector<double3> delta;
-	delta.resize(vertices);
-	for (auto e : range(40)) {
-		for (double3& v : delta)
-			v = {0, 0, 0};
-		for (auto i : range(vertices))
-			for (auto j : range(i)) {
-				double3 d = V[i] - V[j];
-				d *= 0.05 / dot(d, d);
-				delta[i] += d;
-				delta[j] -= d;
-			}
-		for (auto i : range(vertices))
-			V[i] = normalize(V[i] + delta[i]);
-	}
+    // increase the distance between the closest two vertices
+    // (as random clumps vertices together)
+    vector<double3> delta;
+    delta.resize(vertices);
+    for (auto e : range(40)) {
+        for (double3& v : delta) v = {0, 0, 0};
+        for (auto i : range(vertices))
+            for (auto j : range(i)) {
+                double3 d = V[i] - V[j];
+                d *= 0.05 / dot(d, d);
+                delta[i] += d;
+                delta[j] -= d;
+            }
+        for (auto i : range(vertices)) V[i] = normalize(V[i] + delta[i]);
+    }
 
-	vector<double3> I;
-	I.resize(vertices);
-	for (auto i : range(vertices))
-		I[i] = V[i] * radius;
+    vector<double3> I;
+    I.resize(vertices);
+    for (auto i : range(vertices)) I[i] = V[i] * radius;
 
-	return convex_hull(I);
+    return convex_hull(I);
 }
 
 mesh3 generate_cross(double inner, double outer);

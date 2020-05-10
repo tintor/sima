@@ -44,7 +44,7 @@ void auto_tune();
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE && mods == GLFW_MOD_SHIFT)
-	glfwSetWindowShouldClose(window, GL_TRUE);
+        glfwSetWindowShouldClose(window, GL_TRUE);
     if (action == GLFW_PRESS && key == GLFW_KEY_P && mods == 0) gShowPos = (gShowPos + 1) % 4;
     if (action == GLFW_PRESS && key == GLFW_KEY_V && mods == 0) gShowVel = (gShowVel + 1) % 4;
     if (action == GLFW_PRESS && key == GLFW_KEY_I && mods == 0) gShowIAcc ^= 1;
@@ -57,37 +57,37 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (action == GLFW_PRESS && key == GLFW_KEY_2 && mods == 0) kSel = 1;
     if (action == GLFW_PRESS && key == GLFW_KEY_3 && mods == 0) kSel = 2;
     if (action == GLFW_PRESS && key == GLFW_KEY_EQUAL && mods == 0) {
-	kParam[kSel] *= 1.1;
-	kRecompute = true;
+        kParam[kSel] *= 1.1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_MINUS && mods == 0) {
-	kParam[kSel] /= 1.1;
-	kRecompute = true;
+        kParam[kSel] /= 1.1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_F && mods == 0) {
-	kParam[kSel] *= -1;
-	kRecompute = true;
+        kParam[kSel] *= -1;
+        kRecompute = true;
     }
 
     if (action == GLFW_PRESS && key == GLFW_KEY_S && mods == 0) {
-	gSpring ^= 1;
-	kRecompute = true;
+        gSpring ^= 1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_P && mods == 0) {
-	gPeriodic ^= 1;
-	kRecompute = true;
+        gPeriodic ^= 1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_C && mods == 0) {
-	gConst ^= 1;
-	kRecompute = true;
+        gConst ^= 1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_Q && mods == 0) {
-	gQuadDamping ^= 1;
-	kRecompute = true;
+        gQuadDamping ^= 1;
+        kRecompute = true;
     }
     if (action == GLFW_PRESS && key == GLFW_KEY_L && mods == 0) {
-	gLinearDamping ^= 1;
-	kRecompute = true;
+        gLinearDamping ^= 1;
+        kRecompute = true;
     }
 }
 
@@ -138,19 +138,19 @@ class PidController : public Controller {
     double kDeriv = 0;
 
     void reset(Params params) override {
-	m_integral = 0;
-	m_maxAcc = params.maxAcc;
+        m_integral = 0;
+        m_maxAcc = params.maxAcc;
     }
 
     double execute(double pos, double vel, double time) override {
-	double prevExtAcc = (time == 0) ? 0 : ((vel - m_prevVel) / (time - m_prevTime) - m_prevAcc);
-	m_prevVel = vel;
-	m_prevTime = time;
+        double prevExtAcc = (time == 0) ? 0 : ((vel - m_prevVel) / (time - m_prevTime) - m_prevAcc);
+        m_prevVel = vel;
+        m_prevTime = time;
 
-	m_integral += pos;
-	double acc = clamp(kProp * pos + kInteg * m_integral + kDeriv * vel /*- prevExtAcc*/, -m_maxAcc, m_maxAcc);
-	m_prevAcc = acc;
-	return acc;
+        m_integral += pos;
+        double acc = clamp(kProp * pos + kInteg * m_integral + kDeriv * vel /*- prevExtAcc*/, -m_maxAcc, m_maxAcc);
+        m_prevAcc = acc;
+        return acc;
     }
 
    private:
@@ -185,45 +185,45 @@ double evaluate(Controller* controller, Params params, double pos, double vel, d
     uint crossings = 0;
     controller->reset(params);
     while (true) {
-	if (abs(pos) <= params.maxPosErr && abs(vel) <= params.maxVelErr) {
-	    if (stable_since == -1) {
-		stable_since = time;
-	    }
-	} else {
-	    stable_since = -1;
-	}
+        if (abs(pos) <= params.maxPosErr && abs(vel) <= params.maxVelErr) {
+            if (stable_since == -1) {
+                stable_since = time;
+            }
+        } else {
+            stable_since = -1;
+        }
 
-	if (time > maxTime) {
-	    if (show && stable_since == -1) print("unstable (min pos %s, crossings %s)\n", minPos, crossings);
-	    if (show && stable_since != -1)
-		print("stabilized in %ss (min pos %s, crossings %s)\n", time, minPos, crossings);
-	    return (stable_since != -1) ? stable_since : std::numeric_limits<double>::infinity();
-	}
-	if (samples == nullptr && pos < params.minPos) {
-	    if (show) print("overshoot! (min pos %s, crossings %s)\n", minPos, crossings);
-	    return std::numeric_limits<double>::infinity();
-	}
+        if (time > maxTime) {
+            if (show && stable_since == -1) print("unstable (min pos %s, crossings %s)\n", minPos, crossings);
+            if (show && stable_since != -1)
+                print("stabilized in %ss (min pos %s, crossings %s)\n", time, minPos, crossings);
+            return (stable_since != -1) ? stable_since : std::numeric_limits<double>::infinity();
+        }
+        if (samples == nullptr && pos < params.minPos) {
+            if (show) print("overshoot! (min pos %s, crossings %s)\n", minPos, crossings);
+            return std::numeric_limits<double>::infinity();
+        }
 
-	double eAcc = extAcc(pos, vel, time);
-	double perror = normal(rnd);
-	double verror = normal(rnd);
-	double aerror = normal(rnd);
+        double eAcc = extAcc(pos, vel, time);
+        double perror = normal(rnd);
+        double verror = normal(rnd);
+        double aerror = normal(rnd);
 
-	double zpos = posLag.tick(pos) + perror;
-	double zvel = velLag.tick(vel) + verror;
-	double zacc = controller->execute(zpos, zvel, time) + aerror;
-	double iAcc = clamp(lowPass.tick(accLag.tick(zacc)), -params.maxAcc, params.maxAcc);
-	double acc = eAcc + iAcc;
+        double zpos = posLag.tick(pos) + perror;
+        double zvel = velLag.tick(vel) + verror;
+        double zacc = controller->execute(zpos, zvel, time) + aerror;
+        double iAcc = clamp(lowPass.tick(accLag.tick(zacc)), -params.maxAcc, params.maxAcc);
+        double acc = eAcc + iAcc;
 
-	if (show) print("time %s, pos %s, vel %s, acc %s + %s -> %s\n", time, pos, vel, eAcc, iAcc, acc);
-	if (samples) samples->push_back({pos, vel, iAcc, eAcc});
+        if (show) print("time %s, pos %s, vel %s, acc %s + %s -> %s\n", time, pos, vel, eAcc, iAcc, acc);
+        if (samples) samples->push_back({pos, vel, iAcc, eAcc});
 
-	double p = pos;
-	pos += vel * dt + acc * dt * dt / 2;
-	vel += acc * dt;
-	time += dt;
-	minimize(minPos, pos);
-	crossings += p * pos < 0;
+        double p = pos;
+        pos += vel * dt + acc * dt * dt / 2;
+        vel += acc * dt;
+        time += dt;
+        minimize(minPos, pos);
+        crossings += p * pos < 0;
     }
 }
 
@@ -251,43 +251,43 @@ void auto_tune() {
     double s = std::numeric_limits<double>::infinity();
     auto start = std::chrono::system_clock::now();
     while (std::chrono::duration<double>(std::chrono::system_clock::now() - start).count() < 10) {
-	double kp, ki, kd;
-	kp = normal(rnd) * 10;
-	ki = normal(rnd);
-	kd = normal(rnd) * 2;
+        double kp, ki, kd;
+        kp = normal(rnd) * 10;
+        ki = normal(rnd);
+        kd = normal(rnd) * 2;
 
-	pid->kProp = kp;
-	pid->kInteg = ki;
-	pid->kDeriv = kd;
-	double ks = evaluate(pid, params, 10, 0, 100, false, nullptr, ext);
+        pid->kProp = kp;
+        pid->kInteg = ki;
+        pid->kDeriv = kd;
+        double ks = evaluate(pid, params, 10, 0, 100, false, nullptr, ext);
 
-	if (ks == std::numeric_limits<double>::infinity()) continue;
-	for (int iter = 0; iter < 1000; iter++) {
-	    double zp, zi, zd;
-	    zp = kp * (1 + normal(rnd));
-	    zi = ki * (1 + normal(rnd));
-	    zd = kd * (1 + normal(rnd));
+        if (ks == std::numeric_limits<double>::infinity()) continue;
+        for (int iter = 0; iter < 1000; iter++) {
+            double zp, zi, zd;
+            zp = kp * (1 + normal(rnd));
+            zi = ki * (1 + normal(rnd));
+            zd = kd * (1 + normal(rnd));
 
-	    pid->kProp = zp;
-	    pid->kInteg = zi;
-	    pid->kDeriv = zd;
-	    double zs = evaluate(pid, params, 10, 0, 100, false, nullptr, ext);
+            pid->kProp = zp;
+            pid->kInteg = zi;
+            pid->kDeriv = zd;
+            double zs = evaluate(pid, params, 10, 0, 100, false, nullptr, ext);
 
-	    if (zs < ks) {
-		ks = zs;
-		kp = zp;
-		ki = zi;
-		kd = zd;
-	    }
-	}
+            if (zs < ks) {
+                ks = zs;
+                kp = zp;
+                ki = zi;
+                kd = zd;
+            }
+        }
 
-	if (ks < s) {
-	    p = kp;
-	    i = ki;
-	    d = kd;
-	    s = ks;
-	    print("found %s\n", s);
-	}
+        if (ks < s) {
+            p = kp;
+            i = ki;
+            d = kd;
+            s = ks;
+            print("found %s\n", s);
+        }
     }
     kParam[0] = p;
     kParam[1] = i;
@@ -341,9 +341,9 @@ int main(int argc, char** argv) {
     std::array<vec2, 500> v;
 
     FontRenderer renderer(800, 600);
-	Font timesNewRoman("Times New Roman", 48, &renderer);
-	Font arial("Arial", 48, &renderer);
-	Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
+    Font timesNewRoman("Times New Roman", 48, &renderer);
+    Font arial("Arial", 48, &renderer);
+    Font monaco("/System/Library/Fonts/Monaco.dfont", 48, &renderer);
 
     glClearColor(0, 0, 0, 1.0f);
 
@@ -355,98 +355,98 @@ int main(int argc, char** argv) {
     ortho[2][1] = -1.0f;
 
     RunEventLoop(window, [&]() {
-	if (kRecompute) {
-	    samples.clear();
-	    pid->kProp = kParam[0];
-	    pid->kInteg = kParam[1];
-	    pid->kDeriv = kParam[2];
-	    evaluate(pid, params, 10, 0, 500, false, &samples, ext);
-	    kRecompute = false;
-	}
-	const uint n = min<uint>(v.size(), uint(samples.size()));
+        if (kRecompute) {
+            samples.clear();
+            pid->kProp = kParam[0];
+            pid->kInteg = kParam[1];
+            pid->kDeriv = kParam[2];
+            evaluate(pid, params, 10, 0, 500, false, &samples, ext);
+            kRecompute = false;
+        }
+        const uint n = min<uint>(v.size(), uint(samples.size()));
 
-	glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	double mx, my;
-	glfwGetCursorPos(window, &mx, &my);
-	my = Height - 1 - my;
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        my = Height - 1 - my;
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	double kTime = 5;
-	double kAcc = 3;
-	if (mx >= 0 && mx < Width && my >= 0 && my < Height) {
-	    const Sample& s = samples[round(mx / kTime)];
-	    auto msg = format("time %.2f, pos %.3f, vel %.2f, eacc %.2f, iacc %.2f, acc %.2f", mx / kTime * params.dt,
-	                      s.pos, s.vel, s.eacc, s.iacc, s.eacc + s.iacc);
-	    timesNewRoman.render(msg, 5, 5, 0.15, "7FE030");
-	}
-	string_view fmt[3] = {"prop [%s], integ %s, deriv %s", "prop %s, integ [%s], deriv %s",
-	                      "prop %s, integ %s, deriv [%s]"};
-	timesNewRoman.render(format(fmt[kSel], kParam[0], kParam[1], kParam[2]), 5, 600 - 10, 0.15, "7FE030");
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        double kTime = 5;
+        double kAcc = 3;
+        if (mx >= 0 && mx < Width && my >= 0 && my < Height) {
+            const Sample& s = samples[round(mx / kTime)];
+            auto msg = format("time %.2f, pos %.3f, vel %.2f, eacc %.2f, iacc %.2f, acc %.2f", mx / kTime * params.dt,
+                              s.pos, s.vel, s.eacc, s.iacc, s.eacc + s.iacc);
+            timesNewRoman.render(msg, 5, 5, 0.15, "7FE030");
+        }
+        string_view fmt[3] = {"prop [%s], integ %s, deriv %s", "prop %s, integ [%s], deriv %s",
+                              "prop %s, integ %s, deriv [%s]"};
+        timesNewRoman.render(format(fmt[kSel], kParam[0], kParam[1], kParam[2]), 5, 600 - 10, 0.15, "7FE030");
 
-	string mods;
-	if (gSpring) mods += "spring ";
-	if (gPeriodic) mods += "periodic ";
-	if (gQuadDamping) mods += "quad_damping ";
-	if (gLinearDamping) mods += "linear_damping ";
-	if (gConst) mods += "constant ";
-	timesNewRoman.render(mods, 200, 600 - 10, 0.15, "7FE030");
-	glDisable(GL_BLEND);
+        string mods;
+        if (gSpring) mods += "spring ";
+        if (gPeriodic) mods += "periodic ";
+        if (gQuadDamping) mods += "quad_damping ";
+        if (gLinearDamping) mods += "linear_damping ";
+        if (gConst) mods += "constant ";
+        timesNewRoman.render(mods, 200, 600 - 10, 0.15, "7FE030");
+        glDisable(GL_BLEND);
 
-	glUseProgram(shader);
-	buffer.bind();
-	transformUniform = ortho;
+        glUseProgram(shader);
+        buffer.bind();
+        transformUniform = ortho;
 
-	v[0] = vec2(0, Height / 2);
-	v[1] = vec2(Width, Height / 2);
-	buffer.write(v);
-	colorUniform = vec4(1, 1, 1, 1);
-	glDrawArrays(GL_LINE_STRIP, 0, 2);
+        v[0] = vec2(0, Height / 2);
+        v[1] = vec2(Width, Height / 2);
+        buffer.write(v);
+        colorUniform = vec4(1, 1, 1, 1);
+        glDrawArrays(GL_LINE_STRIP, 0, 2);
 
-	v[0] = vec2(mx, Height);
-	v[1] = vec2(mx, 0);
-	buffer.write(v);
-	colorUniform = vec4(1, 1, 1, 1);
-	glDrawArrays(GL_LINE_STRIP, 0, 2);
+        v[0] = vec2(mx, Height);
+        v[1] = vec2(mx, 0);
+        buffer.write(v);
+        colorUniform = vec4(1, 1, 1, 1);
+        glDrawArrays(GL_LINE_STRIP, 0, 2);
 
-	if (gShowPos) {
-	    double kPos = 70 * (1 << (gShowPos - 1));
-	    for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].pos * kPos + Height / 2);
-	    buffer.write(v);
-	    colorUniform = vec4(0, 0.5, 1, 1);
-	    glDrawArrays(GL_LINE_STRIP, 0, n);
-	}
+        if (gShowPos) {
+            double kPos = 70 * (1 << (gShowPos - 1));
+            for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].pos * kPos + Height / 2);
+            buffer.write(v);
+            colorUniform = vec4(0, 0.5, 1, 1);
+            glDrawArrays(GL_LINE_STRIP, 0, n);
+        }
 
-	if (gShowVel) {
-	    double kVel = 24 * (1 << (gShowVel - 1));
-	    for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].vel * kVel + Height / 2);
-	    buffer.write(v);
-	    colorUniform = vec4(0, 1, 0.5, 1);
-	    glDrawArrays(GL_LINE_STRIP, 0, n);
-	}
+        if (gShowVel) {
+            double kVel = 24 * (1 << (gShowVel - 1));
+            for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].vel * kVel + Height / 2);
+            buffer.write(v);
+            colorUniform = vec4(0, 1, 0.5, 1);
+            glDrawArrays(GL_LINE_STRIP, 0, n);
+        }
 
-	if (gShowIAcc) {
-	    for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].iacc * kAcc + Height / 2);
-	    buffer.write(v);
-	    colorUniform = vec4(1, 1, 0, 1);
-	    glDrawArrays(GL_LINE_STRIP, 0, n);
-	}
+        if (gShowIAcc) {
+            for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].iacc * kAcc + Height / 2);
+            buffer.write(v);
+            colorUniform = vec4(1, 1, 0, 1);
+            glDrawArrays(GL_LINE_STRIP, 0, n);
+        }
 
-	if (gShowEAcc) {
-	    for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].eacc * kAcc + Height / 2);
-	    buffer.write(v);
-	    colorUniform = vec4(1, 0, 0, 1);
-	    glDrawArrays(GL_LINE_STRIP, 0, n);
-	}
+        if (gShowEAcc) {
+            for (uint i = 0; i < n; i++) v[i] = vec2(i * kTime, samples[i].eacc * kAcc + Height / 2);
+            buffer.write(v);
+            colorUniform = vec4(1, 0, 0, 1);
+            glDrawArrays(GL_LINE_STRIP, 0, n);
+        }
 
-	if (gShowAcc) {
-	    for (uint i = 0; i < n; i++)
-		v[i] = vec2(i * kTime, (samples[i].eacc + samples[i].iacc) * kAcc + Height / 2);
-	    buffer.write(v);
-	    colorUniform = vec4(1, 0.5, 0, 1);
-	    glDrawArrays(GL_LINE_STRIP, 0, n);
-	}
+        if (gShowAcc) {
+            for (uint i = 0; i < n; i++)
+                v[i] = vec2(i * kTime, (samples[i].eacc + samples[i].iacc) * kAcc + Height / 2);
+            buffer.write(v);
+            colorUniform = vec4(1, 0.5, 0, 1);
+            glDrawArrays(GL_LINE_STRIP, 0, n);
+        }
     });
     return 0;
 }

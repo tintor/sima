@@ -1,15 +1,16 @@
 #pragma once
 #include <geom/mesh.h>
-#include <geom/triangle.h>
 #include <geom/plane.h>
+#include <geom/triangle.h>
+
 #include <random>
 
 class SolidBSPTree {
-public:
+   public:
     SolidBSPTree(const mesh3& mesh, uint num_samples, std::default_random_engine& rnd);
     bool intersects(double3 v);
 
-private:
+   private:
     struct Node {
         plane divider;
         uint positive, negative;
@@ -34,21 +35,12 @@ private:
         std::default_random_engine rnd;
     };
 
-    pair<uint, float> build_internal(
-            BuildData& data, const vector<uint>& mesh,
-            uint* samples_begin, uint* samples_end);
+    pair<uint, float> build_internal(BuildData& data, const vector<uint>& mesh, uint* samples_begin, uint* samples_end);
 
     void print_tree(uint n, int depth = 0);
 
-    static void evaluate_candidate(
-            plane candidate,
-            BuildData& data,
-            const vector<uint>& mesh,
-            uint* samples_begin,
-            uint* samples_end,
-            long& best_heuristic,
-            Hist& best_hist,
-            plane& best_candidate);
+    static void evaluate_candidate(plane candidate, BuildData& data, const vector<uint>& mesh, uint* samples_begin,
+                                   uint* samples_end, long& best_heuristic, Hist& best_hist, plane& best_candidate);
 
     uint add_node() {
         uint n = node.size();
