@@ -1,6 +1,7 @@
 #include <core/callstack.h>
 #include <core/format.h>
 #include <core/util.h>
+#include <core/thread.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -23,12 +24,12 @@ void Check(bool value, string_view message = "", const char* file = __builtin_FI
 enum class Figure : char { None, Dome, Player1, Player2 };
 
 struct Cell {
-    char level = 0;
-    Figure figure = Figure::None;
+    char level = 0; // 2 bits
+    Figure figure = Figure::None; // 2 bits
 };
 
 struct Coord {
-    int x, y;
+    char x, y;
 };
 
 bool operator==(Coord a, Coord b) { return a.x == b.x && a.y == b.y; }
@@ -462,7 +463,33 @@ size_t MCTS_Iteration(size_t N, Figure player, std::unique_ptr<Node>& node) {
     return e;
 }
 
-Action AutoMCTS(const Board& board, size_t iterations) {
+optional<Action> TrivialAction(const Board& board) {
+    optional<Action> trivial_action;
+    size_t count = 0;
+    vector<Action> temp;
+    bool done = false;
+    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
+        Check(!done);
+        if (winner == board.player) {
+            trivial_action = actions[0];
+            done = true;
+            return false;
+        }
+        if (winner != Figure::None) return true;
+        // TODO check if opponent can win in one sequence!
+        trivial_action = (count == 0) ? optional{actions[0]} : nullopt;
+        count += 1;
+        return true;
+    });
+    return trivial_action;
+}
+
+Action AutoMCTS(const Board& board, const size_t iterations, const bool trivial = false) {
+    if (trivial) {
+        auto a = TrivialAction(board);
+        if (a) return *a;
+    }
+
     vector<std::unique_ptr<Node>> children;
     Expand(board, children);
     if (children.size() == 1) return children[0]->action;
@@ -803,42 +830,46 @@ const std::unordered_map<string_view, Policy> g_policies = {
     {"greedy", AutoGreedy},
     {"climber", AutoClimber},
     {"mcts100", [](const auto& e) { return AutoMCTS(e, 100); }},
+    {"mcts100t", [](const auto& e) { return AutoMCTS(e, 100, true); }},
     {"mcts200", [](const auto& e) { return AutoMCTS(e, 200); }},
     {"mcts400", [](const auto& e) { return AutoMCTS(e, 400); }},
     {"minimax6", [](const auto& e) { return AutoMiniMax(e, 6); }},
-    {"minimax9", [](const auto& e) { return AutoMiniMax(e, 9); }}};
+    {"minimax9", [](const auto& e) { return AutoMiniMax(e, 9); }},
+    {"minimax12", [](const auto& e) { return AutoMiniMax(e, 12); }}};
 
 void AutoBattle(int count, string_view name_a, string_view name_b) {
     const Policy& policy_a = g_policies.at(name_a);
     const Policy& policy_b = g_policies.at(name_b);
+    atomic<int> wins_a = 0, wins_b = 0;
 
-    int wins_a = 0;
-    for (int i = 0; i < count; i++) {
-        if (Battle(policy_a, policy_b) == Figure::Player1) {
-            wins_a += 1;
-            print("a");
-        } else
-            print("b");
-        cout.flush();
-    }
-    print("\r%s %s : %s %s   \n", name_a, wins_a, count - wins_a, name_b);
+    atomic<bool> stop = false;
+    thread monitor([&](){
+        string message;
+        while (!stop) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            for (int j = 0; j < message.size(); j++) cout << '\r';
+            message = format("%s %s : %s %s", name_a, wins_a, wins_b, name_b);
+            cout << message;
+            cout.flush();
+        }
+        cout << '\n';
+    });
 
-    int wins_b = 0;
-    for (int i = 0; i < count; i++) {
-        if (Battle(policy_b, policy_a) == Figure::Player1) {
-            wins_b += 1;
-            print("b");
-        } else
-            print("a");
-        cout.flush();
-    }
-    print("\r%s %s : %s %s   \n", name_b, wins_b, count - wins_b, name_a);
+    parallel_for(count, [&](size_t i) {
+        if (Battle(policy_a, policy_b) == Figure::Player1) wins_a += 1; else wins_b += 1;
+        if (Battle(policy_b, policy_a) == Figure::Player1) wins_b += 1; else wins_a += 1;
+    });
+
+    stop = true;
+    monitor.join();
 }
 
 int main(int argc, char** argv) {
     InitSegvHandler();
 
     if (argc > 1) {
+        AutoBattle(100, "climber", "minimax12");
+        AutoBattle(1000, "mcts100", "mcts100t");
         AutoBattle(100, "minimax6", "minimax9");
         AutoBattle(100, "climber", "minimax9");
         AutoBattle(100, "climber", "minimax6");
