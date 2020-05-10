@@ -11,8 +11,8 @@ Makefile
 */*/*.a
 */*_test
 arena
-santorini
-santorini2
+santorini/santorini
+santorini/santorini2
 main
 run_gravity
 test

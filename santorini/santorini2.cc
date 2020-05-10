@@ -146,10 +146,6 @@ void Render(const Board &board, View &view) {
                 view.add({px + a, py - a}, color);
                 view.add({px + a, py + a}, color);
                 view.add({px - a, py + a}, color);
-                /*for (int i = 0; i < 16; i++) {
-                    double k = i * 2 * M_PI / 16;
-                    view.add({px + cos(k) * a, py + sin(k) * a}, color);
-                }*/
                 view.draw(GL_TRIANGLE_FAN);
             }
         }
@@ -181,10 +177,10 @@ int main(int argc, char **argv) {
     RunEventLoop(window, [&]() {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glEnable(GL_BLEND);
+        /*glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         view.mono.render(format("Hello world,\nMarko!"), 500, 500, 13.0 / 48, "FFFFFF");
-        glDisable(GL_BLEND);
+        glDisable(GL_BLEND);*/
 
         Render(board, view);
     });
