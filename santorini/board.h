@@ -3,6 +3,7 @@
 #include <core/std.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
+#include <santorini/tensor.h>
 
 #include <fstream>
 
@@ -75,18 +76,21 @@ int Count(const Board& board, const Fn& fn) {
 }
 
 // Network input description:
-// Board:
+// Board (28 + 25xCell):
 // 1 - setup
 // 25 - which figure moved (if any)
 // 1 - built
 // 1 - player
 // 25x - cell
 
-// Cell:
+// Cell (7):
 // 4 - level
 // 1 - dome
 // 1 - player1
 // 1 - player2
+
+constexpr int CellBits = 4 + 3;
+constexpr int BoardBits = 3 + 25 * (1 + CellBits);
 
 using std::ostream;
 
@@ -110,6 +114,16 @@ ostream& operator<<(ostream& os, const Board& board) {
     os << Bit(board.player == Figure::Player1);
     for (Coord e : kAll) os << board(e);
     return os;
+}
+
+void Serialize(const Board& board, Tensor<float>& out) {
+    Check(out.shape().size() == 1);
+    Check(out.shape()[0] == BoardBits);
+    ostringstream os;
+    os.str().reserve(BoardBits);
+    os << board;
+    Check(os.str().size() == BoardBits);
+    for (size_t i = 0; i < BoardBits; i++) out[i] = (os.str()[i] == '1') ? 1.0f : 0.0f;
 }
 
 class Values {
@@ -140,6 +154,7 @@ class Values {
         for (const auto& [board, wins] : m_data) {
             double w = wins.player1 / double(wins.player1 + wins.player2);
             for (int transform = 0; transform < 8; transform++) {
+                // TODO(Marko) deduplicate
                 Board out;
                 out.cell = Transform(board.cell, transform);
                 os << out << ' ' << std::setprecision(10) << w << '\n';

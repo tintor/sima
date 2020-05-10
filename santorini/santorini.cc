@@ -5,6 +5,7 @@
 #include <core/util.h>
 #include <santorini/action.h>
 #include <santorini/board.h>
+#include <santorini/neural.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -13,13 +14,6 @@
 
 #include <random>
 #include <variant>
-
-void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
-           unsigned line = __builtin_LINE()) {
-    if (value) return;
-    print("Check failed at %s:%s with message: %s\n", file, line, message);
-    exit(0);
-}
 
 // Board and judge
 // ===============
@@ -312,6 +306,16 @@ Action AutoClimber(const Board& board) {
     });
     Check(sampler.count > 0);
     return choice;
+}
+
+FeedForwardNetwork g_value_fn(BoardBits, 16, g_random);
+
+// 1 - current player wins always
+// 0 - current player looses alwaya
+double WinValue(const Board& board) {
+    Tensor<float> input({BoardBits});
+    Serialize(board, input);
+    return g_value_fn.Predict(input);
 }
 
 size_t Rollout(Figure player, Board board) {

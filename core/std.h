@@ -9,6 +9,7 @@
 #include <random>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -38,6 +39,9 @@ using std::unordered_multiset;
 
 using std::cout;
 using std::endl;
+using std::istream;
+using std::ostream;
+using std::ostringstream;
 using std::swap;
 
 using std::numeric_limits;
@@ -84,3 +88,10 @@ overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 
 constexpr double PI = M_PI;
 constexpr double INF = numeric_limits<double>::infinity();
+
+inline void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
+                  unsigned line = __builtin_LINE()) {
+    if (value) return;
+    cout << "Check failed at " << file << ':' << line << " with message: " << message << endl;
+    exit(0);
+}
