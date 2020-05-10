@@ -363,6 +363,44 @@ Action AutoClimber(const Board& board) {
     return choice;
 }
 
+double MCTSRank(Figure player, Board board) {
+    while (true) {
+        if (Execute(board, RandomAction(board)) != nullopt) continue;
+
+        auto w = Winner(board);
+        if (w != Figure::None) return (w == player) ? 1 : -1;
+    }
+}
+
+Action AutoMCTS(const Board& board) {
+    vector<Action> temp;
+    Action choice;
+    size_t count = 0;
+    double best_rank = -1e100;
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    AllValidActionSequences(board, temp, [&](const vector<Action>& actions, const Board& new_board, Figure winner) {
+        // Print(actions);
+        if (winner == board.player) {
+            choice = actions[0];
+            best_rank = 1e100;
+            count = 1;
+            return false;
+        }
+        if (winner != Figure::None) return true;
+
+        double rank = MCTSRank(board.player, new_board);
+        if (rank == best_rank && dis(g_random) <= 1.0 / ++count) choice = actions[0];
+        if (rank > best_rank) {
+            best_rank = rank;
+            choice = actions[0];
+            count = 1;
+        }
+        return true;
+    });
+    if (count == 0) { print("no moves available\n"); throw new std::runtime_error("no moves available"); }
+    return choice;
+}
+
 // Human interface
 // ===============
 
@@ -601,7 +639,7 @@ Figure Battle(const Policy& policy_a, const Policy& policy_b) {
     }
 }
 
-const std::unordered_map<string_view, Policy> g_policies = {{"random", AutoRandom}, {"greedy", AutoGreedy}, {"climber", AutoClimber}};
+const std::unordered_map<string_view, Policy> g_policies = {{"random", AutoRandom}, {"greedy", AutoGreedy}, {"climber", AutoClimber}, {"mcts", AutoMCTS}};
 
 void AutoBattle(int count, string_view name_a, string_view name_b) {
     const Policy& policy_a = g_policies.at(name_a);
@@ -623,6 +661,10 @@ int main(int argc, char** argv) {
     AutoBattle(100, "random", "greedy");
     AutoBattle(100, "random", "climber");
     AutoBattle(100, "greedy", "climber");
+
+    AutoBattle(100, "random", "mcts");
+    AutoBattle(100, "greedy", "mcts");
+    AutoBattle(100, "climber", "mcts");
     return 0;
 
     auto window = CreateWindow({.width = Width, .height = Height, .resizeable = false});
