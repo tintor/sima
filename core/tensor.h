@@ -22,10 +22,14 @@ class TensorSpan {
    public:
     TensorSpan(T* data, cspan<uint32_t> shape) : m_data(data) { Copy(shape, m_shape); }
 
-    template<typename X>
-    TensorSpan(const TensorSpan<X>& o) : m_data(o.m_data) { Copy(o.m_shape, m_shape); }
-    template<typename X>
-    TensorSpan(const Tensor<X>& o) : m_data(o.data()) { Copy(o.shape(), m_shape); }
+    template <typename X>
+    TensorSpan(const TensorSpan<X>& o) : m_data(o.m_data) {
+        Copy(o.m_shape, m_shape);
+    }
+    template <typename X>
+    TensorSpan(const Tensor<X>& o) : m_data(o.data()) {
+        Copy(o.shape(), m_shape);
+    }
 
     T* data() { return m_data; }
     T const* data() const { return m_data; }
@@ -52,9 +56,12 @@ class TensorSpan {
 template <typename T>
 class Tensor {
    public:
-    Tensor(cspan<uint32_t> shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape.data(), shape.size()) { }
-    template<typename X>
-    Tensor(const TensorSpan<X>& o) { operator=(o); }
+    Tensor(cspan<uint32_t> shape, T init = T())
+        : m_data(Product<size_t>(shape), init), m_shape(shape.data(), shape.size()) {}
+    template <typename X>
+    Tensor(const TensorSpan<X>& o) {
+        operator=(o);
+    }
     Tensor(const Tensor<const T>& o) { operator=(o); }
 
     size_t size() const { return m_data.size(); }
@@ -68,12 +75,12 @@ class Tensor {
     operator TensorSpan<T>() { return TensorSpan<T>(m_data.data(), m_shape); }
 
     TensorSpan<T> sub(uint32_t index) {
-          cspan<uint32_t> sub_shape = m_shape.pop_back();
-          return TensorSpan<T>(m_data + index * Product<size_t>(sub_shape), sub_shape);
+        cspan<uint32_t> sub_shape = m_shape.pop_back();
+        return TensorSpan<T>(m_data + index * Product<size_t>(sub_shape), sub_shape);
     }
     TensorSpan<const T> sub(uint32_t index) const {
-          cspan<uint32_t> sub_shape = cspan<uint32_t>(m_shape).pop_back();
-          return TensorSpan<const T>(m_data.data() + index * Product<size_t>(sub_shape), sub_shape);
+        cspan<uint32_t> sub_shape = cspan<uint32_t>(m_shape).pop_back();
+        return TensorSpan<const T>(m_data.data() + index * Product<size_t>(sub_shape), sub_shape);
     }
 
     size_t offset(cspan<uint32_t> index) const {

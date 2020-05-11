@@ -22,7 +22,10 @@ class Layer {
 class InputLayer : public Layer {
    public:
     InputLayer(cspan<uint32_t> shape) : Layer(shape) {}
-    void set(const TensorSpan<const float>& y) { Check(m_y.shape() == y.shape()); m_y = y; }
+    void set(const TensorSpan<const float>& y) {
+        Check(m_y.shape() == y.shape());
+        m_y = y;
+    }
 };
 
 class ReluLayer : public Layer {
@@ -140,8 +143,7 @@ class MeanSquareErrorLayer : public Layer {
         const auto& r = m_reference->y();
         auto& dx = m_input->dy();
 
-        for (size_t i = 0; i < x.size(); i++)
-           dx[i] = 2 * (x[i] - r[i]);
+        for (size_t i = 0; i < x.size(); i++) dx[i] = 2 * (x[i] - r[i]);
     }
 
    private:
@@ -149,7 +151,7 @@ class MeanSquareErrorLayer : public Layer {
     Layer* m_input;
 };
 
-template<typename Model>
+template <typename Model>
 void TrainWithSGD(Model& model, const Tensor<float>& in, const Tensor<float>& out, std::mt19937& random) {
     Check(in.shape().size() > 0);
     Check(out.shape().size() > 0);
