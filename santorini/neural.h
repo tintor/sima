@@ -1,6 +1,6 @@
 #pragma once
 #include <core/std.h>
-#include <santorini/tensor.h>
+#include <core/tensor.h>
 
 template<typename T>
 vector<T> Sub(const vector<T>& in, size_t start, size_t end) {
