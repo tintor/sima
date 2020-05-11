@@ -1,9 +1,9 @@
 #pragma once
 #include <core/hash.h>
 #include <core/std.h>
+#include <core/tensor.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
-#include <santorini/tensor.h>
 
 #include <fstream>
 

@@ -78,7 +78,8 @@ inline float Dot(const TensorSpan<const float>& a, const TensorSpan<const float>
 vector<uint32_t> Concat(uint32_t a, cspan<uint32_t> b) {
     vector<uint32_t> out(1 + b.size());
     out[0] = a;
-    Copy(b, span<uint32_t>(out.data() + 1, out.size() - 1));
+    span<uint32_t> tail(out.data() + 1, out.size() - 1);
+    Copy(b, tail);
     return out;
 }
 

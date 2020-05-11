@@ -9,8 +9,8 @@ T Product(const Range& range) {
 }
 
 template <typename CollectionA, typename CollectionB>
-void Copy(const CollectionA& a, const CollectionB& b) {
-    b.resize(a.size());
+void Copy(const CollectionA& a, CollectionB& b) {
+    Check(a.size() == b.size());
     for (size_t i = 0; i < a.size(); i++) b[i] = a[i];
 }
 
@@ -20,16 +20,16 @@ class Tensor;
 template <typename T>
 class TensorSpan {
    public:
-    TensorSpan(T* data, cspan<uint32_t> shape) : m_data(data) { Copy(shape, m_shape); }
+    TensorSpan(T* data, cspan<uint32_t> shape) : m_data(data), m_shape(shape.size()) { Copy(shape, m_shape); }
 
     template <typename X>
     TensorSpan(const TensorSpan<X>& o) : m_data(o.m_data) {
         Copy(o.m_shape, m_shape);
     }
-    template <typename X>
+    /*template <typename X>
     TensorSpan(const Tensor<X>& o) : m_data(o.data()) {
         Copy(o.shape(), m_shape);
-    }
+    }*/
 
     T* data() { return m_data; }
     T const* data() const { return m_data; }
@@ -56,12 +56,13 @@ class TensorSpan {
 template <typename T>
 class Tensor {
    public:
-    Tensor(cspan<uint32_t> shape, T init = T())
-        : m_data(Product<size_t>(shape), init), m_shape(shape.data(), shape.size()) {}
+    Tensor(cspan<uint32_t> shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape.size()) { Copy(shape, m_shape); }
+
     template <typename X>
     Tensor(const TensorSpan<X>& o) {
         operator=(o);
     }
+
     Tensor(const Tensor<const T>& o) { operator=(o); }
 
     size_t size() const { return m_data.size(); }
@@ -73,6 +74,7 @@ class Tensor {
     const T& operator()(cspan<uint32_t> index) const { return m_data[offset(index)]; }
 
     operator TensorSpan<T>() { return TensorSpan<T>(m_data.data(), m_shape); }
+    operator TensorSpan<const T>() const { return TensorSpan<const T>(m_data.data(), m_shape); }
 
     TensorSpan<T> sub(uint32_t index) {
         cspan<uint32_t> sub_shape = m_shape.pop_back();
@@ -90,6 +92,7 @@ class Tensor {
     }
 
     void operator=(const TensorSpan<const float>& o) {
+        m_shape.resize(o.shape().size());
         Copy(o.shape(), m_shape);
         m_data.resize(o.size());
         // TODO(Marko) not safe when strides are added to TensorSpan
@@ -97,6 +100,7 @@ class Tensor {
     }
 
     void reshape(cspan<uint32_t> shape, T init = T()) {
+        m_shape.resize(shape.size());
         Copy(shape, m_shape);
         m_data.resize(Product<size_t>(m_shape), init);
     }
