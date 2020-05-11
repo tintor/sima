@@ -7,8 +7,13 @@
     (const auto& e) { return EXPR; }
 
 template <typename T>
-inline int sign(T a) {
+int sign(T a) {
     return (0 < a) - (a < 0);
+}
+
+template <typename T>
+T sqr(T a) {
+    return a * a;
 }
 
 template <typename T>
@@ -178,4 +183,24 @@ size_t IndexOfMax(cspan<T> s, P measure) {
         }
     }
     return mi;
+}
+
+template <typename T, typename Range>
+T Product(const Range& range) {
+    T out = 1;
+    for (const auto& e : range) out *= e;
+    return out;
+}
+
+template <typename T, typename Range>
+T Sum(const Range& range) {
+    T out = 0;
+    for (const auto& e : range) out += e;
+    return out;
+}
+
+template <typename CollectionA, typename CollectionB>
+void Copy(const CollectionA& a, CollectionB& b) {
+    Check(a.size() == b.size());
+    for (size_t i = 0; i < a.size(); i++) b[i] = a[i];
 }

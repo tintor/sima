@@ -1,18 +1,6 @@
 #pragma once
 #include <core/std.h>
-
-template <typename T, typename Range>
-T Product(const Range& range) {
-    T out = 1;
-    for (const auto& e : range) out *= e;
-    return out;
-}
-
-template <typename CollectionA, typename CollectionB>
-void Copy(const CollectionA& a, CollectionB& b) {
-    Check(a.size() == b.size());
-    for (size_t i = 0; i < a.size(); i++) b[i] = a[i];
-}
+#include <core/util.h>
 
 template <typename T>
 class Tensor;
@@ -56,7 +44,9 @@ class TensorSpan {
 template <typename T>
 class Tensor {
    public:
-    Tensor(cspan<uint32_t> shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape.size()) { Copy(shape, m_shape); }
+    Tensor(cspan<uint32_t> shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape.size()) {
+        Copy(shape, m_shape);
+    }
 
     template <typename X>
     Tensor(const TensorSpan<X>& o) {

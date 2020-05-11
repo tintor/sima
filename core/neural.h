@@ -132,10 +132,7 @@ class MeanSquareErrorLayer : public Layer {
         const auto& x = m_input->y();
         const auto& r = m_reference->y();
         float error = 0;
-        for (size_t i = 0; i < x.size(); i++) {
-            float e = x[i] - r[i];
-            error += e * e;
-        }
+        for (size_t i = 0; i < x.size(); i++) error += sqr(x[i] - r[i]);
         m_y[0] = error;
     }
 
@@ -150,6 +147,35 @@ class MeanSquareErrorLayer : public Layer {
    private:
     const Layer* m_reference;
     Layer* m_input;
+};
+
+class BatchNormLayer : public Layer {
+   public:
+    BatchNormLayer(Layer* input, float delta) : Layer(input->shape()), m_delta(delta) {}
+
+    void Forward() {
+        const auto& x = m_input->y();
+
+        const float mean = Sum(x) / x.size();
+
+        float s = 0;
+        for (size_t i = 0; i < x.size(); i++) s += sqr(x[i] - mean);
+        const float stdev = sqrt(delta + s / x.size());
+
+        for (size_t i = 0; i < x.size(); i++) m_y[i] = (x[i] - mean) / stdev;
+    }
+
+    void Backward() {
+        const auto& x = m_input->y();
+        auto& dx = m_input->dy();
+
+        // TODO(Marko)
+        Check(false, "unfinished");
+        // dj/dx  = dj/dy * d (1/stdev )/dx
+    }
+
+   private:
+    const float m_delta;
 };
 
 template <typename Model>
