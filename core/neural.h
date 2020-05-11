@@ -2,19 +2,6 @@
 #include <core/std.h>
 #include <core/tensor.h>
 
-template<typename T>
-vector<T> Sub(const vector<T>& in, size_t start, size_t end) {
-    vector<T> out;
-    out.reserve(end - start);
-    for (size_t i = start; i < end; i++) out.push_back(in[i]);
-    return out;
-}
-
-template<typename T>
-vector<T> Sub(const vector<T>& in, size_t start) {
-    return Sub(in, start, in.size());
-}
-
 class Layer {
    public:
     Layer(cspan<uint32_t> shape) : m_y(shape), m_dy(shape) {}
@@ -38,27 +25,19 @@ class InputLayer : public Layer {
     void set(const TensorSpan<const float>& y) { Check(m_y.shape() == y.shape()); m_y = y; }
 };
 
-inline double Relu(double x) { return x > 0 ? x : 0; }
-
-inline double ReluGradient(double x) {
-    if (x > 0) return 1;
-    if (x == 0) return 0.5;
-    return 0;
-}
-
 class ReluLayer : public Layer {
    public:
     ReluLayer(Layer* input) : Layer(input->shape()), m_input(input) {}
 
     void Forward() {
         const auto& x = m_input->y();
-        for (size_t i = 0; i < m_y.size(); i++) m_y[i] = Relu(x[i]);
+        for (size_t i = 0; i < m_y.size(); i++) m_y[i] = (x[i] > 0) ? x[i] : 0;
     }
 
     void Backward() {
         const auto& x = m_input->y();
         auto& dx = m_input->dy();
-        for (size_t i = 0; i < x.size(); i++) dx[i] = m_dy[i] * ReluGradient(x[i]);
+        for (size_t i = 0; i < x.size(); i++) dx[i] = (x[i] > 0) ? m_dy[i] : 0.0f;
     }
 
    private:
@@ -87,7 +66,7 @@ class SigmoidLayer : public Layer {
 };
 
 inline float Dot(const TensorSpan<const float>& a, const TensorSpan<const float>& b) {
-    Check(a.size() == b.size());
+    Check(a.shape() == b.shape());
     float sum = 0;
     for (size_t i = 0; i < a.size(); i++) sum += a[i] * b[i];
     return sum;
@@ -170,80 +149,8 @@ class MeanSquareErrorLayer : public Layer {
     Layer* m_input;
 };
 
-struct FeedForwardNetwork {
-    InputLayer input;
-    InputLayer reference;
-
-    // hidden
-    FullyConnectedLayer fc1;
-    ReluLayer relu;
-    FullyConnectedLayer fc2;
-
-    SigmoidLayer output;
-    MeanSquareErrorLayer loss;
-
-    FeedForwardNetwork(uint32_t input_size, uint32_t fc1_size, std::mt19937& random)
-        : input({input_size}),
-          reference({1}),
-          fc1(&input, fc1_size, 0.01f, random),
-          relu(&fc1),
-          fc2(&relu, 1, 0.01f, random),
-          output(&fc2),
-          loss(&output, &reference) {}
-
-    void Load(istream& is) {
-        // is >> input >> fc1 >> relu >> fc2 >> sigmoid >> loss;
-    }
-
-    void Save(ostream& os) const {
-        // os << input << fc1 << relu << fc2 << sigmoid << loss;
-    }
-
-    void Forward() {
-        fc1.Forward();
-        relu.Forward();
-        fc2.Forward();
-        output.Forward();
-    }
-
-    void Backward() {
-        output.Backward();
-        fc2.Backward();
-        relu.Backward();
-        fc1.Backward();
-    }
-
-    void Train(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
-        input.set(in);
-        reference.set(ref);
-
-        Forward();
-        loss.Forward();
-        // TODO how to propagate loss back in network?
-        loss.Backward();
-        Backward();
-    }
-
-    void TrainBatch(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
-        // TODO(Marko)
-    }
-
-    float Loss(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
-        input.set(in);
-        reference.set(ref);
-        Forward();
-        loss.Forward();
-        return loss.y()[0];
-    }
-
-    float Predict(const Tensor<float>& in) {
-        input.set(in);
-        Forward();
-        return output.y()[0];
-    }
-};
-
-void TrainWithSGD(FeedForwardNetwork& model, const Tensor<float>& in, const Tensor<float>& out, std::mt19937& random) {
+template<typename Model>
+void TrainWithSGD(Model& model, const Tensor<float>& in, const Tensor<float>& out, std::mt19937& random) {
     Check(in.shape().size() > 0);
     Check(out.shape().size() > 0);
     Check(in.shape().back() == out.shape().back());

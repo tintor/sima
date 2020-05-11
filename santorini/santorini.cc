@@ -5,7 +5,7 @@
 #include <core/util.h>
 #include <santorini/action.h>
 #include <santorini/board.h>
-#include <santorini/neural.h>
+#include <santorini/model.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
