@@ -1,5 +1,5 @@
 #pragma once
-#include <core/neural.h>
+#include <core/diff.h>
 #include <core/std.h>
 
 struct FeedForwardNetwork {
