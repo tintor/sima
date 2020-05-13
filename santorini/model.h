@@ -3,8 +3,8 @@
 #include <core/std.h>
 
 struct FeedForwardNetwork {
-    Input input;
-    Input reference;
+    Variable input;
+    Variable reference;
 
     // hidden
     FullyConnected fc1;

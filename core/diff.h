@@ -20,14 +20,12 @@ struct Diff {
 
 struct Constant : public Diff {};
 
-// input and reference value
-struct Variable : public Diff {};
-
 // learnable parameter, can be saved
 struct Parameter : public Diff {};
 
-struct Input : public Diff {
-    Input(tensor_shape shape) : Diff(shape) {}
+// input and reference value
+struct Variable : public Diff {
+    Variable(tensor_shape shape) : Diff(shape) {}
 
     void set(const tensor y) {
         Check(m_y.shape() == y.shape());
