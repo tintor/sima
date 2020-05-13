@@ -116,7 +116,7 @@ ostream& operator<<(ostream& os, const Board& board) {
     return os;
 }
 
-void Serialize(const Board& board, Tensor<float>& out) {
+void Serialize(const Board& board, tensor out) {
     Check(out.shape().size() == 1);
     Check(out.shape()[0] == BoardBits);
     ostringstream os;

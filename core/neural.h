@@ -2,12 +2,11 @@
 #include <core/std.h>
 #include <core/tensor.h>
 
-class Layer {
-   public:
-    Layer(cspan<uint32_t> shape) : m_y(shape), m_dy(shape) {}
+struct Diff {
+    Diff(tensor_shape shape) : m_y(shape), m_dy(shape) {}
 
-    const Tensor<float>& y() const { return m_y; }
-    Tensor<float>& dy() { return m_dy; }
+    const tensor y() const { return m_y; }
+    tensor dy() { return m_dy; }
 
     auto shape() const { return m_y.shape(); }
     size_t size() const { return m_y.size(); }
@@ -16,83 +15,83 @@ class Layer {
     void Backward() {}
 
    protected:
-    Tensor<float> m_y, m_dy;
+    vtensor m_y, m_dy;
 };
 
-class InputLayer : public Layer {
-   public:
-    InputLayer(cspan<uint32_t> shape) : Layer(shape) {}
-    void set(const TensorSpan<const float>& y) {
+struct Constant : public Diff {};
+
+// input and reference value
+struct Variable : public Diff {};
+
+// learnable parameter, can be saved
+struct Parameter : public Diff {};
+
+struct Input : public Diff {
+    Input(tensor_shape shape) : Diff(shape) {}
+
+    void set(const tensor y) {
         Check(m_y.shape() == y.shape());
         m_y = y;
     }
 };
 
-class ReluLayer : public Layer {
-   public:
-    ReluLayer(Layer* input) : Layer(input->shape()), m_input(input) {}
+struct DiffFunc : public Diff {
+    DiffFunc(Diff* input) : Diff(input->shape()), m_input(input) {}
 
-    void Forward() {
-        const auto& x = m_input->y();
-        for (size_t i = 0; i < m_y.size(); i++) m_y[i] = (x[i] > 0) ? x[i] : 0;
-    }
+    void Forward() { Func(m_input->y(), m_y); }
 
     void Backward() {
-        const auto& x = m_input->y();
-        auto& dx = m_input->dy();
-        for (size_t i = 0; i < x.size(); i++) dx[i] = (x[i] > 0) ? m_dy[i] : 0.0f;
+        Grad(m_input->y(), m_y, m_input->dy());
+        for (size_t i = 0; i < m_dy.size(); i++) m_input->dy()[i] *= m_dy[i];
     }
+
+    virtual void Func(const tensor x, tensor y) = 0;
+    virtual void Grad(const tensor x, const tensor y, tensor dy) = 0;
 
    private:
-    Layer* m_input;
+    Diff* m_input;
 };
 
-inline double Sigmoid(double x) { return 1 / (1 + exp(-x)); }
+struct Relu : public DiffFunc {
+    Relu(Diff* input) : DiffFunc(input) {}
 
-class SigmoidLayer : public Layer {
-   public:
-    SigmoidLayer(Layer* input) : Layer(input->shape()), m_input(input) {}
-
-    void Forward() {
-        const auto& x = m_input->y();
-        for (size_t i = 0; i < x.size(); i++) m_y[i] = Sigmoid(x[i]);
+    void Func(const tensor x, tensor y) override {
+        for (size_t i = 0; i < y.size(); i++) y[i] = (x[i] > 0) ? x[i] : 0;
     }
 
-    void Backward() {
-        const auto& x = m_input->y();
-        auto& dx = m_input->dy();
-        for (size_t i = 0; i < x.size(); i++) dx[i] = m_dy[i] * m_y[i] * (1 - m_y[i]);
+    void Grad(const tensor x, const tensor y, tensor dy) override {
+        for (size_t i = 0; i < y.size(); i++) dy[i] = (x[i] > 0) ? 1 : 0;
     }
-
-   private:
-    Layer* m_input;
 };
 
-inline float Dot(const TensorSpan<const float>& a, const TensorSpan<const float>& b) {
+struct Sigmoid : public DiffFunc {
+    Sigmoid(Diff* input) : DiffFunc(input) {}
+
+    void Func(const tensor x, tensor y) override {
+        for (size_t i = 0; i < y.size(); i++) y[i] = 1 / (1 + exp(-x[i]));
+    }
+
+    void Grad(const tensor x, const tensor y, tensor dy) override {
+        for (size_t i = 0; i < y.size(); i++) dy[i] = y[i] * (1 - y[i]);
+    }
+};
+
+inline tensor::type Dot(const tensor a, const tensor b) {
     Check(a.shape() == b.shape());
-    float sum = 0;
+    tensor::type sum = 0;
     for (size_t i = 0; i < a.size(); i++) sum += a[i] * b[i];
     return sum;
 }
 
-vector<uint32_t> Concat(uint32_t a, cspan<uint32_t> b) {
-    vector<uint32_t> out(1 + b.size());
-    out[0] = a;
-    span<uint32_t> tail(out.data() + 1, out.size() - 1);
-    Copy(b, tail);
-    return out;
-}
-
-class FullyConnectedLayer : public Layer {
-   public:
-    FullyConnectedLayer(Layer* input, uint32_t size, float variance, std::mt19937& random)
-        : Layer({size}), m_input(input), m_w(Concat(size, input->shape())), m_b({size}, 0.0f) {
+struct FullyConnected : public Diff {
+    FullyConnected(Diff* input, uint16_t size, float variance, std::mt19937& random)
+        : Diff(Shape(size)), m_input(input), m_w(Concat(size, input->shape())), m_b(Shape(size), 0) {
         std::normal_distribution<float> dis(0.0f, variance);
         for (size_t i = 0; i < m_w.size(); i++) m_w[i] = dis(random);
     }
 
     void Forward() {
-        const auto& x = m_input->y();
+        const tensor x = m_input->y();
         const size_t m = x.size();
         const size_t n = m_b.size();
 
@@ -105,8 +104,8 @@ class FullyConnectedLayer : public Layer {
     }
 
     void Backward() {
-        const auto& x = m_input->y();
-        auto& dx = m_input->dy();
+        const tensor x = m_input->y();
+        tensor dx = m_input->dy();
         const size_t m = x.size();
         const size_t n = m_b.size();
 
@@ -118,40 +117,38 @@ class FullyConnectedLayer : public Layer {
     }
 
    private:
-    Layer* m_input;
-    Tensor<float> m_w, m_b;
+    Diff* m_input;
+    vtensor m_w, m_b;
 };
 
-class MeanSquareErrorLayer : public Layer {
-   public:
-    MeanSquareErrorLayer(Layer* input, const Layer* reference) : Layer({1}), m_input(input), m_reference(reference) {
+struct MeanSquareError : public Diff {
+    MeanSquareError(Diff* input, const Diff* reference) : Diff({1}), m_input(input), m_reference(reference) {
         Check(input->shape() == reference->shape());
     }
 
     void Forward() {
-        const auto& x = m_input->y();
-        const auto& r = m_reference->y();
+        const tensor x = m_input->y();
+        const tensor r = m_reference->y();
         float error = 0;
         for (size_t i = 0; i < x.size(); i++) error += sqr(x[i] - r[i]);
         m_y[0] = error;
     }
 
     void Backward() {
-        const auto& x = m_input->y();
-        const auto& r = m_reference->y();
-        auto& dx = m_input->dy();
+        const tensor x = m_input->y();
+        const tensor r = m_reference->y();
+        tensor dx = m_input->dy();
 
         for (size_t i = 0; i < x.size(); i++) dx[i] = 2 * (x[i] - r[i]);
     }
 
    private:
-    const Layer* m_reference;
-    Layer* m_input;
+    const Diff* m_reference;
+    Diff* m_input;
 };
 
-class BatchNormLayer : public Layer {
-   public:
-    BatchNormLayer(Layer* input, float delta) : Layer(input->shape()), m_delta(delta) {}
+struct BatchNorm : public Diff {
+    BatchNorm(Diff* input, float delta) : Diff(input->shape()), m_delta(delta) {}
 
     void Forward() {
         const auto& x = m_input->y();
@@ -166,8 +163,8 @@ class BatchNormLayer : public Layer {
     }
 
     void Backward() {
-        const auto& x = m_input->y();
-        auto& dx = m_input->dy();
+        const tensor x = m_input->y();
+        tensor dx = m_input->dy();
 
         // TODO(Marko)
         Check(false, "unfinished");
@@ -176,17 +173,17 @@ class BatchNormLayer : public Layer {
 
    private:
     const float m_delta;
-    Layer* m_input;
+    Diff* m_input;
 };
 
 template <typename Model>
-void TrainWithSGD(Model& model, const Tensor<float>& in, const Tensor<float>& out, std::mt19937& random) {
+void TrainWithSGD(Model& model, const tensor in, tensor out, std::mt19937& random) {
     Check(in.shape().size() > 0);
     Check(out.shape().size() > 0);
     Check(in.shape().back() == out.shape().back());
 
-    Check(in.shape().pop_back() == model.input.shape());
-    Check(out.shape().pop_back() == model.output.shape());
+    Check(PopBack(in.shape()) == model.input.shape());
+    Check(PopBack(out.shape()) == model.output.shape());
 
     vector<uint32_t> samples;
     samples.resize(in.shape().back());
@@ -194,7 +191,7 @@ void TrainWithSGD(Model& model, const Tensor<float>& in, const Tensor<float>& ou
     std::shuffle(samples.begin(), samples.end(), random);
 
     for (uint32_t index : samples) {
-        model.Train(in.sub(index), out.sub(index));
+        // model.Train(in.sub(index), out.sub(index));
         // x
         // y = f(x, w)
         // loss = norm(y - ref)

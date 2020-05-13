@@ -3,19 +3,19 @@
 #include <core/std.h>
 
 struct FeedForwardNetwork {
-    InputLayer input;
-    InputLayer reference;
+    Input input;
+    Input reference;
 
     // hidden
-    FullyConnectedLayer fc1;
-    ReluLayer relu;
-    FullyConnectedLayer fc2;
+    FullyConnected fc1;
+    Relu relu;
+    FullyConnected fc2;
 
-    SigmoidLayer output;
-    MeanSquareErrorLayer loss;
+    Sigmoid output;
+    MeanSquareError loss;
 
-    FeedForwardNetwork(uint32_t input_size, uint32_t fc1_size, std::mt19937& random)
-        : input({input_size}),
+    FeedForwardNetwork(uint16_t input_size, uint16_t fc1_size, std::mt19937& random)
+        : input({input_size, 0, 0, 0}),
           reference({1}),
           fc1(&input, fc1_size, 0.01f, random),
           relu(&fc1),
@@ -45,7 +45,7 @@ struct FeedForwardNetwork {
         fc1.Backward();
     }
 
-    void Train(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
+    void Train(const tensor in, const tensor ref) {
         input.set(in);
         reference.set(ref);
 
@@ -56,11 +56,11 @@ struct FeedForwardNetwork {
         Backward();
     }
 
-    void TrainBatch(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
+    void TrainBatch(const tensor in, const tensor ref) {
         // TODO(Marko)
     }
 
-    float Loss(const TensorSpan<const float>& in, const TensorSpan<const float>& ref) {
+    float Loss(const tensor in, const tensor ref) {
         input.set(in);
         reference.set(ref);
         Forward();
@@ -68,7 +68,7 @@ struct FeedForwardNetwork {
         return loss.y()[0];
     }
 
-    float Predict(const Tensor<float>& in) {
+    float Predict(const tensor in) {
         input.set(in);
         Forward();
         return output.y()[0];

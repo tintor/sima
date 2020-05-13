@@ -313,7 +313,7 @@ FeedForwardNetwork g_value_fn(BoardBits, 16, g_random);
 // 1 - current player wins always
 // 0 - current player looses alwaya
 double WinValue(const Board& board) {
-    Tensor<float> input({BoardBits});
+    vtensor input(Shape(BoardBits));
     Serialize(board, input);
     return g_value_fn.Predict(input);
 }
