@@ -156,11 +156,11 @@ class BatchNormLayer : public Layer {
     void Forward() {
         const auto& x = m_input->y();
 
-        const float mean = Sum(x) / x.size();
+        const float mean = Sum<float>(x) / x.size();
 
         float s = 0;
         for (size_t i = 0; i < x.size(); i++) s += sqr(x[i] - mean);
-        const float stdev = sqrt(delta + s / x.size());
+        const float stdev = sqrt(m_delta + s / x.size());
 
         for (size_t i = 0; i < x.size(); i++) m_y[i] = (x[i] - mean) / stdev;
     }
@@ -176,6 +176,7 @@ class BatchNormLayer : public Layer {
 
    private:
     const float m_delta;
+    Layer* m_input;
 };
 
 template <typename Model>

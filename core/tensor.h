@@ -2,6 +2,15 @@
 #include <core/std.h>
 #include <core/util.h>
 
+// TODO:
+// Optimized Tensor and TensorView class layout (main difference is that TensorView doesn't own its memory):
+// - m_data ptr (based on raw_array)
+// - 8 byte shape array: std::array<uint16_t, 4> (if >4 dimensions are needed then shape vector can be varint encoded)
+// simple!
+// efficient for small tensors
+// supports large tensors
+// can be optimized for inline storage for tensor of size 1 float (ie. scalars can be efficient as tensors)
+
 template <typename T>
 class Tensor;
 
@@ -21,6 +30,11 @@ class TensorSpan {
 
     T* data() { return m_data; }
     T const* data() const { return m_data; }
+
+    const T* begin() const { return data(); }
+    const T* end() const { return data() + size(); }
+    T* begin() { return data(); }
+    T* end() { return data() + size(); }
 
     size_t size() const { return Product<size_t>(m_shape); }
     T& operator[](size_t index) { return m_data[index]; }
@@ -54,6 +68,14 @@ class Tensor {
     }
 
     Tensor(const Tensor<const T>& o) { operator=(o); }
+
+    T* data() { return m_data.data(); }
+    T const* data() const { return m_data.data(); }
+
+    const T* begin() const { return data(); }
+    const T* end() const { return data() + size(); }
+    T* begin() { return data(); }
+    T* end() { return data() + size(); }
 
     size_t size() const { return m_data.size(); }
     T& operator[](size_t index) { return m_data[index]; }
