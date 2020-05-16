@@ -22,7 +22,7 @@ struct tensor_shape {
     const uint16_t* begin() const { return dim.data(); }
     const uint16_t* end() const { return dim.data() + size(); }
 
-    size_t volume() const { return Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
+    size_t volume() const { return (size() == 0) ? 0 : Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
 
     tensor_shape remove_zeros() const {
         tensor_shape s;
@@ -143,7 +143,6 @@ class Tensor {
 };
 
 // VTensor is multi-dimensional vector (owns memory)
-// Can't be reshaped.
 template <typename T>
 class VTensor {
    public:
@@ -189,13 +188,13 @@ class VTensor {
     void operator=(const Tensor<T> o) {
         m_shape = o.shape();
         m_data.resize(o.size());
-        // TODO(Marko) not safe when strides are added to Tensor
+        // TODO not safe if strides are added to Tensor
         std::copy(o.data(), o.data() + o.size(), m_data.data());
     }
 
     void reshape(tensor_shape shape, T init = T()) {
         m_shape = shape;
-        m_data.resize(Product<size_t>(m_shape), init);
+        m_data.resize(m_shape.volume(), init);
     }
 
     bool operator==(const Tensor<T>& o) const {

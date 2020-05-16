@@ -308,12 +308,12 @@ Action AutoClimber(const Board& board) {
     return choice;
 }
 
-FeedForwardNetwork g_value_fn(BoardBits, 16, g_random);
+ValueFunction g_value_fn(BoardBits);
 
 // 1 - current player wins always
 // 0 - current player looses alwaya
 double WinValue(const Board& board) {
-    vtensor input(Shape(BoardBits));
+    vtensor input(tensor_shape{BoardBits});
     Serialize(board, input);
     return g_value_fn.Predict(input);
 }

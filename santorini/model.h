@@ -2,75 +2,26 @@
 #include <core/diff.h>
 #include <core/std.h>
 
-struct FeedForwardNetwork {
-    Variable input;
-    Variable reference;
-
-    // hidden
-    FullyConnected fc1;
-    Relu relu;
-    FullyConnected fc2;
-
-    Sigmoid output;
-    MeanSquareError loss;
-
-    FeedForwardNetwork(uint16_t input_size, uint16_t fc1_size, std::mt19937& random)
-        : input({input_size, 0, 0, 0}),
-          reference({1}),
-          fc1(&input, fc1_size, 0.01f, random),
-          relu(&fc1),
-          fc2(&relu, 1, 0.01f, random),
-          output(&fc2),
-          loss(&output, &reference) {}
-
-    void Load(istream& is) {
-        // is >> input >> fc1 >> relu >> fc2 >> sigmoid >> loss;
-    }
-
-    void Save(ostream& os) const {
-        // os << input << fc1 << relu << fc2 << sigmoid << loss;
-    }
-
-    void Forward() {
-        fc1.Forward();
-        relu.Forward();
-        fc2.Forward();
-        output.Forward();
-    }
-
-    void Backward() {
-        output.Backward();
-        fc2.Backward();
-        relu.Backward();
-        fc1.Backward();
-    }
-
-    void Train(const tensor in, const tensor ref) {
-        input.set(in);
-        reference.set(ref);
-
-        Forward();
-        loss.Forward();
-        // TODO how to propagate loss back in network?
-        loss.Backward();
-        Backward();
-    }
-
-    void TrainBatch(const tensor in, const tensor ref) {
-        // TODO(Marko)
+struct ValueFunction : public Model {
+    ValueFunction(uint16_t input_size) {
+        input = Data({input_size}, "input");
+        reference = Data({1}, "reference");
+        NormalInit w_init(0.01f);
+        auto fc1 = Relu(FullyConnected(input, 128, w_init));
+        output = FullyConnected(fc1, 1, w_init);
+        loss = MeanSquareError(output, reference);
     }
 
     float Loss(const tensor in, const tensor ref) {
-        input.set(in);
-        reference.set(ref);
+        input->v = in; // TODO don't allow changing chape!
+        reference->v = ref;
         Forward();
-        loss.Forward();
-        return loss.y()[0];
+        return loss->v[0];
     }
 
     float Predict(const tensor in) {
-        input.set(in);
-        Forward();
-        return output.y()[0];
+        input->v = in;
+        Forward(); // TODO no need to compute loss here
+        return output->v[0];
     }
 };
