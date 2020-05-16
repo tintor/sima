@@ -4,8 +4,8 @@
 
 struct ValueFunction : public Model {
     ValueFunction(uint16_t input_size) {
-        input = Data({input_size}, "input");
-        reference = Data({1}, "reference");
+        input = Data({0, input_size}, "input");
+        reference = Data({0, 1}, "reference");
         NormalInit w_init(0.01f);
         auto fc1 = Relu(FullyConnected(input, 128, w_init));
         output = FullyConnected(fc1, 1, w_init);
