@@ -12,14 +12,29 @@ struct tensor_shape {
 
     tensor_shape(const tensor_shape& o) : dim{o.dim} {}
     uint16_t operator[](int i) const { return dim[i]; }
-    uint16_t& operator[](int i) { return dim[i]; }
+
+    tensor_shape set(int i, uint16_t v) const {
+        tensor_shape s = *this;
+        s.dim[i] = v;
+        return s;
+    }
 
     size_t size() const {
         for (int i = dim.size() - 1; i >= 0; i--) if (dim[i]) return i + 1;
         return 0;
     }
 
+    const uint16_t* begin() const { return dim.data(); }
+    const uint16_t* end() const { return dim.data() + size(); }
+
     size_t volume() const { return Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
+
+    tensor_shape remove_zeros() const {
+        tensor_shape s;
+        int w = 0;
+        for (int i = 0; i < dim.size(); i++) if (dim[i]) s.dim[w++] = dim[i];
+        return s;
+    }
 
     tensor_shape pop_front() const {
         tensor_shape s;
@@ -79,7 +94,7 @@ class Tensor {
     Tensor() : m_data(nullptr) {}
     Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {}
 
-    Tensor(const Tensor<T>& o) : m_data(o.m_data) { Copy(o.m_shape, m_shape); }
+    Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) { }
 
     operator bool() const { return m_data != nullptr; }
 
@@ -91,7 +106,7 @@ class Tensor {
     T* begin() { return data(); }
     T* end() { return data() + size(); }
 
-    size_t size() const { return Product<size_t>(m_shape); }
+    size_t size() const { return m_shape.volume(); }
     T& operator[](size_t index) { return m_data[index]; }
     const T& operator[](size_t index) const { return m_data[index]; }
 
@@ -106,6 +121,17 @@ class Tensor {
         size_t out = index[0];
         for (size_t i = 1; i < index.size(); i++) out = out * m_shape[i] + index[i];
         return out;
+    }
+
+    // sub-tensor for the fixed value of the first dimension
+    Tensor slice(uint16_t a) {
+        auto v = m_shape.pop_front().volume();
+        return Tensor(m_data + a * v, v);
+    }
+
+    const Tensor slice(uint16_t a) const {
+        auto v = m_shape.pop_front().volume();
+        return Tensor(m_data + a * v, v);
     }
 
    private:
