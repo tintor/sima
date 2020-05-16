@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 	
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-add_definitions(-O3 -mavx2 -mfma -DNDEBUG -Wfatal-errors)
+add_definitions(-O3 -mavx2 -mfma -ffast-math -DNDEBUG -Wfatal-errors)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
 #add_definitions(-O3 -flto -DNDEBUG -mavx2 -lgmpxx -lgmp)
 
