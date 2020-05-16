@@ -133,6 +133,14 @@ bool contains(const array<T, M>& container, T element) {
     return contains(cspan<T>(container), element);
 }
 
+template<typename Map, typename Value>
+inline bool contains_value(const Map& map, const Value& value) {
+    for (const auto& [k, v] : map)
+        if (v == value)
+            return true;
+    return false;
+}
+
 template <typename Iterable, typename UnaryPredicate>
 bool All(const Iterable& iterable, const UnaryPredicate& predicate) {
     for (const auto& e : iterable)
