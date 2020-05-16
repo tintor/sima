@@ -21,6 +21,7 @@
 
 namespace fs = std::filesystem;
 
+using std::function;
 using std::complex;
 using std::pair;
 using std::regex;

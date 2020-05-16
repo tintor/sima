@@ -9,12 +9,14 @@ add_executable(core_test
 	test_array_set.cc
  	test_auto.cc
 	test_bits.cc
+	test_diff.cc
 	test_dynamic_array.cc
 	test_format.cc
 	test_map.cc
 	test_range.cc
 	test_span.cc
 	test_sparse_matrix.cc
+	test_tensor.cc
 	test_util.cc
 	test_string_util.cc
 	test_zip.cc

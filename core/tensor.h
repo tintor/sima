@@ -2,13 +2,8 @@
 #include <core/std.h>
 #include <core/util.h>
 
-// TODO first dimension can be 0 for mini-batches
 struct tensor_shape {
-    tensor_shape(uint16_t a = 0, uint16_t b = 0, uint16_t c = 0, uint16_t d = 0) : dim{a, b, c, d} {
-        if (d != 0) Check(c != 0);
-        if (c != 0) Check(b != 0);
-        if (b != 0) Check(a != 0);
-    }
+    tensor_shape(uint16_t a = 0, uint16_t b = 0, uint16_t c = 0, uint16_t d = 0) : dim{a, b, c, d} { }
 
     tensor_shape(const tensor_shape& o) : dim{o.dim} {}
     uint16_t operator[](int i) const { return dim[i]; }
@@ -92,7 +87,10 @@ class Tensor {
     using type = T;
 
     Tensor() : m_data(nullptr) {}
-    Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {}
+    Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {
+        Check(data || shape.volume() == 0);
+        Check(shape.volume() != 0 || data == nullptr);
+    }
 
     Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) { }
 
@@ -119,7 +117,7 @@ class Tensor {
 
     size_t offset(tensor_shape index) const {
         size_t out = index[0];
-        for (size_t i = 1; i < index.size(); i++) out = out * m_shape[i] + index[i];
+        for (size_t i = 1; i < m_shape.size(); i++) out = out * m_shape[i] + index[i];
         return out;
     }
 
@@ -134,6 +132,11 @@ class Tensor {
         return Tensor(m_data + a * v, v);
     }
 
+    bool operator==(const Tensor& o) const {
+        return m_shape == o.m_shape && std::equal(m_data, m_data + size(), o.m_data);
+    }
+    bool operator!=(const Tensor& o) const { return !operator==(o); }
+
    private:
     T* m_data;
     tensor_shape m_shape;
@@ -145,15 +148,11 @@ template <typename T>
 class VTensor {
    public:
     VTensor() {}
-
-    VTensor(tensor_shape shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape) {}
-
+    VTensor(tensor_shape shape, T init = T()) : m_data(shape.volume(), init), m_shape(shape) {}
     VTensor(const Tensor<T>& o) { operator=(o); }
-
     VTensor(const VTensor<T>& o) { operator=(o); }
 
-    operator bool() const { return m_data.size() > 0; }
-
+    operator bool() const { return m_data.data() != nullptr; }
     T* data() { return m_data.data(); }
     T const* data() const { return m_data.data(); }
 
@@ -181,24 +180,13 @@ class VTensor {
     operator Tensor<T>() { return Tensor<T>(m_data.data(), m_shape); }
     operator const Tensor<T>() const { return Tensor<T>(const_cast<T*>(m_data.data()), m_shape); }
 
-#if 0
-    Tensor<T> sub(uint32_t index) {
-        tensor_shape sub_shape = m_shape.pop_back();
-        return Tensor<T>(m_data + index * Product<size_t>(sub_shape), sub_shape);
-    }
-    Tensor<const T> sub(uint32_t index) const {
-        tensor_shape sub_shape = tensor_shape(m_shape).pop_back();
-        return Tensor<const T>(m_data.data() + index * Product<size_t>(sub_shape), sub_shape);
-    }
-#endif
-
     size_t offset(tensor_shape index) const {
         size_t out = index[0];
-        for (size_t i = 1; i < index.size(); i++) out = out * m_shape[i] + index[i];
+        for (size_t i = 1; i < m_shape.size(); i++) out = out * m_shape[i] + index[i];
         return out;
     }
 
-    void operator=(const Tensor<float> o) {
+    void operator=(const Tensor<T> o) {
         m_shape = o.shape();
         m_data.resize(o.size());
         // TODO(Marko) not safe when strides are added to Tensor
@@ -209,6 +197,11 @@ class VTensor {
         m_shape = shape;
         m_data.resize(Product<size_t>(m_shape), init);
     }
+
+    bool operator==(const Tensor<T>& o) const {
+        return m_shape == o.shape() && std::equal(data(), data() + size(), o.data());
+    }
+    bool operator!=(const Tensor<T>& o) const { return !operator==(o); }
 
    private:
     vector<T> m_data;
