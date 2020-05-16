@@ -2,39 +2,70 @@
 #include <core/std.h>
 #include <core/util.h>
 
-// TODO:
-// Optimized VTensor and VTensorView class layout (main difference is that VTensorView doesn't own its memory):
-// - m_data ptr (based on raw_array)
-// - 8 byte shape array: std::array<uint16_t, 4> (if >4 dimensions are needed then shape vector can be varint encoded)
-// simple!
-// efficient for small Tensors
-// supports large Tensors
-// can be optimized for inline storage for Tensor of size 1 float (ie. scalars can be efficient as Tensors)
+// TODO first dimension can be 0 for mini-batches
+struct tensor_shape {
+    tensor_shape(uint16_t a = 0, uint16_t b = 0, uint16_t c = 0, uint16_t d = 0) : dim{a, b, c, d} {
+        if (d != 0) Check(c != 0);
+        if (c != 0) Check(b != 0);
+        if (b != 0) Check(a != 0);
+    }
 
-using tensor_shape = array<uint16_t, 4>;
+    tensor_shape(const tensor_shape& o) : dim{o.dim} {}
+    uint16_t operator[](int i) const { return dim[i]; }
+    uint16_t& operator[](int i) { return dim[i]; }
 
-inline tensor_shape Shape(uint16_t a) {
-    return {a, 0, 0, 0};
-}
+    size_t size() const {
+        for (int i = dim.size() - 1; i >= 0; i--) if (dim[i]) return i + 1;
+        return 0;
+    }
 
-inline tensor_shape Shape(uint16_t a, uint16_t b) {
-    return {a, b, 0, 0};
-}
+    size_t volume() const { return Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
 
-inline tensor_shape Concat(uint16_t a, tensor_shape b) {
-    Check(b[3] == 0);
-    return {a, b[0], b[1], b[2]};
-}
+    tensor_shape pop_front() const {
+        tensor_shape s;
+        for (int i = 1; i < dim.size(); i++) s.dim[i - 1] = dim[i];
+        s.dim[dim.size() - 1] = 0;
+        return s;
+    }
 
-inline tensor_shape PopBack(tensor_shape a) {
-    for (int i = 3; i >= 0; i--)
-        if (a[i] != 0) {
-            a[i] = 0;
-            return a;
+    tensor_shape pop_back() const {
+        tensor_shape s = *this;
+        for (int i = dim.size() - 1; i >= 0; i--) if (dim[i]) {
+            s.dim[i] = 0;
+            break;
         }
-    Check(false);
-    return {};
-}
+        return s;
+    }
+
+    auto back() const { auto s = size(); return (s == 0) ? 0 : dim[s - 1]; }
+
+    // first m elements
+    tensor_shape first(int m) const {
+        tensor_shape s = *this;
+        for (int i = m; i < dim.size(); i++) s.dim[i] = 0;
+        return s;
+    }
+
+    // last m elements
+    tensor_shape last(int m) const {
+        m = min<int>(m, size());
+        tensor_shape s;
+        for (int i = 0; i < m; i++) s.dim[i] = dim[i + size() - m];
+        for (int i = m; i < dim.size(); i++) s.dim[i] = 0;
+        return s;
+    }
+
+    tensor_shape push_front(uint16_t a) {
+        Check(dim[3] == 0);
+        return tensor_shape(a, dim[0], dim[1], dim[2]);
+    }
+
+    bool operator==(tensor_shape o) const { return dim == o.dim; }
+    bool operator!=(tensor_shape o) const { return dim != o.dim; }
+
+private:
+    array<uint16_t, 4> dim;
+};
 
 template <typename T = float>
 class VTensor;
@@ -45,9 +76,12 @@ class Tensor {
    public:
     using type = T;
 
+    Tensor() : m_data(nullptr) {}
     Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {}
 
     Tensor(const Tensor<T>& o) : m_data(o.m_data) { Copy(o.m_shape, m_shape); }
+
+    operator bool() const { return m_data != nullptr; }
 
     T* data() { return m_data; }
     T const* data() const { return m_data; }
@@ -62,6 +96,9 @@ class Tensor {
     const T& operator[](size_t index) const { return m_data[index]; }
 
     const auto& shape() const { return m_shape; }
+    T& operator()(uint16_t a, uint16_t b) { return operator()({a, b}); }
+    T& operator()(uint16_t a, uint16_t b, uint16_t c) { return operator()({a, b, c}); }
+    T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) { return operator()({a, b, c, d}); }
     T& operator()(tensor_shape index) { return m_data[offset(index)]; }
     const T& operator()(tensor_shape index) const { return m_data[offset(index)]; }
 
@@ -77,14 +114,19 @@ class Tensor {
 };
 
 // VTensor is multi-dimensional vector (owns memory)
+// Can't be reshaped.
 template <typename T>
 class VTensor {
    public:
+    VTensor() {}
+
     VTensor(tensor_shape shape, T init = T()) : m_data(Product<size_t>(shape), init), m_shape(shape) {}
 
     VTensor(const Tensor<T>& o) { operator=(o); }
 
     VTensor(const VTensor<T>& o) { operator=(o); }
+
+    operator bool() const { return m_data.size() > 0; }
 
     T* data() { return m_data.data(); }
     T const* data() const { return m_data.data(); }
@@ -99,7 +141,15 @@ class VTensor {
     const T& operator[](size_t index) const { return m_data[index]; }
 
     tensor_shape shape() const { return m_shape; }
+
+    T& operator()(uint16_t a, uint16_t b) { return operator()({a, b}); }
+    T& operator()(uint16_t a, uint16_t b, uint16_t c) { return operator()({a, b, c}); }
+    T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) { return operator()({a, b, c, d}); }
     T& operator()(tensor_shape index) { return m_data[offset(index)]; }
+
+    const T& operator()(uint16_t a, uint16_t b) const { return operator()({a, b}); }
+    const T& operator()(uint16_t a, uint16_t b, uint16_t c) const { return operator()({a, b, c}); }
+    const T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) const { return operator()({a, b, c, d}); }
     const T& operator()(tensor_shape index) const { return m_data[offset(index)]; }
 
     operator Tensor<T>() { return Tensor<T>(m_data.data(), m_shape); }
