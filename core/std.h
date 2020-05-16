@@ -17,6 +17,9 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 using std::complex;
 using std::pair;
@@ -48,7 +51,9 @@ using std::numeric_limits;
 
 using std::nullopt;
 using std::optional;
+using std::shared_ptr;
 using std::unique_ptr;
+using std::make_shared;
 
 using std::atomic;
 
