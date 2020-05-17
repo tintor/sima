@@ -169,6 +169,15 @@ Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accum
     return acc;
 }
 
+template<typename T>
+struct Accumulator {
+    void operator<<(T a) { sum += a; count += 1; }
+    T mean() const { return sum / count; }
+
+    T sum = 0;
+    size_t count = 0;
+};
+
 template <typename Iterable, typename UnaryPredicate>
 size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
     size_t count = 0;

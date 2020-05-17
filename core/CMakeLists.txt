@@ -1,5 +1,6 @@
 add_library(core
 	callstack.cc
+	diff.cc
 	file.cc
 	timestamp.cc)
 

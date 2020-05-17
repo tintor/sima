@@ -95,11 +95,7 @@ void Model::Print() const {
 
         print("%s = %s", id, TypeName(*p.get()));
         for (PDiff p : p->Inputs()) if (p) print(" %s", ids.at(p.get()));
-        print(" [");
-        for (auto i : range(p->shape().size())) {
-            print(i > 0 ? " %s" : "%s", p->shape()[i]);
-        }
-        print("]\n");
+        print(" %s\n", string(p->shape()));
     }
 }
 
@@ -109,15 +105,6 @@ vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
     std::shuffle(out.begin(), out.end(), random);
     return out;
 }
-
-template<typename T>
-struct Accumulator {
-    void operator<<(T a) { sum += a; count += 1; }
-    T mean() const { return sum / count; }
-
-    T sum = 0;
-    size_t count = 0;
-};
 
 Metrics SGD::Train(Model& model, const tensor in, const tensor ref) {
     Check(model.compiled);

@@ -44,16 +44,12 @@ struct Diff {
     vtensor v, g;
 };
 
-#define Declare1(Func) PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
-#define Declare2(Func, Type) PDiff Func(PDiff a, PDiff b) { return make_shared<Type>(a, b); }
+#define Declare1(Func) inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
+#define Declare2(Func, Type) inline PDiff Func(PDiff a, PDiff b) { return make_shared<Type>(a, b); }
 
 // Returns a list of all diffs that need to be computed (in order) before all goal diffs.
 // Goal diffs are also ordered if one depends on any other.
-vector<PDiff> TopoSort(const cspan<PDiff> goal) {
-    vector<PDiff> out;
-    // TODO call Diff::Inputs()
-    return out;
-}
+vector<PDiff> TopoSort(const cspan<PDiff> heads);
 
 inline vector<PDiff> LoadModel(string_view filename) {
     return {};
@@ -75,6 +71,7 @@ struct DiffAB : public Diff {
     array<PDiff, 3> Inputs() override { return { a, b, nullptr }; }
 
     void Setup() override {
+        print("Setup %s %s %s\n", typeid(*this).name(), string(a->shape()), string(b->shape()));
         Check(a->shape() == b->shape());
         Reshape(a->shape());
     }
@@ -433,42 +430,9 @@ struct MaxPool1D : public DiffA {
 
 struct MaxPool2D : public DiffA {
     MaxPool2D(PDiff a) : DiffA(a) {}
-
-    void Setup() override {
-        Check(a->shape().size() == 2);
-        // TODO overflow check
-        const uint16_t m = (a->shape()[0] + 1) / 2;
-        const uint16_t n = (a->shape()[1] + 1) / 2;
-        Reshape({m, n});
-    }
-
-    void Forward() override {
-        // TODO edge condition on last row / column
-        Check(a->shape()[0] % 2 == 0);
-        Check(a->shape()[1] % 2 == 0);
-
-        const size_t m = shape()[0];
-        const size_t n = shape()[1];
-        for (size_t i = 0; i < m; i++) {
-            for (size_t j = 0; j < n; j++) {
-                const size_t p = i * 2, q = j * 2;
-                v(i, j) = max(va(p, q), va(p + 1, q), va(p, q + 1), va(p + 1, q + 1));
-            }
-        }
-    }
-
-    void Backward() override {
-        if (!ga) return;
-        Check(false);
-        const size_t m = shape()[0];
-        const size_t n = shape()[1];
-        for (size_t i = 0; i < m; i++) {
-            for (size_t j = 0; j < n; j++) {
-                const size_t p = i * 2, q = j * 2;
-                g(i, j) = max(va(p, q), va(p + 1, q), va(p, q + 1), va(p + 1, q + 1));
-            }
-        }
-    }
+    void Setup() override;
+    void Forward() override;
+    void Backward() override;
 };
 
 struct Reshape : public DiffA {
@@ -485,15 +449,15 @@ struct Reshape : public DiffA {
     void Backward() override { EACH(ga) ga[i] = g[i]; }
 };
 
-// v{a,b} x m{c,d,a,b} -> {c,d}
+// v{*,a,b} x m{c,d,a,b} -> {*,c,d}
 struct VecMatMulT : public DiffAB {
     VecMatMulT(PDiff a, PDiff b) : DiffAB(a, b) { }
 
     void Setup() override {
         auto as = a->shape(), bs = b->shape();
-        Check(as.size() < bs.size());
-        Check(as == bs.last(as.size()));
-        Reshape(bs.first(bs.size() - as.size()));
+        Check(as.size() - 1 < bs.size());
+        Check(as.pop_front() == bs.last(as.size() - 1));
+        Reshape(bs.first(bs.size() - as.size() + 1));
     }
 
     void Forward() override {
@@ -600,7 +564,7 @@ inline PDiff Mean(PDiff a) {
 }
 
 inline PDiff MeanSquareError(PDiff a, PDiff b) {
-    return Sum(Sqr(a - b)) / Constant(a->size());
+    return Sum(Sqr(a - b)) / Constant(a->size()); // TODO a->size() can be 0 due to batch
 }
 
 inline PDiff Softmax(PDiff a) {
@@ -615,9 +579,9 @@ inline PDiff BatchNorm(PDiff a, double delta) {
 }
 
 inline PDiff FullyConnected(PDiff a, uint16_t size, Init& w_init) {
-    auto w = Parameter(a->shape().remove_zeros().push_front(size), w_init);
+    auto w = Parameter(a->shape().remove_zeros().push_front(size), w_init, "w");
     ZeroInit zero_init;
-    auto b = Parameter({size}, zero_init);
+    auto b = Parameter({size}, zero_init, "b");
     return VecMatMul(a, w) + b;
 }
 
@@ -678,42 +642,6 @@ struct Model {
     void Print() const;
 };
 
-#include <cxxabi.h>
-
-template<typename T>
-inline string TypeName(const T& value) {
-    int status;
-    char* demangled = abi::__cxa_demangle(typeid(value).name(), 0, 0, &status);
-    ON_SCOPE_EXIT(free(demangled));
-    return demangled;
-}
-
-void Model::Print() const {
-    map<Diff*, string> ids;
-    for (PDiff p : nodes) {
-        if (IsConstant(p) && p->v.size() == 1 && p->name.empty()) {
-            ids.emplace(p.get(), format("%s", p->v[0]));
-            continue;
-        }
-
-        string id = p->name.empty() ? "#" : p->name;
-        if (contains_value(ids, id)) {
-            int c = 1;
-            while (contains_value(ids, format("%s%s", id, c))) c++;
-            id = format("%s%s", id, c);
-        }
-        ids.emplace(p.get(), id);
-
-        print("%s = %s", id, TypeName(*p.get()));
-        for (PDiff p : p->Inputs()) if (p) print(" %s", ids.at(p.get()));
-        print(" [");
-        for (auto i : range(p->shape().size())) {
-            print(i > 0 ? " %s" : "%s", p->shape()[i]);
-        }
-        print("]\n");
-    }
-}
-
 using Metrics = unordered_map<string, float>;
 
 struct Optimizer {
@@ -723,68 +651,11 @@ struct Optimizer {
     virtual Metrics Test(Model& model, const tensor in, const tensor ref) = 0;
 };
 
-template<typename T>
-struct Accumulator {
-    void operator<<(T a) { sum += a; count += 1; }
-    T mean() const { return sum / count; }
-
-    T sum = 0;
-    size_t count = 0;
-};
-
-inline vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
-    vector<uint32_t> out(size);
-    for (auto i : range(size)) out[i] = i;
-    std::shuffle(out.begin(), out.end(), random);
-    return out;
-}
-
 struct SGD : public Optimizer {
     SGD() : random(std::random_device()()) {}
 
-    Metrics Train(Model& model, const tensor in, const tensor ref) override {
-        Check(model.compiled);
-        Check(in.shape().size() > 0);
-        Check(ref.shape().size() > 0);
-        Check(in.shape()[0] == ref.shape()[0]);
-
-        Check(IsData(model.input));
-        Check(IsData(model.reference));
-        Check(in.shape().pop_front() == model.input->shape().pop_front());
-        Check(ref.shape().pop_front() == model.reference->shape().pop_front());
-
-        const size_t n = in.shape()[0];
-        auto samples = ShuffledInts(n, random);
-
-        string message;
-        Accumulator<float> loss_accum, accuracy_accum;
-        for (auto i : range(n)) {
-            auto index = samples[i];
-            Copy(in.slice(index), model.input->v);
-            Copy(ref.slice(index), model.reference->v);
-            model.Forward();
-
-            auto loss = model.loss->v[0];
-            auto accuracy = model.accuracy->v[0];
-            loss_accum << loss;
-            accuracy_accum << accuracy;
-
-            model.Backward();
-            model.Adjust(alpha);
-
-            for (char& c : message) c = '\r';
-            print("%s", message);
-            message = format("Epoch: %f%% %s/%s loss:%.4f acc:%.4f", 100. * (i + 1) / n, i + 1, n, loss_accum.mean(), accuracy_accum.mean());
-            print("%s", message);
-            cout.flush();
-        }
-        print("\n");
-        return {};
-    }
-
-    Metrics Test(Model& model, const tensor in, const tensor ref) override {
-        return {};
-    }
+    Metrics Train(Model& model, const tensor in, const tensor ref) override;
+    Metrics Test(Model& model, const tensor in, const tensor ref) override;
 
     std::mt19937_64 random;
 };
