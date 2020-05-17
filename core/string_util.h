@@ -34,26 +34,26 @@ inline bool match(string_view s, const regex& re, std::cmatch& match) {
     return std::regex_match(s.begin(), s.end(), /*out*/ match, re);
 }
 
-inline vector<string_view> split(string_view s, cspan<char> delim) {
+inline vector<string_view> split(string_view s, cspan<char> delim, bool remove_empty = true) {
     vector<string_view> out;
     const char* b = s.begin();
     int c = 0;
     for (const char* i = s.begin(); i != s.end(); i++) {
         if (contains(delim, *i)) {
-            if (c > 0) out.push_back(string_view(b, c));
+            if (c > 0 || !remove_empty) out.push_back(string_view(b, c));
             b = i + 1;
             c = 0;
         } else {
             c += 1;
         }
     }
-    if (c > 0) out.push_back(string_view(b, c));
+    if (c > 0 || !remove_empty) out.push_back(string_view(b, c));
     return out;
 }
 
-inline vector<string_view> split(string_view s, char delim = ' ') {
+inline vector<string_view> split(string_view s, char delim = ' ', bool remove_empty = true) {
     array<char, 1> d = {delim};
-    return split(s, d);
+    return split(s, d, remove_empty);
 }
 
 inline bool is_digit(char c) { return '0' <= c && c <= '9'; }

@@ -1,9 +1,10 @@
 #pragma once
+#include <core/format.h>
 #include <core/std.h>
 #include <core/util.h>
 
 struct tensor_shape {
-    tensor_shape(uint16_t a = 0, uint16_t b = 0, uint16_t c = 0, uint16_t d = 0) : dim{a, b, c, d} { }
+    tensor_shape(uint16_t a = 0, uint16_t b = 0, uint16_t c = 0, uint16_t d = 0) : dim{a, b, c, d} {}
 
     tensor_shape(const tensor_shape& o) : dim{o.dim} {}
     uint16_t operator[](int i) const { return dim[i]; }
@@ -15,7 +16,8 @@ struct tensor_shape {
     }
 
     size_t size() const {
-        for (int i = dim.size() - 1; i >= 0; i--) if (dim[i]) return i + 1;
+        for (int i = dim.size() - 1; i >= 0; i--)
+            if (dim[i]) return i + 1;
         return 0;
     }
 
@@ -27,7 +29,8 @@ struct tensor_shape {
     tensor_shape remove_zeros() const {
         tensor_shape s;
         int w = 0;
-        for (int i = 0; i < dim.size(); i++) if (dim[i]) s.dim[w++] = dim[i];
+        for (int i = 0; i < dim.size(); i++)
+            if (dim[i]) s.dim[w++] = dim[i];
         return s;
     }
 
@@ -40,14 +43,18 @@ struct tensor_shape {
 
     tensor_shape pop_back() const {
         tensor_shape s = *this;
-        for (int i = dim.size() - 1; i >= 0; i--) if (dim[i]) {
-            s.dim[i] = 0;
-            break;
-        }
+        for (int i = dim.size() - 1; i >= 0; i--)
+            if (dim[i]) {
+                s.dim[i] = 0;
+                break;
+            }
         return s;
     }
 
-    auto back() const { auto s = size(); return (s == 0) ? 0 : dim[s - 1]; }
+    auto back() const {
+        auto s = size();
+        return (s == 0) ? 0 : dim[s - 1];
+    }
 
     // first m elements
     tensor_shape first(int m) const {
@@ -84,7 +91,7 @@ struct tensor_shape {
     bool operator==(tensor_shape o) const { return dim == o.dim; }
     bool operator!=(tensor_shape o) const { return dim != o.dim; }
 
-private:
+   private:
     array<uint16_t, 4> dim;
 };
 
@@ -103,7 +110,7 @@ class Tensor {
         Check(shape.volume() != 0 || data == nullptr);
     }
 
-    Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) { }
+    Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) {}
 
     operator bool() const { return m_data != nullptr; }
 
@@ -147,6 +154,17 @@ class Tensor {
         return m_shape == o.m_shape && std::equal(m_data, m_data + size(), o.m_data);
     }
     bool operator!=(const Tensor& o) const { return !operator==(o); }
+
+    operator string() const {
+        string s;
+        s += '[';
+        for (size_t i = 0; i < size(); i++) {
+            if (i > 0) s += ' ';
+            format_s(s, "%s", m_data[i]);
+        }
+        s += ']';
+        return s;
+    }
 
    private:
     T* m_data;
@@ -212,6 +230,17 @@ class VTensor {
         return m_shape == o.shape() && std::equal(data(), data() + size(), o.data());
     }
     bool operator!=(const Tensor<T>& o) const { return !operator==(o); }
+
+    operator string() const {
+        string s;
+        s += '[';
+        for (size_t i = 0; i < size(); i++) {
+            if (i > 0) s += ' ';
+            format_s(s, "%s", m_data[i]);
+        }
+        s += ']';
+        return s;
+    }
 
    private:
     vector<T> m_data;

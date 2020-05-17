@@ -1,10 +1,10 @@
 #include <core/diff.h>
 
-#include <cxxabi.h>
-
 static void DFS(PDiff a, unordered_set<Diff*>& visited, vector<PDiff>& out) {
     if (visited.count(a.get())) return;
-    for (PDiff b : a->Inputs()) if (b) DFS(b, visited, out);
+    visited.insert(a.get());
+    for (PDiff b : a->Inputs())
+        if (b) DFS(b, visited, out);
     out.push_back(a);
 }
 
@@ -67,19 +67,10 @@ void MaxPool2D::Backward() {
 #undef gb
 #undef gc
 
-template<typename T>
-inline string TypeName(const T& value) {
-    int status;
-    char* demangled = abi::__cxa_demangle(typeid(value).name(), 0, 0, &status);
-    ON_SCOPE_EXIT(free(demangled));
-    return demangled;
-}
-
-void Model::Print() const {
-    Check(compiled);
+auto ComputeIds(cspan<PDiff> nodes) {
     map<Diff*, string> ids;
     for (PDiff p : nodes) {
-        if (IsConstant(p) && p->v.size() == 1 && p->name.empty()) {
+        if (IsConst(p) && p->v.size() == 1 && p->name.empty()) {
             ids.emplace(p.get(), format("%s", p->v[0]));
             continue;
         }
@@ -92,11 +83,54 @@ void Model::Print() const {
             id = format("%s%s", id, c);
         }
         ids.emplace(p.get(), id);
-
-        print("%s = %s", id, TypeName(*p.get()));
-        for (PDiff p : p->Inputs()) if (p) print(" %s", ids.at(p.get()));
-        print(" %s\n", string(p->shape()));
     }
+    return ids;
+}
+
+void Print(cspan<PDiff> nodes, bool values, bool gradients) {
+    auto ids = ComputeIds(nodes);
+    vector<string> table;
+
+    string os = "id|type|inputs|shape|";
+    if (values) os += "values|";
+    if (gradients) os += "gradients|";
+    table << os;
+
+    for (PDiff p : nodes)
+        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
+            os.clear();
+
+            // id
+            format_s(os, "%s|", ids.at(p.get()));
+
+            // type
+            string type = TypeName(*p.get());
+            if (IsParam(p)) type = "Param";
+            if (IsConst(p)) type = "Const";
+            if (IsData(p)) type = "Data";
+            if (type.back() == 'T') type.pop_back();
+            format_s(os, "%s|", type);
+
+            // inputs
+            for (PDiff e : p->Inputs())
+                if (e) format_s(os, "%s ", ids.at(e.get()));
+            os += '|';
+
+            // shape
+            format_s(os, "%s|", string(p->shape()));
+
+            if (values) format_s(os, "%s|", string(p->v));
+
+            if (gradients) format_s(os, "%s|", string(p->g));
+
+            table << os;
+        }
+    PrintTable(table, '|', " ");
+}
+
+void Model::Print() const {
+    Check(compiled);
+    ::Print(nodes);
 }
 
 vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
@@ -106,47 +140,52 @@ vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
     return out;
 }
 
-Metrics SGD::Train(Model& model, const tensor in, const tensor ref) {
-    Check(model.compiled);
+Metrics Model::Epoch(const tensor in, const tensor ref, const optional<float> alpha) {
+    Check(compiled);
     Check(in.shape().size() > 0);
     Check(ref.shape().size() > 0);
     Check(in.shape()[0] == ref.shape()[0]);
 
-    Check(IsData(model.input));
-    Check(IsData(model.reference));
-    Check(in.shape().pop_front() == model.input->shape().pop_front());
-    Check(ref.shape().pop_front() == model.reference->shape().pop_front());
+    Check(IsData(input));
+    Check(IsData(reference));
+    Check(in.shape().pop_front() == input->shape().pop_front());
+    Check(ref.shape().pop_front() == reference->shape().pop_front());
+
+    std::random_device rd;
+    std::mt19937_64 random(rd());
 
     const size_t n = in.shape()[0];
     auto samples = ShuffledInts(n, random);
 
-    string message;
-    Accumulator<float> loss_accum, accuracy_accum;
+    string msg;
+    Accumulator<float> mean_loss, mean_accuracy;
     for (auto i : range(n)) {
         auto index = samples[i];
-        Copy(in.slice(index), model.input->v);
-        Copy(ref.slice(index), model.reference->v);
-        model.Forward();
+        Copy(in.slice(index), input->v);
+        Copy(ref.slice(index), reference->v);
+        Forward();
 
-        auto loss = model.loss->v[0];
-        auto accuracy = model.accuracy->v[0];
-        loss_accum << loss;
-        accuracy_accum << accuracy;
+        mean_loss << loss->v[0];
+        mean_accuracy << accuracy->v[0];
 
-        model.Backward();
-        model.Adjust(alpha);
+        if (alpha) {
+            ResetGradients();
+            loss->g[0] = 1;
+            Backward();
+            GradientDescent(*alpha);
+        }
 
-        for (char& c : message) c = '\r';
-        print("%s", message);
-        message = format("Epoch: %f%% %s/%s loss:%.4f acc:%.4f",
-            100. * (i + 1) / n, i + 1, n, loss_accum.mean(), accuracy_accum.mean());
-        print("%s", message);
+        for (char& c : msg) c = '\r';
+        cout << msg;
+        msg.clear();
+
+        format_s(msg, "Epoch: %f%%", 100. * (i + 1) / n);
+        format_s(msg, " %s/%s", i + 1, n);
+        format_s(msg, " loss:%.4f", mean_loss.mean());
+        format_s(msg, " acc:%.4f", mean_accuracy.mean());
+        cout << msg;
         cout.flush();
     }
     print("\n");
-    return {};
-}
-
-Metrics SGD::Test(Model& model, const tensor in, const tensor ref) {
-    return {};
+    return {{"loss", mean_loss.mean()}, {"accuracy", mean_accuracy.mean()}};
 }

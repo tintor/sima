@@ -2,7 +2,7 @@
 
 #include <catch.hpp>
 
-TEST_CASE("tensor_shape") {
+TEST_CASE("tensor_shape", "[tensor]") {
     REQUIRE(tensor_shape().size() == 0);
     REQUIRE(tensor_shape(3).size() == 1);
     REQUIRE(tensor_shape(0, 1, 1).size() == 3);
@@ -10,7 +10,7 @@ TEST_CASE("tensor_shape") {
 
     REQUIRE(tensor_shape(1).volume() == 1);
     REQUIRE(tensor_shape(0, 2).volume() == 0);
-    REQUIRE(tensor_shape(2, 3, 4, 5).volume() == 2*3*4*5);
+    REQUIRE(tensor_shape(2, 3, 4, 5).volume() == 2 * 3 * 4 * 5);
 
     REQUIRE(tensor_shape(0, 3, 4, 5).remove_zeros() == tensor_shape(3, 4, 5));
 
@@ -41,7 +41,7 @@ TEST_CASE("tensor_shape") {
     REQUIRE(string(tensor_shape(2, 4, 5)) == "[2 4 5]");
 }
 
-TEST_CASE("tensor") {
+TEST_CASE("tensor", "[tensor]") {
     array<float, 6> m = {1, 2, 3, 4, 5, 6};
     array<float, 3> n = {1, 2, 3};
     REQUIRE(tensor(m.data(), {6})[2] == 3);
@@ -71,7 +71,7 @@ TEST_CASE("tensor") {
     REQUIRE(tensor(m.data(), {1}) != tensor());
 }
 
-TEST_CASE("vtensor") {
+TEST_CASE("vtensor", "[tensor]") {
     vector<int> a;
     REQUIRE(a.data() == nullptr);
 }

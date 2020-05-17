@@ -2,6 +2,7 @@ add_library(core
 	callstack.cc
 	diff.cc
 	file.cc
+	util.cc
 	timestamp.cc)
 
 add_executable(core_test

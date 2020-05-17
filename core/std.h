@@ -2,6 +2,7 @@
 #include <array>
 #include <atomic>
 #include <complex>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -17,12 +18,11 @@
 #include <utility>
 #include <variant>
 #include <vector>
-#include <filesystem>
 
 namespace fs = std::filesystem;
 
-using std::function;
 using std::complex;
+using std::function;
 using std::pair;
 using std::regex;
 using std::string;
@@ -50,11 +50,11 @@ using std::swap;
 
 using std::numeric_limits;
 
+using std::make_shared;
 using std::nullopt;
 using std::optional;
 using std::shared_ptr;
 using std::unique_ptr;
-using std::make_shared;
 
 using std::atomic;
 

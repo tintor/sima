@@ -6,6 +6,8 @@
 #define LAMBDA(EXPR) \
     (const auto& e) { return EXPR; }
 
+#define L(A) [&](const auto& e) { return A; }
+
 template <typename T>
 int sign(T a) {
     return (0 < a) - (a < 0);
@@ -133,11 +135,10 @@ bool contains(const array<T, M>& container, T element) {
     return contains(cspan<T>(container), element);
 }
 
-template<typename Map, typename Value>
+template <typename Map, typename Value>
 inline bool contains_value(const Map& map, const Value& value) {
     for (const auto& [k, v] : map)
-        if (v == value)
-            return true;
+        if (v == value) return true;
     return false;
 }
 
@@ -169,9 +170,12 @@ Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accum
     return acc;
 }
 
-template<typename T>
+template <typename T>
 struct Accumulator {
-    void operator<<(T a) { sum += a; count += 1; }
+    void operator<<(T a) {
+        sum += a;
+        count += 1;
+    }
     T mean() const { return sum / count; }
 
     T sum = 0;
@@ -185,8 +189,6 @@ size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
         if (predicate(e)) count += 1;
     return count;
 }
-
-#define L(A) [&](const auto& e) { return A; }
 
 template <typename T, typename P>
 size_t IndexOfMax(cspan<T> s, P measure) {
@@ -221,3 +223,12 @@ void Copy(const CollectionA& a, CollectionB& b) {
     Check(a.size() == b.size());
     for (size_t i = 0; i < a.size(); i++) b[i] = a[i];
 }
+
+string Demangle(const char* name);
+
+template <typename T>
+inline string TypeName(const T& value) {
+    return Demangle(typeid(value).name());
+}
+
+void PrintTable(cspan<string> rows, char separator, string_view splitter);
