@@ -37,6 +37,8 @@ TEST_CASE("tensor_shape") {
     REQUIRE(tensor_shape(2, 4, 5).last(1) == tensor_shape(5));
     REQUIRE(tensor_shape(2, 4, 5).last(2) == tensor_shape(4, 5));
     REQUIRE(tensor_shape(0, 4, 5).last(3) == tensor_shape(0, 4, 5));
+
+    REQUIRE(string(tensor_shape(2, 4, 5)) == "[2 4 5]");
 }
 
 TEST_CASE("tensor") {

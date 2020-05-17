@@ -70,6 +70,17 @@ struct tensor_shape {
         return tensor_shape(a, dim[0], dim[1], dim[2]);
     }
 
+    operator string() const {
+        ostringstream os;
+        os << '[';
+        for (int i = 0; i < size(); i++) {
+            if (i > 0) os << ' ';
+            os << dim[i];
+        }
+        os << ']';
+        return os.str();
+    }
+
     bool operator==(tensor_shape o) const { return dim == o.dim; }
     bool operator!=(tensor_shape o) const { return dim != o.dim; }
 
