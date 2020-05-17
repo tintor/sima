@@ -9,6 +9,7 @@
 #include <core/interval.h>
 #include <core/span.h>
 #include <core/std.h>
+#include <core/string_util.h>
 #include <core/timestamp.h>
 
 #include <complex>
@@ -554,6 +555,11 @@ void format_s(string& s, string_view fmt, const Args&... args) {
             c = *p++;
             if (c == '%' && p - q == 1) {
                 s += '%';
+                break;
+            }
+            if (c == '@') {
+                auto align = parse<int>(string_view(q, p - q - 1));
+                if (s.size() < align) s.resize(align, ' ');
                 break;
             }
             if (c == 's' || c == 'Y' || c == 'f' || c == 'd' || c == 'g' || c == 'x' || c == 'X' || c == 'p' ||

@@ -42,6 +42,10 @@ TEST_CASE("format - basic", "[format]") {
     REQUIRE("e%" == format("e%%"));
     REQUIRE("e1b" == format("e%sb", 1));
     REQUIRE("e1b2.3ctruea" == format("e%sb%sc%sa", 1, 2.3, true));
+
+    REQUIRE("123  m" == format("123%5@m"));
+    REQUIRE("     m" == format("%5@m"));
+    REQUIRE("      m" == format("%6@m"));
 }
 
 TEST_CASE("format - atomic", "[format]") {
