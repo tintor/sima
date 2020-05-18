@@ -175,6 +175,38 @@ struct TanhT : public DiffA {
     void Backward() override { EACH(ga) ga[i] += g[i] * (1 - sqr(v[i])); }
 };
 
+struct ErfT : public DiffA {
+    ErfT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = erf(va[i]); }
+    void Backward() override { EACH(ga) ga[i] += g[i] * (2 / sqrt(PI)) * exp(-sqr(va[i])); }
+};
+
+struct AtanT : public DiffA {
+    AtanT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = atan(va[i]); }
+    void Backward() override { EACH(ga) ga[i] += g[i] / (1 + sqr(va[i])); }
+};
+
+// x / (1 + abs(x))
+struct SaxT : public DiffA {
+    SaxT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = va[i] / (1 + abs(va[i])); }
+    void Backward() override { EACH(ga) ga[i] += g[i] / sqr(1 + abs(va[i])); }
+};
+
+template<typename T>
+T cube(T a) { return a * a * a; }
+
+// 1/sqrt(1+x^2)
+struct SoxT : public DiffA {
+    SoxT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = 1 / sqrt(1 + sqr(va[i])); }
+    void Backward() override { EACH(ga) ga[i] -= g[i] * va[i] * cube(v[i]); }
+};
+
+// TODO non-linealities to try:
+// atan(pi*x/2)*2/pi
+
 struct SqrT : public DiffA {
     SqrT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = va[i] * va[i]; }
@@ -221,6 +253,10 @@ Declare1(Relu);
 Declare1(LeakyRelu);
 Declare1(Sigmoid);
 Declare1(Tanh);
+Declare1(Erf);
+Declare1(Atan);
+Declare1(Sax);
+Declare1(Sox);
 Declare1(Sqr);
 Declare1(Sqrt);
 Declare1(Exp);

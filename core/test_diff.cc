@@ -78,30 +78,32 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
     Optimize("hölder table", 10, return -abs(sin(x)*cos(y)*exp(abs(1 - sqrt(x*x + y*y)/PI))));
 #endif
 
-TEST_CASE("diff: learn perceptron", "[diff]") {
+TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     // model
     auto x = Data({0, 1}, "x");
     auto y = Data({0, 1}, "y");
     auto ref = Data({0, 1}, "ref");
 
-    auto init = make_shared<NormalInit>(1, 0);
+    auto init = make_shared<NormalInit>(1, 1);
     auto a = Param({1}, "a", init);
     auto b = Param({1}, "b", init);
     auto c = Param({1}, "c", init);
+    auto w = Param({1}, "w", init);
+    auto e = Param({1}, "e", init);
 
-    auto out = Sigmoid(x * a + y * b + c);
+    auto out = Tanh(x * a + y * b + c) * 0.5 + 0.5;
     out->name = "out";
-    auto loss = MeanSquareError(out, ref);// + (Sqr(a) + Sqr(b) + Sqr(c)) / 10000;
+    auto loss = MeanSquareError(out, ref);
     loss->name = "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
 
     Print(TopoSort({loss}));
 
-    Model model(loss, accuracy, 10);
+    Model model(loss, accuracy, 20);
 
     // dataset
-    const float A = 0.7, B = -0.6, C = 0.33;
+    const float A = 0.4, B = 0.6, C = -0.4;
     UniformInit gen(-1, 1, 0);
     const int Classes = 2;
     const int SamplesPerClass = 20000;
@@ -129,14 +131,13 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(100)) metrics = model.Epoch(dataset, 0.1, 0);
+    for (auto i : range(800)) metrics = model.Epoch(dataset, 0.1, 0);
     Print(model.nodes);
 
-    REQUIRE(metrics.at("accuracy") >= 0.9935);
+    REQUIRE(metrics.at("accuracy") >= 0.9965);
 }
 
 // Classification:
-// learn plane in 2d
 // learn hyper plane in Nd
 // learn xor (with neurons)
 // learn circle in 2d
