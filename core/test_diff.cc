@@ -98,7 +98,7 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
 
     Print(TopoSort({loss}));
 
-    Model model(loss, accuracy, 200);
+    Model model(loss, accuracy, 400);
 
     // dataset
     const float A = 0.7, B = -0.6, C = 0.33;
@@ -129,15 +129,13 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.3, 0);
+    for (auto i : range(200)) metrics = model.Epoch(dataset, 0.3, 0);
     Print(model.nodes);
 
     REQUIRE(metrics.at("accuracy") >= 0.98);
 }
 
 // Classification:
-// learn x + c
-// learn a*x + b*y
 // learn plane in 2d
 // learn hyper plane in Nd
 // learn xor (with neurons)

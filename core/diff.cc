@@ -33,8 +33,24 @@ struct IBroadcastT : public DiffA {
         Reshape(b);
     }
     void Setup() override { Fail("forbidden"); }
-    void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
-    void Backward() override { EACH(g) ga[i % ga.size()] += g[i]; }
+    void Forward() override {
+        const auto N = va.size();
+        if (N == 1) {
+            EACH(v) v[i] = va[0];
+        } else {
+            EACH(v) v[i] = va[i % N];
+        }
+    }
+    void Backward() override {
+        const auto N = va.size();
+        if (ga) {
+            if (N == 1) {
+                EACH(g) ga[0] += g[i];
+            } else {
+                EACH(g) ga[i % ga.size()] += g[i];
+            }
+        }
+    }
 };
 
 PDiff IBroadcast(PDiff a, tensor_shape b) {
