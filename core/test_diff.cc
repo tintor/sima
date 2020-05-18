@@ -98,7 +98,7 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
 
     Print(TopoSort({loss}));
 
-    Model model(loss, accuracy, 400);
+    Model model(loss, accuracy, 20000);
 
     // dataset
     const float A = 0.7, B = -0.6, C = 0.33;

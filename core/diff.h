@@ -196,12 +196,7 @@ struct LogT : public DiffA {
 struct AbsT : public DiffA {
     AbsT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = abs(va[i]); }
-    void Backward() override {
-        EACH(ga) {
-            if (va[i] > 0) ga[i] += g[i];
-            if (va[i] < 0) ga[i] -= g[i];
-        }
-    }
+    void Backward() override { EACH(ga) ga[i] += g[i] * sign(va[i]); }
 };
 
 struct CosT : public DiffA {
