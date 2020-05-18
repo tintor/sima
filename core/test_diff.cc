@@ -79,7 +79,6 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 #endif
 
 TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
-    // model
     auto x = Data({0, 1}, "x");
     auto y = Data({0, 1}, "y");
     auto ref = Data({0, 1}, "ref");
@@ -97,9 +96,6 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     loss->name = "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
-
-    Print(TopoSort({loss}));
-
     Model model(loss, accuracy, 20);
 
     // dataset
@@ -135,6 +131,76 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     Print(model.nodes);
 
     REQUIRE(metrics.at("accuracy") >= 0.9965);
+}
+
+PDiff Neuron(PDiff x, PDiff y, string_view name, shared_ptr<Init> init) {
+    auto a = Param({1}, "a", init);
+    auto b = Param({1}, "b", init);
+    auto c = Param({1}, "c", init);
+    auto h = Sigmoid(x * a + y * b + c);
+    h->name = name;
+    return h;
+}
+
+PDiff Neuron(PDiff x, PDiff y, PDiff z, string_view name, shared_ptr<Init> init) {
+    auto a = Param({1}, "a", init);
+    auto b = Param({1}, "b", init);
+    auto c = Param({1}, "c", init);
+    auto d = Param({1}, "d", init);
+    auto h = Sigmoid(x * a + y * b + z * c + d);
+    h->name = name;
+    return h;
+}
+
+TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
+    auto x = Data({0, 1}, "x");
+    auto y = Data({0, 1}, "y");
+    auto ref = Data({0, 1}, "ref");
+
+    auto init = make_shared<NormalInit>(1, 0);
+    auto h1 = Neuron(x, y, "h1", init);
+    auto h2 = Neuron(x, y, "h2", init);
+    auto h3 = Neuron(x, y, "h3", init);
+    auto out = Neuron(h1, h2, h3, "out", init);
+
+    auto loss = MeanSquareError(out, ref);
+    loss->name = "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5);
+    accuracy->name = "accuracy";
+    Model model(loss, accuracy, 20);
+
+    // dataset
+    UniformInit gen(-1, 1, 0);
+    const int Classes = 2;
+    const int SamplesPerClass = 20000;
+    const int Samples = Classes * SamplesPerClass;
+    vtensor data_x({Samples, 1}, 0);
+    vtensor data_y({Samples, 1}, 0);
+    vtensor data_r({Samples, 1}, 0);
+    int count[2] = {0, 0};
+    int index = 0;
+    while (index < Samples) {
+        float dx = gen.get();
+        float dy = gen.get();
+        float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
+        int c = round(dr);
+        if (count[c] >= SamplesPerClass) continue;
+        count[c] += 1;
+        data_x[index] = dx;
+        data_y[index] = dy;
+        data_r[index] = dr;
+        index += 1;
+    }
+    vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
+
+    // train!
+    println("train ...");
+    Print(model.nodes);
+    Metrics metrics;
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.1, 0);
+    Print(model.nodes);
+
+    REQUIRE(metrics.at("accuracy") >= 0.9925);
 }
 
 // Classification:
