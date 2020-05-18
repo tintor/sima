@@ -41,6 +41,9 @@ struct Diff {
 
     string name;
     vtensor v, g;
+
+    ulong forward_ticks = 0;
+    ulong backward_ticks = 0;
 };
 
 #define EACH(V) for (auto i : range(V.size()))
@@ -66,12 +69,21 @@ struct DiffA : public Diff {
     PDiff a;
 };
 
+bool IsBroadcastable(tensor_shape a, tensor_shape b);
+PDiff Broadcast(PDiff a, tensor_shape b);
+
 struct DiffAB : public Diff {
     DiffAB(PDiff a, PDiff b) : a(a), b(b) {}
     array<PDiff, 3> Inputs() override { return {a, b, nullptr}; }
 
     void Setup() override {
-        Check(a->shape() == b->shape());
+        if (a->shape() != b->shape()) {
+            Check(IsBroadcastable(a->shape(), b->shape()) || IsBroadcastable(b->shape(), a->shape()),
+                format("%s %s %s", a->shape(), b->shape(), TypeName(*this)));
+            if (a->size() > b->size()) b = Broadcast(b, a->shape());
+            if (a->size() < b->size()) a = Broadcast(a, b->shape());
+            Check(a->shape() == b->shape());
+        }
         Reshape(a->shape());
     }
 
@@ -114,6 +126,14 @@ struct NormalInit : public Init {
     std::mt19937_64 random;
 };
 
+struct UniformInit : public Init {
+    UniformInit(tensor::type min, tensor::type max, size_t seed) : dis(min, max), random(seed) {}
+    tensor::type get() override { return dis(random); }
+
+    std::uniform_real_distribution<tensor::type> dis;
+    std::mt19937_64 random;
+};
+
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
 inline PDiff Param(tensor_shape shape, string_view name, shared_ptr<Init> init = make_shared<Init>()) {
     auto p = make_shared<Diff>();
@@ -138,26 +158,6 @@ struct ReluT : public DiffA {
     void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : 0; }
     void Backward() override { EACH(ga) ga[i] += (va[i] > 0) ? g[i] : 0; }
 };
-
-#if 0
-struct Unary : public DiffA {
-    Unary(PDiff a) : DiffA(a) {}
-    void Forward() override { return forward(); }
-    void Backward() override { return backward(); }
-    function<void(void)> forward, backward;
-};
-
-#define FORWARD(BLOCK)                       \
-    auto inputs = make_shared<PDiff[]>({a}); \
-    p->forward = [=]() { BLOCK; }
-
-inline PDiff Relu(PDiff a) {
-    auto p = make_shared<Unary>(a);
-    FORWARD(each(i, vp) vp[i] = (va[i] > 0) ? va[i] : 0);
-    BACKWARD(each(i, ga) ga[i] += (va[i] > 0) ? gp[i] : 0);
-    return p;
-}
-#endif
 
 struct LeakyReluT : public DiffA {
     LeakyReluT(PDiff a) : DiffA(a) {}
@@ -218,8 +218,17 @@ struct SinT : public DiffA {
     void Backward() override { EACH(ga) ga[i] += cos(va[i]); }
 };
 
-Declare1(Relu) Declare1(LeakyRelu) Declare1(Sigmoid) Declare1(Sqr) Declare1(Sqrt) Declare1(Exp) Declare1(Log)
-    Declare1(Abs) Declare1(Cos) Declare1(Sin)
+Declare1(Relu);
+Declare1(LeakyRelu);
+Declare1(Sigmoid);
+Declare1(Sqr);
+Declare1(Sqrt);
+Declare1(Exp);
+Declare1(Log);
+Declare1(Abs);
+Declare1(Cos);
+Declare1(Sin);
+
 #if 0
 // Y = A * b + c
 // b and c are scalars
@@ -245,18 +254,20 @@ struct BroadcastFMA : public DiffABC {
 };
 #endif
 
-        struct BroadcastT : public DiffAB {
+
+// [1] -> [N] = [N 1]
+// [4] -> [N 4]
+struct BroadcastT : public DiffAB {
     BroadcastT(PDiff a, PDiff b) : DiffAB(a, b) {}
 
     void Setup() override {
-        Check(a->size() == 1);
-        Reshape(b->shape());
+        auto as = a->shape(), bs = b->shape();
+        Check(as.volume() == 1 || as == bs.pop_front());
+        Reshape(bs);
     }
 
-    void Forward() override { EACH(v) v[i] = va[0]; }
-    void Backward() override {
-        if (ga) ga[0] += g[0] * v.size();
-    }
+    void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
+    void Backward() override { EACH(g) ga[i % ga.size()] += g[i]; }
 };
 
 struct Add : public DiffAB {
@@ -299,8 +310,12 @@ struct Div : public DiffAB {
     }
 };
 
-Declare2(Broadcast, BroadcastT) Declare2(operator+, Add) Declare2(operator-, Sub) Declare2(operator*, Mul)
-    Declare2(operator/, Div)
+Declare2(Broadcast, BroadcastT);
+Declare2(operator+, Add);
+Declare2(operator-, Sub);
+Declare2(operator*, Mul);
+Declare2(operator/, Div);
+
 #define RELATION(NAME, OP)                                                   \
     struct NAME : public DiffAB {                                            \
         NAME(PDiff a, PDiff b) : DiffAB(a, b) {}                             \
@@ -308,20 +323,30 @@ Declare2(Broadcast, BroadcastT) Declare2(operator+, Add) Declare2(operator-, Sub
     };                                                                       \
     Declare2(operator OP, NAME)
 
-        RELATION(Greater, >) RELATION(Less_, <) RELATION(GreaterOrEqual, >=) RELATION(LessOrEqual, <=)
+RELATION(Greater, >);
+RELATION(Less_, <);
+RELATION(GreaterOrEqual, >=);
+RELATION(LessOrEqual, <=);
 
 #undef RELATION
 
+// TODO Broadcast
 #define CONST_OVERLOAD(OP)                                                     \
-    inline auto operator OP(tensor::type a, PDiff b) { return Const(a) OP b; } \
-    inline auto operator OP(PDiff a, tensor::type b) { return a OP Const(b); }
+    inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b) OP b; } \
+    inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a); }
 
-            CONST_OVERLOAD(+) CONST_OVERLOAD(-) CONST_OVERLOAD(*) CONST_OVERLOAD(/) CONST_OVERLOAD(>) CONST_OVERLOAD(<)
-                CONST_OVERLOAD(>=) CONST_OVERLOAD(<=)
+CONST_OVERLOAD(+);
+CONST_OVERLOAD(-);
+CONST_OVERLOAD(*);
+CONST_OVERLOAD(/);
+CONST_OVERLOAD(>);
+CONST_OVERLOAD(<);
+CONST_OVERLOAD(>=);
+CONST_OVERLOAD(<=);
 
 #undef CONST_OVERLOAD
 
-                    struct MinT : public DiffAB {
+struct MinT : public DiffAB {
     MinT(PDiff a, PDiff b) : DiffAB(a, b) {}
     void Forward() override { EACH(v) v[i] = min(va[i], vb[i]); }
 
@@ -353,9 +378,10 @@ struct MaxT : public DiffAB {
     }
 };
 
-Declare2(Min, MinT) Declare2(Max, MaxT)
+Declare2(Min, MinT);
+Declare2(Max, MaxT);
 
-    struct Concat : public DiffAB {
+struct Concat : public DiffAB {
     Concat(PDiff a, PDiff b) : DiffAB(a, b) {}
 
     void Setup() override {
@@ -480,11 +506,10 @@ struct VecMatMulT : public DiffAB {
     }
 };
 
-Declare2(VecMatMul, VecMatMulT)
+Declare2(VecMatMul, VecMatMulT);
 
-    struct SumT : public DiffA {
+struct SumT : public DiffA {
     SumT(PDiff a) : DiffA(a) {}
-
     void Setup() override { Reshape({1}); }
 
     void Forward() override {
@@ -496,7 +521,15 @@ Declare2(VecMatMul, VecMatMulT)
     void Backward() override { EACH(ga) ga[i] += g[0]; }
 };
 
-Declare1(Sum)
+struct SizeT : public DiffA {
+    SizeT(PDiff a) : DiffA(a) {}
+    void Setup() override { v.reshape({1}); }
+    void Forward() override { v[0] = va.size(); }
+};
+
+Declare1(Sum);
+Declare1(Size);
+
 #if 0
 struct MeanT : public DiffA {
     MeanT(PDiff a) : DiffA(a) { }
@@ -560,13 +593,9 @@ struct SumSquareDiff : public DiffAB {
 #undef gb
 #undef gc
 
-    inline PDiff Mean(PDiff a) {
-    return Sum(a) / Const(a->size());  // TODO a->size() can be 0 due to batch!
-}
+inline PDiff Mean(PDiff a) { return Sum(a) / Size(a); }
 
-inline PDiff MeanSquareError(PDiff a, PDiff b) {
-    return Sum(Sqr(a - b)) / Const(a->size());  // TODO a->size() can be 0 due to batch!
-}
+inline PDiff MeanSquareError(PDiff a, PDiff b) { return Sum(Sqr(a - b)) / Size(a); }
 
 inline PDiff Softmax(PDiff a) {
     PDiff e = Exp(a);
@@ -596,72 +625,43 @@ inline bool IsParam(PDiff a) { return IsDiff(a) && a->g && a->shape().size() > 0
 
 inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g && a->shape().size() > 0 && a->shape()[0] != 0; }
 
-inline void Setup(span<PDiff> nodes) {
-    for (PDiff p : nodes) p->Setup();
-}
-
-inline void Setup(span<PDiff> nodes, int batch_size) {
-    for (PDiff p : nodes)
-        if (IsData(p)) p->v.reshape(p->v.shape().set(0, batch_size));
-    Setup(nodes);
-}
-
-inline void Forward(span<PDiff> nodes) {
-    for (PDiff p : nodes) p->Forward();
-}
-
-inline void ResetGradients(span<PDiff> nodes) {
-    for (PDiff p : nodes) EACH(p->g) p->g[i] = 0;
-}
-
-inline void Backward(span<PDiff> nodes) { EACH(nodes) nodes[nodes.size() - 1 - i]->Backward(); }
-
-inline void GradientDescent(span<PDiff> nodes, const float alpha) {
-    for (PDiff p : nodes)
-        if (IsParam(p)) EACH(p->v) p->v[i] -= alpha * p->g[i];
-}
-
+void Setup(span<PDiff> nodes);
+void InitBatches(span<PDiff> nodes, int batch_size);
+void Forward(span<PDiff> nodes);
+void ResetGradients(span<PDiff> nodes);
+void Backward(span<PDiff> nodes);
+void GradientDescent(span<PDiff> nodes, const float alpha);
+void CheckBounded(cspan<PDiff> nodes, const tensor::type limit);
 void Print(cspan<PDiff> nodes, bool values = false, bool gradients = false);
 
 using Metrics = unordered_map<string, float>;
 
 struct Model {
-    int batch_size = 1;
-    bool compiled = false;
+    Model(PDiff loss, PDiff accuracy, int batch_size)
+        : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
+        InitBatches(nodes, batch_size);
+        Setup(nodes);
+        // TODO optimize it here:
+        // - remove redundant diffs
+        // - replace more expensive diffs with cheaper diffs
+        // - fuse diffs
+        // - if fanout of diff is 1 then its downstream diff can use = instead of += for gradients
+        // - don't compute gradients which are not used!
+        // - cpu vectorized kernels
+        // - gpu vectorized kernels
+        // - cpu multi-core kernels
+    }
 
-    PDiff input;
-    PDiff reference;
-    PDiff output;
     PDiff loss;
     PDiff accuracy;
-
     vector<PDiff> nodes;
+    // TODO filtered lists of nodes for forward, reset_gradients, backward, gradient_descent
 
-    void Compile() {
-        Check(!compiled);
-        nodes = TopoSort({loss});
-        Setup(nodes, batch_size);
-        compiled = true;
-    }
+    void Forward() { ::Forward(nodes); }
+    void ResetGradients() { ::ResetGradients(nodes); }
+    void Backward() { ::Backward(nodes); }
+    void GradientDescent(tensor::type alpha) { ::GradientDescent(nodes, alpha); }
+    void Print() const { ::Print(nodes); }
 
-    void Forward() {
-        Check(compiled);
-        ::Forward(nodes);
-    }
-    void ResetGradients() {
-        Check(compiled);
-        ::ResetGradients(nodes);
-    }
-    void Backward() {
-        Check(compiled);
-        ::Backward(nodes);
-    }
-    void GradientDescent(tensor::type alpha) {
-        Check(compiled);
-        ::GradientDescent(nodes, alpha);
-    }
-
-    void Print() const;
-
-    Metrics Epoch(const tensor in, const tensor ref, optional<float> alpha);
+    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const size_t seed);
 };

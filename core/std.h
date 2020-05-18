@@ -95,9 +95,31 @@ overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 constexpr double PI = M_PI;
 constexpr double INF = numeric_limits<double>::infinity();
 
+#include <core/callstack.h>
+
 inline void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
-                  unsigned line = __builtin_LINE()) {
+                  unsigned line = __builtin_LINE(), const char* function = __builtin_FUNCTION()) {
     if (value) return;
-    cout << "Check failed at " << file << ':' << line << " with message: " << message << endl;
+    cout << "Check failed in " << function << " at " << file << ':' << line << " with message: " << message << endl;
+    string s;
+    Callstack().write(s, {});
+    cout << s;
+    cout.flush();
+    exit(0);
+}
+
+#if 0
+#define DCheck(A, B) Check(A, B)
+#else
+#define DCheck(A, B)
+#endif
+
+inline void Fail(string_view message = "", const char* file = __builtin_FILE(),
+                  unsigned line = __builtin_LINE(), const char* function = __builtin_FUNCTION()) {
+    cout << "Failed in " << function << " at " << file << ':' << line << " with message: " << message << endl;
+    string s;
+    Callstack().write(s, {});
+    cout << s;
+    cout.flush();
     exit(0);
 }

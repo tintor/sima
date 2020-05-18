@@ -590,6 +590,11 @@ void print(string_view fmt, const Args&... args) {
 }
 
 template <typename... Args>
+void println(string_view fmt = "", const Args&... args) {
+    cout << format(fmt, args...) << endl;
+}
+
+template <typename... Args>
 void dprint(string_view fmt, const Args&... args) {
     if (debug) cout << format(fmt, args...);
 }

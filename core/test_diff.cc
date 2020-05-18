@@ -77,3 +77,76 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
     Optimize("schaffer n.2", 100, return 0.5 + (sqr(sin(x*x - y*y)) - 0.5) / sqr(1 + 0.001*(x*x + y*y)));
     Optimize("hölder table", 10, return -abs(sin(x)*cos(y)*exp(abs(1 - sqrt(x*x + y*y)/PI))));
 #endif
+
+TEST_CASE("diff: learn perceptron", "[diff]") {
+    // model
+    auto x = Data({0, 1}, "x");
+    // auto y = Data({0, 1}, "y");
+    auto r = Data({0, 1}, "r");
+
+    auto init = make_shared<NormalInit>(1, 0);
+    //auto a = Param({1}, "a", init);
+    //auto b = Param({1}, "b", init);
+    auto c = Param({1}, "c", init);
+
+    auto out = Sigmoid(x + c);
+    auto loss = MeanSquareError(out, r);
+    loss->name = "loss";
+    auto accuracy = Mean(Abs(out - r) < 0.5);
+    accuracy->name = "accuracy";
+
+    Print(TopoSort({loss}));
+
+    Model model(loss, accuracy, 4);
+
+    // dataset
+    const float A = 1, B = 1, C = 0.4;
+    UniformInit gen(-1, 1, 0);
+    const int Classes = 2;
+    const int SamplesPerClass = 5120;
+    const int Samples = Classes * SamplesPerClass;
+    vtensor data_x({Samples, 1}, 0);
+    // vtensor data_y({Samples, 1}, 0);
+    vtensor data_r({Samples, 1}, 0);
+    int count[2] = {0, 0};
+    int index = 0;
+    while (index < Samples) {
+        float dx = gen.get();
+        float dy = gen.get();
+        float dr = (dx * A + dy * B + C >= 0) ? 1 : 0;
+        int c = round(dr);
+        if (count[c] >= SamplesPerClass) continue;
+        count[c] += 1;
+        data_x[index] = dx;
+        // data_y[index] = dy;
+        data_r[index] = dr;
+        index += 1;
+    }
+    vector<pair<PDiff, tensor>> dataset = {{x, data_x}, /*{y, data_y},*/ {r, data_r}};
+
+    // train!
+    println("train ...");
+    Print(model.nodes, true, true);
+    for (size_t i = 0; i < 1000; i++) {
+        model.Epoch(dataset, 0.01, 0);
+        Print(model.nodes, true, true);
+    }
+}
+
+// Classification:
+// learn x + c
+// learn a*x + b*y
+// learn plane in 2d
+// learn hyper plane in Nd
+// learn xor (with neurons)
+// learn circle in 2d
+// learn hyper sphere in Nd
+
+// Regression:
+// - multiply two inputs: x * y
+// - sqr
+// - sqrt
+// - sine in 1d
+// - sine in 2d : sin(sqrt(x^2 + y^2)
+
+TEST_CASE("diff: learn xor", "[diff]") {}

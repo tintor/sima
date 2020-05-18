@@ -21,9 +21,6 @@ struct tensor_shape {
         return 0;
     }
 
-    const uint16_t* begin() const { return dim.data(); }
-    const uint16_t* end() const { return dim.data() + size(); }
-
     size_t volume() const { return (size() == 0) ? 0 : Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
 
     tensor_shape remove_zeros() const {
@@ -95,9 +92,6 @@ struct tensor_shape {
     array<uint16_t, 4> dim;
 };
 
-template <typename T = float>
-class VTensor;
-
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)
 template <typename T = float>
 class Tensor {
@@ -123,15 +117,21 @@ class Tensor {
     T* end() { return data() + size(); }
 
     size_t size() const { return m_shape.volume(); }
-    T& operator[](size_t index) { return m_data[index]; }
-    const T& operator[](size_t index) const { return m_data[index]; }
+    T& operator[](size_t index) {
+        DCheck(index < size(), format("%s < %s", index, size()));
+        return m_data[index];
+    }
+    const T& operator[](size_t index) const {
+        DCheck(index < size(), format("%s < %s", index, size()));
+        return m_data[index];
+    }
 
     const auto& shape() const { return m_shape; }
     T& operator()(uint16_t a, uint16_t b) { return operator()({a, b}); }
     T& operator()(uint16_t a, uint16_t b, uint16_t c) { return operator()({a, b, c}); }
     T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) { return operator()({a, b, c, d}); }
     T& operator()(tensor_shape index) { return m_data[offset(index)]; }
-    const T& operator()(tensor_shape index) const { return m_data[offset(index)]; }
+    const T& operator()(tensor_shape index) const { return operator[](offset(index)); }
 
     size_t offset(tensor_shape index) const {
         size_t out = index[0];
@@ -141,13 +141,20 @@ class Tensor {
 
     // sub-tensor for the fixed value of the first dimension
     Tensor slice(uint16_t a) {
+        DCheck(m_shape.size() > 0 && a < m_shape[0], "");
         auto v = m_shape.pop_front().volume();
         return Tensor(m_data + a * v, v);
     }
 
     const Tensor slice(uint16_t a) const {
+        DCheck(m_shape.size() > 0 && a < m_shape[0], "");
         auto v = m_shape.pop_front().volume();
         return Tensor(m_data + a * v, v);
+    }
+
+    void copy_from(const Tensor& o) {
+        Check(shape() == o.shape());
+        std::copy(o.begin(), o.end(), begin());
     }
 
     bool operator==(const Tensor& o) const {
@@ -155,6 +162,12 @@ class Tensor {
     }
     bool operator!=(const Tensor& o) const { return !operator==(o); }
 
+    Tensor& operator=(const Tensor& o) {
+        m_data = o.m_data;
+        m_shape = o.m_shape;
+        return *this;
+    }
+
     operator string() const {
         string s;
         s += '[';
@@ -166,85 +179,53 @@ class Tensor {
         return s;
     }
 
-   private:
+   protected:
     T* m_data;
     tensor_shape m_shape;
 };
 
 // VTensor is multi-dimensional vector (owns memory)
 template <typename T>
-class VTensor {
+class VTensor : public Tensor<T> {
    public:
     VTensor() {}
-    VTensor(tensor_shape shape, T init = T()) : m_data(shape.volume(), init), m_shape(shape) {}
+    VTensor(tensor_shape shape, T init = T()) : m_vector(shape.volume(), init) {
+        Tensor<T>::m_shape = shape;
+        Tensor<T>::m_data = m_vector.data();
+    }
+    VTensor(VTensor<T>&& o) { operator=(o); }
     VTensor(const Tensor<T>& o) { operator=(o); }
-    VTensor(const VTensor<T>& o) { operator=(o); }
 
-    operator bool() const { return m_data.data() != nullptr; }
-    T* data() { return m_data.data(); }
-    T const* data() const { return m_data.data(); }
+    VTensor& operator=(VTensor<T>&& o) {
+        if (this == &o) return *this;
+        Tensor<T>::m_shape = o.shape();
+        m_vector.clear();
+        swap(m_vector, o.m_vector);
+        Tensor<T>::m_data = m_vector.data();
 
-    const T* begin() const { return data(); }
-    const T* end() const { return data() + size(); }
-    T* begin() { return data(); }
-    T* end() { return data() + size(); }
-
-    size_t size() const { return m_data.size(); }
-    T& operator[](size_t index) { return m_data[index]; }
-    const T& operator[](size_t index) const { return m_data[index]; }
-
-    tensor_shape shape() const { return m_shape; }
-
-    T& operator()(uint16_t a, uint16_t b) { return operator()({a, b}); }
-    T& operator()(uint16_t a, uint16_t b, uint16_t c) { return operator()({a, b, c}); }
-    T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) { return operator()({a, b, c, d}); }
-    T& operator()(tensor_shape index) { return m_data[offset(index)]; }
-
-    const T& operator()(uint16_t a, uint16_t b) const { return operator()({a, b}); }
-    const T& operator()(uint16_t a, uint16_t b, uint16_t c) const { return operator()({a, b, c}); }
-    const T& operator()(uint16_t a, uint16_t b, uint16_t c, uint16_t d) const { return operator()({a, b, c, d}); }
-    const T& operator()(tensor_shape index) const { return m_data[offset(index)]; }
-
-    operator Tensor<T>() { return Tensor<T>(m_data.data(), m_shape); }
-    operator const Tensor<T>() const { return Tensor<T>(const_cast<T*>(m_data.data()), m_shape); }
-
-    size_t offset(tensor_shape index) const {
-        size_t out = index[0];
-        for (size_t i = 1; i < m_shape.size(); i++) out = out * m_shape[i] + index[i];
-        return out;
+        o.m_data = nullptr;
+        o.m_shape = tensor_shape();
+        return *this;
     }
 
-    void operator=(const Tensor<T> o) {
-        m_shape = o.shape();
-        m_data.resize(o.size());
+    VTensor& operator=(const Tensor<T> o) {
+        if (this == &o) return *this;
+        Tensor<T>::m_shape = o.shape();
+        m_vector.resize(o.size());
+        Tensor<T>::m_data = m_vector.data();
         // TODO not safe if strides are added to Tensor
-        std::copy(o.data(), o.data() + o.size(), m_data.data());
+        std::copy(o.data(), o.data() + o.size(), m_vector.data());
+        return *this;
     }
 
-    void reshape(tensor_shape shape, T init = T()) {
-        m_shape = shape;
-        m_data.resize(m_shape.volume(), init);
-    }
-
-    bool operator==(const Tensor<T>& o) const {
-        return m_shape == o.shape() && std::equal(data(), data() + size(), o.data());
-    }
-    bool operator!=(const Tensor<T>& o) const { return !operator==(o); }
-
-    operator string() const {
-        string s;
-        s += '[';
-        for (size_t i = 0; i < size(); i++) {
-            if (i > 0) s += ' ';
-            format_s(s, "%s", m_data[i]);
-        }
-        s += ']';
-        return s;
+    void reshape(tensor_shape new_shape, T init = T()) {
+        Tensor<T>::m_shape = new_shape;
+        m_vector.resize(new_shape.volume(), init);
+        Tensor<T>::m_data = m_vector.data();
     }
 
    private:
-    vector<T> m_data;
-    tensor_shape m_shape;
+    vector<T> m_vector;
 };
 
 using tensor = Tensor<float>;

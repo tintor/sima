@@ -67,6 +67,50 @@ void MaxPool2D::Backward() {
 #undef gb
 #undef gc
 
+void Setup(span<PDiff> nodes) {
+    for (PDiff p : nodes) p->Setup();
+}
+
+void InitBatches(span<PDiff> nodes, int batch_size) {
+    for (PDiff p : nodes)
+        if (IsData(p)) p->v.reshape(p->v.shape().set(0, batch_size));
+}
+
+void Forward(span<PDiff> nodes) {
+    for (PDiff p : nodes) {
+        Timestamp begin;
+        p->Forward();
+        Timestamp end;
+        p->forward_ticks += begin.elapsed(end);
+    }
+}
+
+void ResetGradients(span<PDiff> nodes) {
+    for (PDiff p : nodes) EACH(p->g) p->g[i] = 0;
+}
+
+void Backward(span<PDiff> nodes) {
+    EACH(nodes) {
+        auto p = nodes[nodes.size() - 1 - i];
+        Timestamp begin;
+        p->Backward();
+        Timestamp end;
+        p->backward_ticks += begin.elapsed(end);
+    }
+}
+
+void GradientDescent(span<PDiff> nodes, const float alpha) {
+    for (PDiff p : nodes)
+        if (IsParam(p)) EACH(p->v) p->v[i] -= alpha * p->g[i];
+}
+
+void CheckBounded(cspan<PDiff> nodes, const tensor::type limit) {
+    for (PDiff p : nodes) {
+        EACH(p->v) Check(std::isfinite(p->v[i]) && abs(p->v[i]) <= limit, "value not bounded");
+        EACH(p->g) Check(std::isfinite(p->g[i]) && abs(p->g[i]) <= limit, "gradient not bounded");
+    }
+}
+
 auto ComputeIds(cspan<PDiff> nodes) {
     map<Diff*, string> ids;
     for (PDiff p : nodes) {
@@ -91,7 +135,7 @@ void Print(cspan<PDiff> nodes, bool values, bool gradients) {
     auto ids = ComputeIds(nodes);
     vector<string> table;
 
-    string os = "id|type|inputs|shape|";
+    string os = "id|type|inputs|shape|fticks|bticks|";
     if (values) os += "values|";
     if (gradients) os += "gradients|";
     table << os;
@@ -119,6 +163,12 @@ void Print(cspan<PDiff> nodes, bool values, bool gradients) {
             // shape
             format_s(os, "%s|", string(p->shape()));
 
+            // fticks
+            format_s(os, "%s|", (p->forward_ticks + 500) / 1000);
+
+            // bticks
+            format_s(os, "%s|", (p->backward_ticks + 500) / 1000);
+
             if (values) format_s(os, "%s|", string(p->v));
 
             if (gradients) format_s(os, "%s|", string(p->g));
@@ -128,11 +178,6 @@ void Print(cspan<PDiff> nodes, bool values, bool gradients) {
     PrintTable(table, '|', " ");
 }
 
-void Model::Print() const {
-    Check(compiled);
-    ::Print(nodes);
-}
-
 vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
     vector<uint32_t> out(size);
     for (auto i : range(size)) out[i] = i;
@@ -140,52 +185,53 @@ vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
     return out;
 }
 
-Metrics Model::Epoch(const tensor in, const tensor ref, const optional<float> alpha) {
-    Check(compiled);
-    Check(in.shape().size() > 0);
-    Check(ref.shape().size() > 0);
-    Check(in.shape()[0] == ref.shape()[0]);
+Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const size_t seed) {
+    Check(data.size() > 0);
+    const auto B = data[0].first->shape()[0];
+    const auto N = data[0].second.shape()[0];
+    Check(N % B == 0);
 
-    Check(IsData(input));
-    Check(IsData(reference));
-    Check(in.shape().pop_front() == input->shape().pop_front());
-    Check(ref.shape().pop_front() == reference->shape().pop_front());
+    for (const auto& [key, value] : data) {
+        Check(key->shape()[0] == B);
+        Check(value.shape()[0] == N);
+        Check(value.shape().pop_front() == key->shape().pop_front(), format("%s %s", value.shape(), key->shape()));
+    }
 
-    std::random_device rd;
-    std::mt19937_64 random(rd());
-
-    const size_t n = in.shape()[0];
-    auto samples = ShuffledInts(n, random);
+    std::mt19937_64 random(seed);
+    auto samples = ShuffledInts(N, random);
 
     string msg;
     Accumulator<float> mean_loss, mean_accuracy;
-    for (auto i : range(n)) {
-        auto index = samples[i];
-        Copy(in.slice(index), input->v);
-        Copy(ref.slice(index), reference->v);
+    for (size_t i = 0; i < N; i += B) {
+        for (const auto& [key, value] : data) {
+            for (size_t j = 0; j < B; j++)
+                key->v.slice(j).copy_from(value.slice(samples[i + j]));
+        }
+
         Forward();
 
         mean_loss << loss->v[0];
         mean_accuracy << accuracy->v[0];
 
-        if (alpha) {
+        if (alpha != 0) {
             ResetGradients();
             loss->g[0] = 1;
             Backward();
-            GradientDescent(*alpha);
+            GradientDescent(alpha);
         }
 
         for (char& c : msg) c = '\r';
         cout << msg;
         msg.clear();
 
-        format_s(msg, "Epoch: %f%%", 100. * (i + 1) / n);
-        format_s(msg, " %s/%s", i + 1, n);
+        format_s(msg, "%s/%s", i + 1, N);
         format_s(msg, " loss:%.4f", mean_loss.mean());
         format_s(msg, " acc:%.4f", mean_accuracy.mean());
         cout << msg;
         cout.flush();
+
+        // CheckBounded(nodes, 1e6);
     }
-    print("\n");
+    println();
     return {{"loss", mean_loss.mean()}, {"accuracy", mean_accuracy.mean()}};
 }
