@@ -27,7 +27,7 @@ TEST_CASE("diff: minimize circle", "[diff]") {
     REQUIRE(loss->v[0] == sqr(3.14f) + sqr(2.16f));
 
     Iterate(nodes, 0.1, 70);
-    Print(nodes, true, true);
+    Print(nodes);
 
     REQUIRE(abs(x->v[0]) < 1e-6);
     REQUIRE(abs(y->v[0]) < 1e-6);
@@ -37,7 +37,7 @@ void Minimize(PDiff loss, float alpha, size_t iterations) {
     auto nodes = TopoSort({loss});
     Setup(nodes);
     Iterate(nodes, alpha, iterations);
-    Print(nodes, true, true);
+    Print(nodes);
 }
 
 TEST_CASE("diff: minimize booth", "[diff]") {
@@ -81,32 +81,33 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 TEST_CASE("diff: learn perceptron", "[diff]") {
     // model
     auto x = Data({0, 1}, "x");
-    // auto y = Data({0, 1}, "y");
-    auto r = Data({0, 1}, "r");
+    auto y = Data({0, 1}, "y");
+    auto ref = Data({0, 1}, "ref");
 
-    auto init = make_shared<NormalInit>(1, 0);
-    //auto a = Param({1}, "a", init);
-    //auto b = Param({1}, "b", init);
+    auto init = make_shared<NormalInit>(1, 2);
+    auto a = Param({1}, "a", init);
+    auto b = Param({1}, "b", init);
     auto c = Param({1}, "c", init);
 
-    auto out = Sigmoid(x + c);
-    auto loss = MeanSquareError(out, r);
+    auto out = Sigmoid(x * a + y * b + c);
+    out->name = "out";
+    auto loss = MeanSquareError(out, ref) + (Sqr(a) + Sqr(b) + Sqr(c)) / 10000;
     loss->name = "loss";
-    auto accuracy = Mean(Abs(out - r) < 0.5);
+    auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
 
     Print(TopoSort({loss}));
 
-    Model model(loss, accuracy, 4);
+    Model model(loss, accuracy, 200);
 
     // dataset
-    const float A = 1, B = 1, C = 0.4;
+    const float A = 0.7, B = -0.6, C = 0.33;
     UniformInit gen(-1, 1, 0);
     const int Classes = 2;
-    const int SamplesPerClass = 5120;
+    const int SamplesPerClass = 20000;
     const int Samples = Classes * SamplesPerClass;
     vtensor data_x({Samples, 1}, 0);
-    // vtensor data_y({Samples, 1}, 0);
+    vtensor data_y({Samples, 1}, 0);
     vtensor data_r({Samples, 1}, 0);
     int count[2] = {0, 0};
     int index = 0;
@@ -118,19 +119,20 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
         if (count[c] >= SamplesPerClass) continue;
         count[c] += 1;
         data_x[index] = dx;
-        // data_y[index] = dy;
+        data_y[index] = dy;
         data_r[index] = dr;
         index += 1;
     }
-    vector<pair<PDiff, tensor>> dataset = {{x, data_x}, /*{y, data_y},*/ {r, data_r}};
+    vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
 
     // train!
     println("train ...");
-    Print(model.nodes, true, true);
-    for (size_t i = 0; i < 1000; i++) {
-        model.Epoch(dataset, 0.01, 0);
-        Print(model.nodes, true, true);
-    }
+    Print(model.nodes);
+    Metrics metrics;
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.3, 0);
+    Print(model.nodes);
+
+    REQUIRE(metrics.at("accuracy") >= 0.98);
 }
 
 // Classification:

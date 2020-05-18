@@ -70,7 +70,7 @@ struct DiffA : public Diff {
 };
 
 bool IsBroadcastable(tensor_shape a, tensor_shape b);
-PDiff Broadcast(PDiff a, tensor_shape b);
+PDiff IBroadcast(PDiff a, tensor_shape b);
 
 struct DiffAB : public Diff {
     DiffAB(PDiff a, PDiff b) : a(a), b(b) {}
@@ -78,11 +78,9 @@ struct DiffAB : public Diff {
 
     void Setup() override {
         if (a->shape() != b->shape()) {
-            Check(IsBroadcastable(a->shape(), b->shape()) || IsBroadcastable(b->shape(), a->shape()),
-                format("%s %s %s", a->shape(), b->shape(), TypeName(*this)));
-            if (a->size() > b->size()) b = Broadcast(b, a->shape());
-            if (a->size() < b->size()) a = Broadcast(a, b->shape());
-            Check(a->shape() == b->shape());
+            if (a->size() > b->size()) b = IBroadcast(b, a->shape());
+            if (a->size() < b->size()) a = IBroadcast(a, b->shape());
+            Check((a->size() == 1 && b->size() == 1) ||  a->shape() == b->shape(), format("%s %s", a->shape(), b->shape()));
         }
         Reshape(a->shape());
     }
@@ -168,7 +166,7 @@ struct LeakyReluT : public DiffA {
 struct SigmoidT : public DiffA {
     SigmoidT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = 1 / (1 + exp(-va[i])); }
-    void Backward() override { EACH(ga) ga[i] += v[i] * (1 - v[i]); }
+    void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
 };
 
 struct SqrT : public DiffA {
@@ -261,13 +259,12 @@ struct BroadcastT : public DiffAB {
     BroadcastT(PDiff a, PDiff b) : DiffAB(a, b) {}
 
     void Setup() override {
-        auto as = a->shape(), bs = b->shape();
-        Check(as.volume() == 1 || as == bs.pop_front());
-        Reshape(bs);
+        Check(IsBroadcastable(a->shape(), b->shape()), format("%s %s", a->shape(), b->shape()));
+        Reshape(b->shape());
     }
 
     void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
-    void Backward() override { EACH(g) ga[i % ga.size()] += g[i]; }
+    void Backward() override { if (ga) EACH(g) ga[i % ga.size()] += g[i]; }
 };
 
 struct Add : public DiffAB {
@@ -627,30 +624,18 @@ inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g && a->shape().size() > 
 
 void Setup(span<PDiff> nodes);
 void InitBatches(span<PDiff> nodes, int batch_size);
+void ResetTicks(span<PDiff> nodes);
 void Forward(span<PDiff> nodes);
 void ResetGradients(span<PDiff> nodes);
 void Backward(span<PDiff> nodes);
 void GradientDescent(span<PDiff> nodes, const float alpha);
 void CheckBounded(cspan<PDiff> nodes, const tensor::type limit);
-void Print(cspan<PDiff> nodes, bool values = false, bool gradients = false);
+void Print(cspan<PDiff> nodes);
 
 using Metrics = unordered_map<string, float>;
 
 struct Model {
-    Model(PDiff loss, PDiff accuracy, int batch_size)
-        : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
-        InitBatches(nodes, batch_size);
-        Setup(nodes);
-        // TODO optimize it here:
-        // - remove redundant diffs
-        // - replace more expensive diffs with cheaper diffs
-        // - fuse diffs
-        // - if fanout of diff is 1 then its downstream diff can use = instead of += for gradients
-        // - don't compute gradients which are not used!
-        // - cpu vectorized kernels
-        // - gpu vectorized kernels
-        // - cpu multi-core kernels
-    }
+    Model(PDiff loss, PDiff accuracy, int batch_size);
 
     PDiff loss;
     PDiff accuracy;

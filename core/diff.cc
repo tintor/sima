@@ -23,6 +23,24 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
 #define gb (b->g)
 #define gc (c->g)
 
+bool IsBroadcastable(tensor_shape a, tensor_shape b) {
+    return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
+}
+
+struct IBroadcastT : public DiffA {
+    IBroadcastT(PDiff a, tensor_shape b) : DiffA(a) {
+        Check(IsBroadcastable(a->shape(), b), format("%s %s", a->shape(), b));
+        Reshape(b);
+    }
+    void Setup() override { Fail("forbidden"); }
+    void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
+    void Backward() override { EACH(g) ga[i % ga.size()] += g[i]; }
+};
+
+PDiff IBroadcast(PDiff a, tensor_shape b) {
+    return make_shared<IBroadcastT>(a, b);
+}
+
 void MaxPool2D::Setup() {
     Check(a->shape().size() == 2);
     // TODO overflow check
@@ -74,6 +92,10 @@ void Setup(span<PDiff> nodes) {
 void InitBatches(span<PDiff> nodes, int batch_size) {
     for (PDiff p : nodes)
         if (IsData(p)) p->v.reshape(p->v.shape().set(0, batch_size));
+}
+
+void ResetTicks(span<PDiff> nodes) {
+    for (PDiff p : nodes) p->forward_ticks = p->backward_ticks = 0;
 }
 
 void Forward(span<PDiff> nodes) {
@@ -131,15 +153,16 @@ auto ComputeIds(cspan<PDiff> nodes) {
     return ids;
 }
 
-void Print(cspan<PDiff> nodes, bool values, bool gradients) {
+string Summary(const tensor v) {
+    Accumulator<tensor::type> acc;
+    for (auto i : range(v.size())) acc << v[i];
+    return format("(%s %s %s) %s", acc.min(), acc.mean(), acc.max(), acc.stdev());
+}
+
+void Print(cspan<PDiff> nodes) {
     auto ids = ComputeIds(nodes);
-    vector<string> table;
-
-    string os = "id|type|inputs|shape|fticks|bticks|";
-    if (values) os += "values|";
-    if (gradients) os += "gradients|";
-    table << os;
-
+    vector<string> table = {"id|type|inputs|shape|fticks|bticks|values|gradients|"};
+    string os;
     for (PDiff p : nodes)
         if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
             os.clear();
@@ -169,13 +192,31 @@ void Print(cspan<PDiff> nodes, bool values, bool gradients) {
             // bticks
             format_s(os, "%s|", (p->backward_ticks + 500) / 1000);
 
-            if (values) format_s(os, "%s|", string(p->v));
+            size_t summary = 6;
+            format_s(os, "%s|", (p->v.size() >= summary) ? Summary(p->v) : string(p->v));
 
-            if (gradients) format_s(os, "%s|", string(p->g));
+            format_s(os, "%s|", (p->g.size() >= summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }
     PrintTable(table, '|', " ");
+}
+
+Model::Model(PDiff loss, PDiff accuracy, int batch_size)
+    : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
+    InitBatches(nodes, batch_size);
+    Setup(nodes);
+    // Recompute TopoSort as Setup can add more nodes.
+    nodes = TopoSort({loss, accuracy});
+    // TODO optimize it here:
+    // - remove redundant diffs
+    // - replace more expensive diffs with cheaper diffs
+    // - fuse diffs
+    // - if fanout of diff is 1 then its downstream diff can use = instead of += for gradients
+    // - don't compute gradients which are not used!
+    // - cpu vectorized kernels
+    // - gpu vectorized kernels
+    // - cpu multi-core kernels
 }
 
 vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
@@ -183,6 +224,14 @@ vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
     for (auto i : range(size)) out[i] = i;
     std::shuffle(out.begin(), out.end(), random);
     return out;
+}
+
+template <typename Func>
+ulong Duration(const Func& func) {
+    Timestamp begin;
+    func();
+    Timestamp end;
+    return begin.elapsed(end);
 }
 
 Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const size_t seed) {
@@ -201,37 +250,52 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
     auto samples = ShuffledInts(N, random);
 
     string msg;
-    Accumulator<float> mean_loss, mean_accuracy;
+    Accumulator<float> a_loss, a_accuracy, a_f_ticks, a_b_ticks, a_gd_ticks;
+    ulong f_ticks = 0, b_ticks = 0, gd_ticks = 0;
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
             for (size_t j = 0; j < B; j++)
                 key->v.slice(j).copy_from(value.slice(samples[i + j]));
         }
 
-        Forward();
+        f_ticks += Duration([&](){ Forward(); });
 
-        mean_loss << loss->v[0];
-        mean_accuracy << accuracy->v[0];
+        a_loss << loss->v[0];
+        a_accuracy << accuracy->v[0];
 
         if (alpha != 0) {
             ResetGradients();
             loss->g[0] = 1;
-            Backward();
-            GradientDescent(alpha);
+            b_ticks += Duration([&](){ Backward(); });
+            gd_ticks += Duration([&](){ GradientDescent(alpha); });
         }
 
         for (char& c : msg) c = '\r';
         cout << msg;
         msg.clear();
 
-        format_s(msg, "%s/%s", i + 1, N);
-        format_s(msg, " loss:%.4f", mean_loss.mean());
-        format_s(msg, " acc:%.4f", mean_accuracy.mean());
+        a_f_ticks << f_ticks;
+        a_b_ticks << b_ticks;
+        a_gd_ticks << gd_ticks;
+
+        format_s(msg, "%s/%s", i + B, N);
+        //format_s(msg, " loss:%.4f", a_loss.mean());
+        //format_s(msg, " acc:%.4f", a_accuracy.mean());
+        //msg += "   ";
         cout << msg;
         cout.flush();
 
+        //::Print(nodes);
         // CheckBounded(nodes, 1e6);
     }
-    println();
-    return {{"loss", mean_loss.mean()}, {"accuracy", mean_accuracy.mean()}};
+
+    for (char& c : msg) c = '\r';
+    cout << msg;
+    msg.clear();
+
+    print("%s/%s", N, N);
+    print(" loss:%.4f", a_loss.mean());
+    print(" acc:%.4f", a_accuracy.mean());
+    println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()), ulong(a_gd_ticks.mean()));
+    return {{"loss", a_loss.mean()}, {"accuracy", a_accuracy.mean()}};
 }
