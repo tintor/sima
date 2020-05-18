@@ -154,7 +154,7 @@ inline PDiff Data(tensor_shape shape, string_view name = "") {
 struct ReluT : public DiffA {
     ReluT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : 0; }
-    void Backward() override { EACH(ga) ga[i] += (va[i] > 0) ? g[i] : 0; }
+    void Backward() override { EACH(ga) ga[i] += (va[i] > 0) * g[i]; }
 };
 
 struct LeakyReluT : public DiffA {
@@ -167,6 +167,12 @@ struct SigmoidT : public DiffA {
     SigmoidT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = 1 / (1 + exp(-va[i])); }
     void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
+};
+
+struct TanhT : public DiffA {
+    TanhT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = tanh(va[i]); }
+    void Backward() override { EACH(ga) ga[i] += g[i] * (1 - sqr(v[i])); }
 };
 
 struct SqrT : public DiffA {
@@ -214,6 +220,7 @@ struct SinT : public DiffA {
 Declare1(Relu);
 Declare1(LeakyRelu);
 Declare1(Sigmoid);
+Declare1(Tanh);
 Declare1(Sqr);
 Declare1(Sqrt);
 Declare1(Exp);
@@ -280,11 +287,31 @@ struct BroadcastT : public DiffAB {
 
 struct Add : public DiffAB {
     Add(PDiff a, PDiff b) : DiffAB(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] + vb[i]; }
+
+    void Setup() override {
+        Check(a->shape() == b->shape() || b->size() == 1);
+        Reshape(a->shape());
+    }
+
+    void Forward() override {
+        if (vb.size() == 1) {
+            EACH(v) v[i] = va[i] + vb[0];
+        } else {
+            EACH(v) v[i] = va[i] + vb[i];
+        }
+    }
 
     void Backward() override {
         EACH(ga) ga[i] += g[i];
-        EACH(gb) gb[i] += g[i];
+        if (gb) {
+            if (gb.size() == 1) {
+                tensor::type s = 0;
+                EACH(g) s += g[i];
+                gb[0] = s;
+            } else {
+                EACH(gb) gb[i] += g[i];
+            }
+        }
     }
 };
 
@@ -300,11 +327,32 @@ struct Sub : public DiffAB {
 
 struct Mul : public DiffAB {
     Mul(PDiff a, PDiff b) : DiffAB(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] * vb[i]; }
+
+    void Setup() override {
+        Check(a->shape() == b->shape() || b->size() == 1);
+        Reshape(a->shape());
+    }
+
+    void Forward() override {
+        if (vb.size() == 1) {
+            EACH(v) v[i] = va[i] * vb[0];
+        } else {
+            EACH(v) v[i] = va[i] * vb[i];
+        }
+    }
 
     void Backward() override {
-        EACH(ga) ga[i] += g[i] * vb[i];
-        EACH(gb) gb[i] += g[i] * va[i];
+        if (vb.size() == 1) {
+            EACH(ga) ga[i] += g[i] * vb[0];
+            if (gb) {
+                tensor::type s = 0;
+                EACH(g) s += g[i] * va[i];
+                gb[0] = s;
+            }
+        } else {
+            EACH(ga) ga[i] += g[i] * vb[i];
+            EACH(gb) gb[i] += g[i] * va[i];
+        }
     }
 };
 
@@ -343,14 +391,18 @@ RELATION(LessOrEqual, <=);
     inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b) OP b; } \
     inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a); }
 
-CONST_OVERLOAD(+);
 CONST_OVERLOAD(-);
-CONST_OVERLOAD(*);
 CONST_OVERLOAD(/);
 CONST_OVERLOAD(>);
 CONST_OVERLOAD(<);
 CONST_OVERLOAD(>=);
 CONST_OVERLOAD(<=);
+
+inline auto operator+(tensor::type a, PDiff b) { return b + Const(a); }
+inline auto operator+(PDiff a, tensor::type b) { return a + Const(b); }
+
+inline auto operator*(tensor::type a, PDiff b) { return b * Const(a); }
+inline auto operator*(PDiff a, tensor::type b) { return a * Const(b); }
 
 #undef CONST_OVERLOAD
 

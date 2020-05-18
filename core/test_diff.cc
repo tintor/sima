@@ -84,21 +84,21 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
     auto y = Data({0, 1}, "y");
     auto ref = Data({0, 1}, "ref");
 
-    auto init = make_shared<NormalInit>(1, 2);
+    auto init = make_shared<NormalInit>(1, 0);
     auto a = Param({1}, "a", init);
     auto b = Param({1}, "b", init);
     auto c = Param({1}, "c", init);
 
     auto out = Sigmoid(x * a + y * b + c);
     out->name = "out";
-    auto loss = MeanSquareError(out, ref) + (Sqr(a) + Sqr(b) + Sqr(c)) / 10000;
+    auto loss = MeanSquareError(out, ref);// + (Sqr(a) + Sqr(b) + Sqr(c)) / 10000;
     loss->name = "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
 
     Print(TopoSort({loss}));
 
-    Model model(loss, accuracy, 20000);
+    Model model(loss, accuracy, 10);
 
     // dataset
     const float A = 0.7, B = -0.6, C = 0.33;
@@ -129,10 +129,10 @@ TEST_CASE("diff: learn perceptron", "[diff]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(200)) metrics = model.Epoch(dataset, 0.3, 0);
+    for (auto i : range(100)) metrics = model.Epoch(dataset, 0.1, 0);
     Print(model.nodes);
 
-    REQUIRE(metrics.at("accuracy") >= 0.98);
+    REQUIRE(metrics.at("accuracy") >= 0.9935);
 }
 
 // Classification:
