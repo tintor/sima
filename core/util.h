@@ -19,6 +19,11 @@ T sqr(T a) {
 }
 
 template <typename T>
+T cube(T a) {
+    return a * a * a;
+}
+
+template <typename T>
 T clamp(T a, T min, T max) {
     if (a > max) return max;
     if (a < min) return min;
@@ -174,7 +179,7 @@ Value Accum(const Iterable& iterable, const Value& init, const Accumulate& accum
 // More numerically stable than naive sum of squares variance.
 template <typename T>
 class Accumulator {
-public:
+   public:
     void operator<<(T a) {
         m_count += 1;
         double delta = a - m_mean;
@@ -192,7 +197,7 @@ public:
     T min() const { return m_min; }
     T max() const { return m_max; }
 
-private:
+   private:
     size_t m_count = 0;
     double m_mean = 0;
     double m_m2 = 0;
