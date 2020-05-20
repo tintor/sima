@@ -27,12 +27,11 @@ bool IsBroadcastable(tensor_shape a, tensor_shape b) {
     return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
 }
 
-struct IBroadcastT : public DiffA {
-    IBroadcastT(PDiff a, tensor_shape b) : DiffA(a) {
+struct BroadcastT : public DiffSimpleA {
+    BroadcastT(PDiff a, tensor_shape b) : DiffSimpleA(a) {
         Check(IsBroadcastable(a->shape(), b), format("%s %s", a->shape(), b));
         Reshape(b);
     }
-    void Setup() override { Fail("forbidden"); }
     void Forward() override {
         const auto N = va.size();
         if (N == 1) {
@@ -53,11 +52,9 @@ struct IBroadcastT : public DiffA {
     }
 };
 
-PDiff IBroadcast(PDiff a, tensor_shape b) {
-    return make_shared<IBroadcastT>(a, b);
-}
+PDiff Broadcast(PDiff a, tensor_shape b) { return make_shared<BroadcastT>(a, b); }
 
-void MaxPool2D::Setup() {
+MaxPool2D::MaxPool2D(PDiff a) : DiffSimpleA(a) {
     Check(a->shape().size() == 2);
     // TODO overflow check
     const uint16_t m = (a->shape()[0] + 1) / 2;
@@ -100,15 +97,6 @@ void MaxPool2D::Backward() {
 #undef ga
 #undef gb
 #undef gc
-
-void Setup(span<PDiff> nodes) {
-    for (PDiff p : nodes) p->Setup();
-}
-
-void InitBatches(span<PDiff> nodes, int batch_size) {
-    for (PDiff p : nodes)
-        if (IsData(p)) p->v.reshape(p->v.shape().set(0, batch_size));
-}
 
 void ResetTicks(span<PDiff> nodes) {
     for (PDiff p : nodes) p->forward_ticks = p->backward_ticks = 0;
@@ -218,10 +206,8 @@ void Print(cspan<PDiff> nodes) {
     PrintTable(table, '|', " ");
 }
 
-Model::Model(PDiff loss, PDiff accuracy, int batch_size)
+Model::Model(PDiff loss, PDiff accuracy)
     : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
-    InitBatches(nodes, batch_size);
-    Setup(nodes);
     // Recompute TopoSort as Setup can add more nodes.
     nodes = TopoSort({loss, accuracy});
     // TODO optimize it here:

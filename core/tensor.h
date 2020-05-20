@@ -31,6 +31,22 @@ struct tensor_shape {
         return s;
     }
 
+    tensor_shape remove_ones() const {
+        tensor_shape s;
+        int w = 0;
+        for (int i = 0; i < dim.size(); i++)
+            if (dim[i] != 1) s.dim[w++] = dim[i];
+        return s;
+    }
+
+    tensor_shape concat(tensor_shape o) const {
+        Check(size() + o.size() <= dim.size());
+        tensor_shape s = *this;
+        auto m = size();
+        for (int i = 0; i < o.size(); i++) s.dim[m++] = o[i];
+        return s;
+    }
+
     tensor_shape pop_front() const {
         tensor_shape s;
         for (int i = 1; i < dim.size(); i++) s.dim[i - 1] = dim[i];
@@ -69,9 +85,16 @@ struct tensor_shape {
         return s;
     }
 
-    tensor_shape push_front(uint16_t a) {
+    tensor_shape push_front(uint16_t a) const {
         Check(dim[3] == 0);
         return tensor_shape(a, dim[0], dim[1], dim[2]);
+    }
+
+    tensor_shape push_back(uint16_t a) const {
+        Check(dim[3] == 0);
+        tensor_shape s = *this;
+        s.dim[s.size()] = a;
+        return s;;
     }
 
     operator string() const {

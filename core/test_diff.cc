@@ -19,8 +19,6 @@ TEST_CASE("diff: minimize circle", "[diff]") {
     loss->name = "loss";
 
     auto nodes = TopoSort({loss});
-    Setup(nodes);
-
     x->v[0] = 3.14f;
     y->v[0] = 2.16f;
     Forward(nodes);
@@ -35,7 +33,6 @@ TEST_CASE("diff: minimize circle", "[diff]") {
 
 void Minimize(PDiff loss, float alpha, size_t iterations) {
     auto nodes = TopoSort({loss});
-    Setup(nodes);
     Iterate(nodes, alpha, iterations);
     Print(nodes);
 }
@@ -79,9 +76,10 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 #endif
 
 TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
-    auto x = Data({0, 1}, "x");
-    auto y = Data({0, 1}, "y");
-    auto ref = Data({0, 1}, "ref");
+    const int Batch = 20;
+    auto x = Data({Batch, 1}, "x");
+    auto y = Data({Batch, 1}, "y");
+    auto ref = Data({Batch, 1}, "ref");
 
     auto init = make_shared<NormalInit>(1, 1);
     auto a = Param({1}, "a", init);
@@ -96,7 +94,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     loss->name = "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
-    Model model(loss, accuracy, 20);
+    Model model(loss, accuracy);
 
     // dataset
     const float A = 0.4, B = 0.6, C = -0.4;
@@ -137,7 +135,7 @@ PDiff Neuron(PDiff x, PDiff y, string_view name, shared_ptr<Init> init) {
     auto a = Param({1}, "a", init);
     auto b = Param({1}, "b", init);
     auto c = Param({1}, "c", init);
-    auto h = Sigmoid(x * a + y * b + c);
+    auto h = Logistic(x * a + y * b + c);
     h->name = name;
     return h;
 }
@@ -147,15 +145,16 @@ PDiff Neuron(PDiff x, PDiff y, PDiff z, string_view name, shared_ptr<Init> init)
     auto b = Param({1}, "b", init);
     auto c = Param({1}, "c", init);
     auto d = Param({1}, "d", init);
-    auto h = Sigmoid(x * a + y * b + z * c + d);
+    auto h = Logistic(x * a + y * b + z * c + d);
     h->name = name;
     return h;
 }
 
 TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
-    auto x = Data({0, 1}, "x");
-    auto y = Data({0, 1}, "y");
-    auto ref = Data({0, 1}, "ref");
+    const int Batch = 20;
+    auto x = Data({Batch, 1}, "x");
+    auto y = Data({Batch, 1}, "y");
+    auto ref = Data({Batch, 1}, "ref");
 
     auto init = make_shared<NormalInit>(1, 0);
     auto h1 = Neuron(x, y, "h1", init);
@@ -167,7 +166,7 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
     loss->name = "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5);
     accuracy->name = "accuracy";
-    Model model(loss, accuracy, 20);
+    Model model(loss, accuracy);
 
     // dataset
     UniformInit gen(-1, 1, 0);
@@ -203,11 +202,59 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
     REQUIRE(metrics.at("accuracy") >= 0.9925);
 }
 
+TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]") {
+    const int Batch = 20;
+    auto in = Data({Batch, 2}, "in");
+    auto ref = Data({Batch, 1}, "ref");
+
+    auto init = make_shared<NormalInit>(1, 0);
+    auto hidden = Logistic(FullyConnected(in, 3, init));
+    auto out = Logistic(FullyConnected(hidden, 1, init));
+
+    auto loss = MeanSquareError(out, ref);
+    loss->name = "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5);
+    accuracy->name = "accuracy";
+    Model model(loss, accuracy);
+
+    // dataset
+    UniformInit gen(-1, 1, 0);
+    const int Classes = 2;
+    const int SamplesPerClass = 20000;
+    const int Samples = Classes * SamplesPerClass;
+    vtensor data_in({Samples, 2}, 0);
+    vtensor data_ref({Samples, 1}, 0);
+    int count[2] = {0, 0};
+    int index = 0;
+    while (index < Samples) {
+        float dx = gen.get();
+        float dy = gen.get();
+        float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
+        int c = round(dr);
+        if (count[c] >= SamplesPerClass) continue;
+        count[c] += 1;
+        data_in(index, 0) = dx;
+        data_in(index, 1) = dy;
+        data_ref[index] = dr;
+        index += 1;
+    }
+    vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+
+    // train!
+    println("train ...");
+    Print(model.nodes);
+    Metrics metrics;
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.1, 0);
+    Print(model.nodes);
+
+    REQUIRE(metrics.at("accuracy") >= 0.9925);
+}
+
 // Classification:
 // learn hyper plane in Nd
-// learn xor (with neurons)
 // learn circle in 2d
 // learn hyper sphere in Nd
+// spiral in 2d
 
 // Regression:
 // - multiply two inputs: x * y
@@ -216,4 +263,15 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
 // - sine in 1d
 // - sine in 2d : sin(sqrt(x^2 + y^2)
 
-TEST_CASE("diff: learn xor", "[diff]") {}
+// Neuro-plasticity:
+// 1) train same model on datasets A and B separately, then take model trained of A and train it on B, should be able to get to similar performance level as when only trained on B
+// 2) train fully on A, then fully on B, then some refresher on A, and make sure that both skills are retained
+
+// Be able to detect if input is 1) in-domain (ie. similar to training data) or 2) out-of-domain (very different from training data)
+
+// Idea: add 2nd order derivatives!
+// Idea: solve motion planning problems! One layer/diff for one time step. All costs add up to loss. Parameters are control inputs!
+// Idea: could take advantage of mini batches to solve multiple problems at once.
+// Idea: would need to be able to compute Lp-distance on GPU
+
+// Idea: let model decide if it wants to propagate gradients to any specific part of the network
