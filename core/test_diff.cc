@@ -264,14 +264,16 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]")
 // - sine in 2d : sin(sqrt(x^2 + y^2)
 
 // Neuro-plasticity:
-// 1) train same model on datasets A and B separately, then take model trained of A and train it on B, should be able to get to similar performance level as when only trained on B
-// 2) train fully on A, then fully on B, then some refresher on A, and make sure that both skills are retained
+// 1) train same model on datasets A and B separately, then take model trained of A and train it on B, should be able to
+// get to similar performance level as when only trained on B 2) train fully on A, then fully on B, then some refresher
+// on A, and make sure that both skills are retained
 
-// Be able to detect if input is 1) in-domain (ie. similar to training data) or 2) out-of-domain (very different from training data)
+// Be able to detect if input is 1) in-domain (ie. similar to training data) or 2) out-of-domain (very different from
+// training data)
 
 // Idea: add 2nd order derivatives!
-// Idea: solve motion planning problems! One layer/diff for one time step. All costs add up to loss. Parameters are control inputs!
-// Idea: could take advantage of mini batches to solve multiple problems at once.
-// Idea: would need to be able to compute Lp-distance on GPU
+// Idea: solve motion planning problems! One layer/diff for one time step. All costs add up to loss. Parameters are
+// control inputs! Idea: could take advantage of mini batches to solve multiple problems at once. Idea: would need to be
+// able to compute Lp-distance on GPU
 
 // Idea: let model decide if it wants to propagate gradients to any specific part of the network
