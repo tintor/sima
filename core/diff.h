@@ -70,18 +70,18 @@ inline vector<PDiff> LoadModel(string_view filename) { return {}; }
 inline void SaveModel(span<PDiff> model, string_view filename) {}
 
 struct DiffSimpleA : public Diff {
-    DiffSimpleA(PDiff a) : a(a) { }
+    DiffSimpleA(PDiff a) : a(a) {}
     array<PDiff, 3> Inputs() override { return {a, nullptr, nullptr}; }
 
     PDiff a;
 };
 
 struct DiffA : public DiffSimpleA {
-    DiffA(PDiff a) : DiffSimpleA(a) { Reshape(a->size()); }
+    DiffA(PDiff a) : DiffSimpleA(a) { Reshape({uint16_t(a->size())}); }
 };
 
 struct DiffSimpleAB : public Diff {
-    DiffSimpleAB(PDiff a, PDiff b) : a(a), b(b) { }
+    DiffSimpleAB(PDiff a, PDiff b) : a(a), b(b) {}
     array<PDiff, 3> Inputs() override { return {a, b, nullptr}; }
 
     PDiff a, b;
@@ -96,7 +96,8 @@ struct DiffAB : public DiffSimpleAB {
             println("%s %s %s %s\n", a->shape(), b->shape(), TypeName(*a), TypeName(*b));
             if (a->size() > b->size()) b = Broadcast(b, a->shape());
             if (a->size() < b->size()) a = Broadcast(a, b->shape());
-            Check((a->size() == 1 && b->size() == 1) || a->shape() == b->shape(), format("%s %s %s", a->shape(), b->shape(), TypeName(*this)));
+            Check((a->size() == 1 && b->size() == 1) || a->shape() == b->shape(),
+                  format("%s %s %s", a->shape(), b->shape(), TypeName(*this)));
         }
         Reshape(a->shape());
     }
@@ -208,9 +209,6 @@ struct SaxT : public DiffA {
     void Backward() override { EACH(ga) ga[i] += g[i] / sqr(1 + abs(va[i])); }
 };
 
-template<typename T>
-T cube(T a) { return a * a * a; }
-
 // 1/sqrt(1+x^2)
 struct SoxT : public DiffA {
     SoxT(PDiff a) : DiffA(a) {}
@@ -314,7 +312,7 @@ inline tensor::type Dot(const tensor a, const tensor b, tensor::type s = 0) {
 }
 
 struct AddVV : public DiffAB {
-    AddVV(PDiff a, PDiff b) : DiffAB(a, b) { }
+    AddVV(PDiff a, PDiff b) : DiffAB(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] + vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -371,9 +369,7 @@ struct Sub : public DiffAB {
     }
 };
 
-inline auto operator-(PDiff a, PDiff b) {
-    return make_shared<Sub>(a, b);
-}
+inline auto operator-(PDiff a, PDiff b) { return make_shared<Sub>(a, b); }
 
 struct MulVS : public DiffSimpleAB {
     MulVS(PDiff a, PDiff b) : DiffSimpleAB(a, b) {
@@ -388,7 +384,7 @@ struct MulVS : public DiffSimpleAB {
 };
 
 struct MulVV : public DiffAB {
-    MulVV(PDiff a, PDiff b) : DiffAB(a, b) { }
+    MulVV(PDiff a, PDiff b) : DiffAB(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] * vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] * vb[i];
@@ -414,9 +410,7 @@ struct Div : public DiffAB {
     }
 };
 
-inline auto operator/(PDiff a, PDiff b) {
-    return make_shared<Div>(a, b);
-}
+inline auto operator/(PDiff a, PDiff b) { return make_shared<Div>(a, b); }
 
 #define RELATION(NAME, OP)                                                   \
     struct NAME : public DiffAB {                                            \
@@ -432,7 +426,7 @@ RELATION(LessOrEqual, <=);
 
 #undef RELATION
 
-#define CONST_OVERLOAD(OP)                                                     \
+#define CONST_OVERLOAD(OP)                                                                            \
     inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape()) OP b; } \
     inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape()); }
 
@@ -485,7 +479,7 @@ struct Concat : public DiffSimpleAB {
         // TODO generalize for more dimensions
         Check(a->shape().size() == 1);
         Check(b->shape().size() == 1);
-        Reshape(tensor_shape(a->size() + b->size()));
+        Reshape({uint16_t(a->size() + b->size())});
     }
 
     void Forward() override {
@@ -578,21 +572,42 @@ struct VecMatMulT : public DiffSimpleAB {
     }
 
     void Forward() override {
-        for (size_t i = 0; i < vb.size(); i += va.size()) {
-            tensor::type s = 0;
-            for (size_t j = 0; j < va.size(); j++) s += va[j] * vb[i + j];
-            v[i] = s;
+        const size_t m = va.shape().pop_back().volume();
+        const size_t q = vb.shape()[0];
+        const size_t p = vb.shape()[1];
+
+        for (auto im : range(m)) {
+            for (auto iq : range(q)) {
+                tensor::type s = 0;
+                for (auto ip : range(p))
+                    s += va[im * p + ip] * vb(iq, ip);
+                v[im * q + iq] = s;
+            }
         }
     }
 
     void Backward() override {
-        EACH (ga) {
-            tensor::type s = 0;
-            for (size_t j = 0; j < vb.size(); j += va.size()) s += g[j] * vb[j + i];
-            ga[i] += s;
+        const size_t m = va.shape().pop_back().volume();
+        const size_t q = vb.shape()[0];
+        const size_t p = vb.shape()[1];
+
+        if (ga) {
+            for (auto im : range(m))
+                for (auto ip : range(p)) {
+                    tensor::type s = ga[im * p + ip];
+                    for (auto iq : range(q))
+                        s += g[im * q + iq] * vb(iq, ip);
+                    ga[im * p + ip] = s;
+                }
         }
         if (gb) {
-            //  TODO
+            for (auto iq : range(q))
+                for (auto ip : range(p)) {
+                    tensor::type s = gb(iq, ip);
+                    for (auto im : range(m))
+                        s += g[im * q + iq] * va[im * p + ip];
+                    gb(iq, ip) = s;
+                }
         }
     }
 };
@@ -674,7 +689,7 @@ inline PDiff BatchNorm(PDiff a, double delta) {
 }
 
 inline PDiff FullyConnected(PDiff a, uint16_t size, shared_ptr<Init> w_init = make_shared<Init>()) {
-    auto w = Param(tensor_shape(size, a->shape().back()), "w", w_init);
+    auto w = Param({size, a->shape().back()}, "w", w_init);
     auto b = Param({size}, "b");
     return VecMatMul(a, w) + b;
 }

@@ -206,8 +206,7 @@ void Print(cspan<PDiff> nodes) {
     PrintTable(table, '|', " ");
 }
 
-Model::Model(PDiff loss, PDiff accuracy)
-    : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
+Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
     // Recompute TopoSort as Setup can add more nodes.
     nodes = TopoSort({loss, accuracy});
     // TODO optimize it here:
@@ -256,11 +255,10 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
     ulong f_ticks = 0, b_ticks = 0, gd_ticks = 0;
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
-            for (size_t j = 0; j < B; j++)
-                key->v.slice(j).copy_from(value.slice(samples[i + j]));
+            for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(samples[i + j]));
         }
 
-        f_ticks += Duration([&](){ Forward(); });
+        f_ticks += Duration([&]() { Forward(); });
 
         a_loss << loss->v[0];
         a_accuracy << accuracy->v[0];
@@ -268,8 +266,8 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
         if (alpha != 0) {
             ResetGradients();
             loss->g[0] = 1;
-            b_ticks += Duration([&](){ Backward(); });
-            gd_ticks += Duration([&](){ GradientDescent(alpha); });
+            b_ticks += Duration([&]() { Backward(); });
+            gd_ticks += Duration([&]() { GradientDescent(alpha); });
         }
 
         for (char& c : msg) c = '\r';
@@ -281,9 +279,9 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
         a_gd_ticks << gd_ticks;
 
         format_s(msg, "%s/%s", i + B, N);
-        //format_s(msg, " loss:%.4f", a_loss.mean());
-        //format_s(msg, " acc:%.4f", a_accuracy.mean());
-        //msg += "   ";
+        // format_s(msg, " loss:%.4f", a_loss.mean());
+        // format_s(msg, " acc:%.4f", a_accuracy.mean());
+        // msg += "   ";
         cout << msg;
         cout.flush();
 
@@ -298,6 +296,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
     print("%s/%s", N, N);
     print(" loss:%.4f", a_loss.mean());
     print(" acc:%.4f", a_accuracy.mean());
-    println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()), ulong(a_gd_ticks.mean()));
+    println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
+            ulong(a_gd_ticks.mean()));
     return {{"loss", a_loss.mean()}, {"accuracy", a_accuracy.mean()}};
 }
