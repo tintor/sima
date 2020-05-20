@@ -108,14 +108,16 @@ inline void Check(bool value, string_view message = "", const char* file = __bui
     exit(0);
 }
 
+inline void Noop(bool value, string_view message = "") {}
+
 #if 0
-#define DCheck(A, B) Check(A, B)
+#define DCheck Check
 #else
-#define DCheck(A, B)
+#define DCheck Noop
 #endif
 
-inline void Fail(string_view message = "", const char* file = __builtin_FILE(),
-                  unsigned line = __builtin_LINE(), const char* function = __builtin_FUNCTION()) {
+inline void Fail(string_view message = "", const char* file = __builtin_FILE(), unsigned line = __builtin_LINE(),
+                 const char* function = __builtin_FUNCTION()) {
     cout << "Failed in " << function << " at " << file << ':' << line << " with message: " << message << endl;
     string s;
     Callstack().write(s, {});
