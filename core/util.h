@@ -205,6 +205,32 @@ class Accumulator {
     T m_max = -std::numeric_limits<T>::infinity();
 };
 
+template <typename T>
+struct Aggregates {
+    Aggregates(const T* begin, const T* end) {
+        double sum = 0;
+        T rmin = std::numeric_limits<T>::infinity();
+        T rmax = -std::numeric_limits<T>::infinity();
+        for (auto p = begin; p != end; p++) {
+            sum += *p;
+            if (*p < rmin) rmin = *p;
+            if (*p > rmax) rmax = *p;
+        }
+        mean = sum / (end - begin);
+        min = rmin;
+        max = rmax;
+
+        double m2 = 0;
+        for (auto p = begin; p != end; p++) m2 += sqr(*p - mean);
+        variance = m2 / (end - begin);
+    }
+
+    double mean;
+    double variance;
+    T min;
+    T max;
+};
+
 template <typename Iterable, typename UnaryPredicate>
 size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
     size_t count = 0;
