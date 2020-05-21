@@ -27,8 +27,8 @@ bool IsBroadcastable(tensor_shape a, tensor_shape b) {
     return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
 }
 
-struct BroadcastT : public DiffSimpleA {
-    BroadcastT(PDiff a, tensor_shape b) : DiffSimpleA(a) {
+struct BroadcastT : public Diff1 {
+    BroadcastT(PDiff a, tensor_shape b) : Diff1(a) {
         Check(IsBroadcastable(a->shape(), b), format("%s %s", a->shape(), b));
         Reshape(b);
     }
@@ -54,7 +54,7 @@ struct BroadcastT : public DiffSimpleA {
 
 PDiff Broadcast(PDiff a, tensor_shape b) { return make_shared<BroadcastT>(a, b); }
 
-MaxPool2D::MaxPool2D(PDiff a) : DiffSimpleA(a) {
+MaxPool2D::MaxPool2D(PDiff a) : Diff1(a) {
     Check(a->shape().size() == 2);
     // TODO overflow check
     const uint16_t m = (a->shape()[0] + 1) / 2;
@@ -130,11 +130,12 @@ void GradientDescent(span<PDiff> nodes, const float alpha) {
         if (IsParam(p)) EACH(p->v) p->v[i] -= alpha * p->g[i];
 }
 
-void CheckBounded(cspan<PDiff> nodes, const tensor::type limit) {
+bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
     for (PDiff p : nodes) {
-        EACH(p->v) Check(std::isfinite(p->v[i]) && abs(p->v[i]) <= limit, "value not bounded");
-        EACH(p->g) Check(std::isfinite(p->g[i]) && abs(p->g[i]) <= limit, "gradient not bounded");
+        for (auto e : p->v) if (!std::isfinite(e) || abs(e) > limit) return false;
+        for (auto e : p->g) if (!std::isfinite(e) || abs(e) > limit) return false;
     }
+    return true;
 }
 
 auto ComputeIds(cspan<PDiff> nodes) {
@@ -158,9 +159,8 @@ auto ComputeIds(cspan<PDiff> nodes) {
 }
 
 string Summary(const tensor v) {
-    Accumulator<tensor::type> acc;
-    for (auto i : range(v.size())) acc << v[i];
-    return format("(%s %s %s) %s", acc.min(), acc.mean(), acc.max(), acc.stdev());
+    Aggregates<tensor::type> a(v.data(), v.data() + v.size());
+    return format("(%s %s %s) %s", a.min, a.mean, a.max, sqrt(a.variance));
 }
 
 void Print(cspan<PDiff> nodes) {
@@ -235,7 +235,7 @@ ulong Duration(const Func& func) {
     return begin.elapsed(end);
 }
 
-Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const size_t seed) {
+Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random) {
     Check(data.size() > 0);
     const auto B = data[0].first->shape()[0];
     const auto N = data[0].second.shape()[0];
@@ -247,12 +247,12 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
         Check(value.shape().pop_front() == key->shape().pop_front(), format("%s %s", value.shape(), key->shape()));
     }
 
-    std::mt19937_64 random(seed);
     auto samples = ShuffledInts(N, random);
 
     string msg;
     Accumulator<float> a_loss, a_accuracy, a_f_ticks, a_b_ticks, a_gd_ticks;
     ulong f_ticks = 0, b_ticks = 0, gd_ticks = 0;
+    ulong message_ticks = 0;
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
             for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(samples[i + j]));
@@ -270,23 +270,25 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, const s
             gd_ticks += Duration([&]() { GradientDescent(alpha); });
         }
 
-        for (char& c : msg) c = '\r';
-        cout << msg;
-        msg.clear();
-
         a_f_ticks << f_ticks;
         a_b_ticks << b_ticks;
         a_gd_ticks << gd_ticks;
 
-        format_s(msg, "%s/%s", i + B, N);
-        // format_s(msg, " loss:%.4f", a_loss.mean());
-        // format_s(msg, " acc:%.4f", a_accuracy.mean());
-        // msg += "   ";
-        cout << msg;
-        cout.flush();
+        ulong ticks = f_ticks + b_ticks + gd_ticks;
+        if (ticks - message_ticks > long(1e10)) {
+            message_ticks = ticks;
 
-        //::Print(nodes);
-        // CheckBounded(nodes, 1e6);
+            for (char& c : msg) c = '\r';
+            cout << msg;
+            msg.clear();
+
+            format_s(msg, "%s/%s", i + B, N);
+            format_s(msg, " loss:%.4f", a_loss.mean());
+            format_s(msg, " acc:%.4f", a_accuracy.mean());
+            msg += "   ";
+            cout << msg;
+            cout.flush();
+        }
     }
 
     for (char& c : msg) c = '\r';
