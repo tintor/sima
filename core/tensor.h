@@ -172,29 +172,29 @@ class Tensor {
     const T& operator()(size_t a, size_t b, size_t c, size_t d) const { return m_data[offset(a, b, c, d)]; }
 
     size_t offset(size_t a) const {
-        DCheck(m_shape.size() == 1);
-        DCheck(a < m_shape[0]);
+        DCheck(m_shape.size() == 1, "");
+        DCheck(a < m_shape[0], "");
         return a;
     }
     size_t offset(size_t a, size_t b) const {
-        DCheck(m_shape.size() == 2);
-        DCheck(a < m_shape[0]);
-        DCheck(b < m_shape[1]);
+        DCheck(m_shape.size() == 2, "");
+        DCheck(a < m_shape[0], "");
+        DCheck(b < m_shape[1], "");
         return a * m_shape[1] + b;
     }
     size_t offset(size_t a, size_t b, size_t c) const {
-        DCheck(m_shape.size() == 3);
-        DCheck(a < m_shape[0]);
-        DCheck(b < m_shape[1]);
-        DCheck(c < m_shape[2]);
+        DCheck(m_shape.size() == 3, "");
+        DCheck(a < m_shape[0], "");
+        DCheck(b < m_shape[1], "");
+        DCheck(c < m_shape[2], "");
         return (a * m_shape[1] + b) * m_shape[2] + c;
     }
     size_t offset(size_t a, size_t b, size_t c, size_t d) const {
-        DCheck(m_shape.size() == 4);
-        DCheck(a < m_shape[0]);
-        DCheck(b < m_shape[1]);
-        DCheck(c < m_shape[2]);
-        DCheck(d < m_shape[3]);
+        DCheck(m_shape.size() == 4, "");
+        DCheck(a < m_shape[0], "");
+        DCheck(b < m_shape[1], "");
+        DCheck(c < m_shape[2], "");
+        DCheck(d < m_shape[3], "");
         return ((a * m_shape[1] + b) * m_shape[2] + c) * m_shape[3] + d;
     }
 
@@ -202,15 +202,15 @@ class Tensor {
 
     // sub-tensor for the fixed value of the first dimension
     Tensor slice(size_t a) {
-        DCheck(m_shape.size() > 0);
-        DCheck(a < m_shape[0]);
+        DCheck(m_shape.size() > 0, "");
+        DCheck(a < m_shape[0], "");
         auto v = m_shape.pop_front().volume();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
     const Tensor slice(size_t a) const {
-        DCheck(m_shape.size() > 0);
-        DCheck(a < m_shape[0]);
+        DCheck(m_shape.size() > 0, "");
+        DCheck(a < m_shape[0], "");
         auto v = m_shape.pop_front().volume();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
