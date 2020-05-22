@@ -44,8 +44,8 @@ TEST_CASE("diff: minimize booth", "[diff]") {
     auto y = Param({1}, "y", init);
     Minimize(Sqr(x + 2 * y - 7) + Sqr(2 * x + y - 5), 0.01, 1000);
 
-    REQUIRE(abs(x->v[0] - 1) < 1e-5);
-    REQUIRE(abs(y->v[0] - 3) < 1e-5);
+    REQUIRE(abs(x->v[0] - 1) <= 2e-5);
+    REQUIRE(abs(y->v[0] - 3) <= 2e-5);
 }
 
 TEST_CASE("diff: minimize rastrigin", "[diff]") {
@@ -128,7 +128,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(800)) metrics = model.Epoch(dataset, 0.1, random);
+    for (auto i : range(800)) metrics = model.Epoch(dataset, 0.1, random, false);
     Print(model.nodes);
 
     REQUIRE(metrics.at("accuracy") >= 0.9965);
@@ -200,10 +200,10 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.1, random);
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.1, random, i % 25 == 24);
     Print(model.nodes);
 
-    REQUIRE(metrics.at("accuracy") >= 0.9925);
+    REQUIRE(metrics.at("accuracy") >= 0.9919);
 }
 
 TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]") {
@@ -250,12 +250,12 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]")
     Print(model.nodes);
     Metrics metrics;
     for (auto i : range(1000)) {
-        metrics = model.Epoch(dataset, 0.03, random);
+        metrics = model.Epoch(dataset, 0.03, random, i % 25 == 24);
         if (!Bounded(model.nodes, 1e6)) break;
     }
     Print(model.nodes);
 
-    REQUIRE(metrics.at("accuracy") >= 0.9925);
+    REQUIRE(metrics.at("accuracy") >= 0.9919);
 }
 
 // Classification:

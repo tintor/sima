@@ -235,7 +235,7 @@ ulong Duration(const Func& func) {
     return begin.elapsed(end);
 }
 
-Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random) {
+Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose) {
     Check(data.size() > 0);
     const auto B = data[0].first->shape()[0];
     const auto N = data[0].second.shape()[0];
@@ -275,7 +275,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         a_gd_ticks << gd_ticks;
 
         ulong ticks = f_ticks + b_ticks + gd_ticks;
-        if (ticks - message_ticks > long(1e10)) {
+        if (ticks - message_ticks > long(1e10) && verbose) {
             message_ticks = ticks;
 
             for (char& c : msg) c = '\r';
@@ -291,14 +291,16 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         }
     }
 
-    for (char& c : msg) c = '\r';
-    cout << msg;
-    msg.clear();
+    if (verbose) {
+        for (char& c : msg) c = '\r';
+        cout << msg;
+        msg.clear();
 
-    print("%s/%s", N, N);
-    print(" loss:%.4f", a_loss.mean());
-    print(" acc:%.4f", a_accuracy.mean());
-    println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
-            ulong(a_gd_ticks.mean()));
+        print("%s/%s", N, N);
+        print(" loss:%.4f", a_loss.mean());
+        print(" acc:%.4f", a_accuracy.mean());
+        println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
+                ulong(a_gd_ticks.mean()));
+    }
     return {{"loss", a_loss.mean()}, {"accuracy", a_accuracy.mean()}};
 }

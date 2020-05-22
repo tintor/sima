@@ -12,13 +12,6 @@
 // - Backward() - g tensors accumulated
 // - GradientDescent() - v tensors adjusted using g tensors
 
-// TODO Data augmentation operators:
-// - non-gradient batch norm
-// - non-gradient 2d mirror
-// - non-gradient 2d small random translate
-// - non-gradient 2d small random rotate
-// - non-gradient 2d small random scale
-
 struct Diff;
 
 using PDiff = std::shared_ptr<Diff>;
@@ -173,6 +166,18 @@ inline PDiff Data(tensor_shape shape, string_view name = "") {
     return p;
 }
 
+struct GaussianT : public Diff {
+    GaussianT(tensor_shape shape, tensor::type mean, tensor::type stdev, size_t seed)
+        : normal(mean, stdev), random(seed) { v.reshape(shape); }
+    void Forward() override { EACH(v) v[i] = normal(random); }
+    std::normal_distribution<tensor::type> normal;
+    std::mt19937_64 random;
+};
+
+inline PDiff Gaussian(tensor_shape shape, tensor::type mean, tensor::type stdev, size_t seed) {
+    return make_shared<GaussianT>(shape, mean, stdev, seed);
+}
+
 struct ReluT : public DiffA {
     ReluT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : 0; }
@@ -180,12 +185,45 @@ struct ReluT : public DiffA {
 };
 Declare1(Relu);
 
+PDiff operator+(PDiff a, PDiff b);
+inline PDiff NoisyRelu(PDiff a, size_t seed) {
+    return Relu(a + Gaussian(a->shape(), 0, 1, seed));
+}
+
+// SmoothRelu
+struct SoftplusT : public DiffA {
+    SoftplusT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = log(1 + exp(va[i])); }
+    void Backward() override { EACH(ga) ga[i] += g[i] / (1 + exp(-va[i])); }
+};
+Declare1(Softplus);
+
 struct LeakyReluT : public DiffA {
     LeakyReluT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] / 10); }
-    void Backward() override { EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] / 10); }
+    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] / 100); }
+    void Backward() override { EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] / 100); }
 };
 Declare1(LeakyRelu);
+
+struct ParametricReluT : public Diff_vv {
+    ParametricReluT(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] * vb[i]); }
+    void Backward() override {
+        EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] * vb[i]);
+        EACH(gb) gb[i] += (va[i] > 0) ? 0 : (g[i] * va[i]);
+    }
+};
+Declare2(ParametricRelu, ParametricReluT);
+
+struct ELUT : public DiffA {
+    ELUT(PDiff a, double k) : DiffA(a), k(k) {}
+    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (k * (exp(va[i] - 1))); }
+    void Backward() override { Check(false, "not implemented"); }
+    double k;
+};
+inline PDiff ELU(PDiff a, double k) {
+    return make_shared<ELUT>(a, k);
+}
 
 struct LogisticT : public DiffA {
     LogisticT(PDiff a) : DiffA(a) {}
@@ -773,5 +811,5 @@ struct Model {
     void GradientDescent(tensor::type alpha) { ::GradientDescent(nodes, alpha); }
     void Print() const { ::Print(nodes); }
 
-    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random);
+    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true);
 };
