@@ -15,6 +15,7 @@ add_executable(core_test
 	test_dynamic_array.cc
 	test_format.cc
 	test_map.cc
+    test_property.cc
 	test_range.cc
 	test_span.cc
 	test_sparse_matrix.cc
