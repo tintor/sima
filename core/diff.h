@@ -38,8 +38,19 @@ struct Diff {
     }
 
     auto str() const { return format("%s %s", TypeName(*this), string(v.shape())); }
-    auto shape() const { return v.shape(); }
-    auto shape(int i) const { return v.shape()[i]; }
+
+    TProperty(Shape, Diff) {
+        operator auto() const { return parent->v.shape(); }
+        auto operator->() const { return &parent->v.shape(); }
+        auto operator()(int i) const { return parent->v.shape()[i]; }
+        bool operator==(const Shape& o) const { return parent->v.shape() == o; }
+        bool operator==(const tensor_shape& o) const { return parent->v.shape() == o; }
+        operator string() const { return string(parent->v.shape()); }
+    } shape;
+
+    Property(Diff) {
+        operator auto() const { return parent->v.shape().size(); }
+    } rank;
 
     Property(Diff) {
         operator auto() const { return parent->v.size(); }
@@ -91,27 +102,27 @@ struct Diff3 : public Diff {
 };
 
 struct DiffA : public Diff1 {
-    DiffA(PDiff a) : Diff1(a) { Reshape(a->shape()); }
+    DiffA(PDiff a) : Diff1(a) { Reshape(a->shape); }
 };
 
 struct Diff_vv : public Diff2 {
     Diff_vv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape() == b->shape());
-        Reshape(a->shape());
+        Check(a->shape == b->shape);
+        Reshape(a->shape);
     }
 };
 
 struct Diff_sv : public Diff2 {
     Diff_sv(PDiff a, PDiff b) : Diff2(a, b) {
         Check(a->size == 1);
-        Reshape(b->shape());
+        Reshape(b->shape);
     }
 };
 
 struct Diff_vs : public Diff2 {
     Diff_vs(PDiff a, PDiff b) : Diff2(a, b) {
         Check(b->size == 1);
-        Reshape(a->shape());
+        Reshape(a->shape);
     }
 };
 
@@ -190,7 +201,7 @@ Declare1(Relu);
 
 PDiff operator+(PDiff a, PDiff b);
 inline PDiff NoisyRelu(PDiff a, size_t seed) {
-    return Relu(a + Gaussian(a->shape(), 0, 1, seed));
+    return Relu(a + Gaussian(a->shape, 0, 1, seed));
 }
 
 // SmoothRelu
@@ -378,8 +389,8 @@ struct Add_vs : public Diff_vs {
 
 struct Add_mv : public Diff2 {
     Add_mv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape().pop_front() == b->shape());
-        Reshape(a->shape());
+        Check(a->shape->pop_front() == b->shape);
+        Reshape(a->shape);
     }
     void Forward() override {
         for (auto i : range<size_t>(0, va.size(), vb.size())) {
@@ -396,7 +407,7 @@ struct Add_mv : public Diff2 {
 inline PDiff operator+(PDiff a, PDiff b) {
     if (a->size == 1) return make_shared<Add_vs>(b, a);
     if (b->size == 1) return make_shared<Add_vs>(a, b);
-    if (a->shape() == b->shape()) return make_shared<Add_vv>(a, b);
+    if (a->shape == b->shape) return make_shared<Add_vv>(a, b);
     if (a->size > b->size) return make_shared<Add_mv>(a, b);
     return make_shared<Add_mv>(b, a);
 }
@@ -450,7 +461,7 @@ inline auto operator-(PDiff a) { return make_shared<Neg>(a); }
 struct Mul_vs : public Diff_vs {
     Mul_vs(PDiff a, PDiff b) : Diff_vs(a, b) {
         Check(b->size == 1);
-        Reshape(a->shape());
+        Reshape(a->shape);
     }
     void Forward() override { EACH(v) v[i] = va[i] * vb[0]; }
     void Backward() override {
@@ -522,8 +533,8 @@ inline auto operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Con
 inline auto operator/(PDiff a, tensor::type b) { return a / Const(b); }
 
 #define CONST_OVERLOAD(OP)                                                                            \
-    inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape()) OP b; } \
-    inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape()); }
+    inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape) OP b; } \
+    inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape); }
 
 #define RELATION(NAME, OP)                                                   \
     struct NAME : public Diff_vv {                                           \
@@ -555,8 +566,8 @@ struct MinT : public Diff_vv {
     }
 };
 Declare2(Min, MinT);
-inline auto Min(tensor::type a, PDiff b) { return Min(Broadcast(Const(a), b->shape()), b); }
-inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->shape())); }
+inline auto Min(tensor::type a, PDiff b) { return Min(Broadcast(Const(a), b->shape), b); }
+inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->shape)); }
 
 struct MaxT : public Diff_vv {
     MaxT(PDiff a, PDiff b) : Diff_vv(a, b) { }
@@ -573,14 +584,14 @@ struct MaxT : public Diff_vv {
     }
 };
 Declare2(Max, MaxT);
-inline auto Max(tensor::type a, PDiff b) { return Max(Broadcast(Const(a), b->shape()), b); }
-inline auto Max(PDiff a, tensor::type b) { return Max(a, Broadcast(Const(b), a->shape())); }
+inline auto Max(tensor::type a, PDiff b) { return Max(Broadcast(Const(a), b->shape), b); }
+inline auto Max(PDiff a, tensor::type b) { return Max(a, Broadcast(Const(b), a->shape)); }
 
 struct Concat : public Diff2 {
     Concat(PDiff a, PDiff b) : Diff2(a, b) {
         // TODO generalize for more dimensions
-        Check(a->shape().size() == 1);
-        Check(b->shape().size() == 1);
+        Check(a->rank == 1);
+        Check(b->rank == 1);
         Reshape({uint(a->size + b->size)});
     }
 
@@ -599,9 +610,9 @@ struct Concat : public Diff2 {
 
 struct Conv1D : public Diff2 {
     Conv1D(PDiff a, PDiff b, int offset) : Diff2(a, b), offset(offset) {
-        Check(a->shape().size() == 1);
-        Check(b->shape().size() == 1);
-        Reshape(a->shape());
+        Check(a->rank == 1);
+        Check(b->rank == 1);
+        Reshape(a->shape);
     }
 
     void Forward() override {
@@ -626,21 +637,21 @@ struct Deconv1D : public Diff2 {
 
 struct MaxPool1D : public Diff1 {
     MaxPool1D(PDiff a) : Diff1(a) {
-        Check(a->shape().size() == 1);
-        const uint m = (a->shape()[0] + 1) / 2;
+        Check(a->rank == 1);
+        const uint m = (a->shape(0) + 1) / 2;
         Reshape({m});
     }
 
     void Forward() override {
-        const size_t m = a->shape()[0] / 2;
+        const size_t m = a->shape(0) / 2;
         for (size_t i = 0; i < m; i++) v[i] = max(va[i * 2], va[i * 2 + 1]);
-        if (a->shape()[0] % 2 == 1) v[m] = va[m * 2];
+        if (a->shape(0) % 2 == 1) v[m] = va[m * 2];
     }
 
     void Backward() override {
         if (!ga) return;
         Check(false);
-        const size_t m = shape()[0];
+        const size_t m = shape(0);
         for (size_t i = 0; i < m; i++) g[i] = max(va[i * 2], va[i * 2 + 1]);
     }
 };
@@ -666,7 +677,7 @@ struct Reshape : public Diff1 {
 // v{m,p} x m{q,p} -> {m,q}
 struct VecMatMulT : public Diff2 {
     VecMatMulT(PDiff a, PDiff b) : Diff2(a, b) {
-        auto as = a->shape(), bs = b->shape();
+        tensor_shape as = a->shape, bs = b->shape;
         Check(as.size() > 0);
         Check(bs.size() == 2);
         Check(as.back() == bs.back());
@@ -770,7 +781,7 @@ struct SumSquareDiff : public DiffAB {
 #endif
 
 struct AveragerT : public Diff1 {
-    AveragerT(PDiff a, float k): Diff1(a) { v.reshape(a->shape()); }
+    AveragerT(PDiff a, float k): Diff1(a) { v.reshape(a->shape); }
     void Forward() override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
     tensor::type k;
 };
@@ -851,7 +862,7 @@ inline PDiff BatchNorm(PDiff a, float k) {
 }
 
 inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
-    auto w = Param({size, a->shape().back()}, w_init) << "fc_w";
+    auto w = Param({size, a->shape->back()}, w_init) << "fc_w";
     auto b = Param({size}) << "fc_b";
     return VecMatMul(a, w) + b << "fc";
 }
@@ -861,11 +872,9 @@ inline bool IsDiff(PDiff a) {
     return typeid(e) == typeid(Diff);
 }
 
-inline bool IsData(PDiff a) { return IsDiff(a) && !a->g && a->shape().size() > 1 && a->shape()[0] == 0; }
+inline bool IsParam(PDiff a) { return IsDiff(a) && a->g; }
 
-inline bool IsParam(PDiff a) { return IsDiff(a) && a->g && a->shape().size() > 0 && a->shape()[0] != 0; }
-
-inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g && a->shape().size() > 0 && a->shape()[0] != 0; }
+inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g; }
 
 void InitBatches(span<PDiff> nodes, int batch_size);
 void ResetTicks(span<PDiff> nodes);

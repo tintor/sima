@@ -149,6 +149,7 @@ class Tensor {
 
     size_t size() const { return m_shape.volume(); }
     const auto& shape() const { return m_shape; }
+    auto rank() const { return m_shape.size(); }
 
     T& operator[](size_t index) {
         DCheck(index < size(), format("%s < %s", index, size()));

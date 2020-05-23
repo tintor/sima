@@ -41,13 +41,13 @@ struct BroadcastT : public Diff1 {
 
 PDiff Broadcast(PDiff a, tensor_shape b) {
     if (a->size == 1) return make_shared<BroadcastS>(a, b);
-    if (a->shape() == b.last(a->shape().size())) return make_shared<BroadcastT>(a, b);
+    if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
     Check(false);
     return nullptr;
 }
 
 MaxPool2D::MaxPool2D(PDiff a) : Diff1(a) {
-    Check(a->shape().size() == 2);
+    Check(a->rank == 2);
     const uint m = (a->shape(0) + 1) / 2;
     const uint n = (a->shape(1) + 1) / 2;
     Reshape({m, n});
@@ -169,7 +169,6 @@ void Print(cspan<PDiff> nodes) {
             string type = TypeName(*p.get());
             if (IsParam(p)) type = "Param";
             if (IsConst(p)) type = "Const";
-            if (IsData(p)) type = "Data";
             if (type.back() == 'T') type.pop_back();
             format_s(os, "%s|", type);
 
@@ -179,7 +178,7 @@ void Print(cspan<PDiff> nodes) {
             os += '|';
 
             // shape
-            format_s(os, "%s|", string(p->shape()));
+            format_s(os, "%s|", string(p->shape));
 
             // fticks
             format_s(os, "%s|", (p->forward_ticks + 500) / 1000);
@@ -228,14 +227,14 @@ ulong Duration(const Func& func) {
 
 Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose) {
     Check(data.size() > 0);
-    const auto B = data[0].first->shape()[0];
+    const auto B = data[0].first->shape(0);
     const auto N = data[0].second.shape()[0];
     Check(N % B == 0, format("N %% B must be 0. N:%s B:%s", N, B));
 
     for (const auto& [key, value] : data) {
-        Check(key->shape()[0] == B);
+        Check(key->shape(0) == B);
         Check(value.shape()[0] == N);
-        Check(value.shape().pop_front() == key->shape().pop_front(), format("%s %s", value.shape(), key->shape()));
+        Check(value.shape().pop_front() == key->shape->pop_front());
     }
 
     auto samples = ShuffledInts(N, random);

@@ -12,4 +12,5 @@ protected:
     } parent;
 };
 
+#define TProperty(N, M) [[no_unique_address]] struct N : public PropertyT<M, __LINE__>
 #define Property(M) [[no_unique_address]] struct : public PropertyT<M, __LINE__>
