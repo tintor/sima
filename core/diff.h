@@ -17,12 +17,6 @@ struct Diff;
 
 using PDiff = std::shared_ptr<Diff>;
 
-#define vb (b->v)
-#define vc (c->v)
-
-#define gb (b->g)
-#define gc (c->g)
-
 struct Diff;
 
 struct Diff {
@@ -35,7 +29,7 @@ struct Diff {
         g.reshape(s);
     }
 
-    auto str() const { return format("%s %s", TypeName(*this), string(v.shape())); }
+    operator string() const { return format("%s %s", TypeName(*this), string(v.shape())); }
 
     TProperty(Shape, Diff) {
         operator auto() const { return parent->v.shape(); }
@@ -81,46 +75,44 @@ inline vector<PDiff> LoadModel(string_view filename) { return {}; }
 
 inline void SaveModel(span<PDiff> model, string_view filename) {}
 
+#define TensorProperty(TENSOR, PARENT) \
+    Property(PARENT) { \
+        tensor::type operator[](size_t i) const { return parent->TENSOR[i]; } \
+        tensor::type& operator[](size_t i) { return parent->TENSOR[i]; } \
+        tensor::type operator()(size_t i, size_t j) const { return parent->TENSOR(i, j); } \
+        tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); } \
+        auto size() const { return parent->TENSOR.size(); } \
+        const auto& shape() const { return parent->TENSOR.shape(); } \
+        operator bool() const { return parent->TENSOR; } \
+        operator tensor(){ return parent->TENSOR; } \
+        operator vtensor&() { return parent->TENSOR; } \
+    }
+
 struct Diff1 : public Diff {
     Diff1(PDiff a) : a(a) {}
     vector<PDiff> Inputs() override { return {a}; }
     PDiff a;
 
-    Property(Diff1) {
-        tensor::type operator[](size_t i) const { return parent->a->v[i]; }
-        tensor::type& operator[](size_t i) { return parent->a->v[i]; }
-        tensor::type operator()(size_t i, size_t j) const { return parent->a->v(i, j); }
-        tensor::type& operator()(size_t i, size_t j) { return parent->a->v(i, j); }
-        auto size() const { return parent->a->v.size(); }
-        const auto& shape() const { return parent->a->v.shape(); }
-        operator bool() const { return parent->a->v; }
-        operator tensor(){ return parent->a->v; }
-        operator vtensor&() { return parent->a->v; }
-    } va;
-
-    Property(Diff1) {
-        tensor::type operator[](size_t i) const { return parent->a->g[i]; }
-        tensor::type& operator[](size_t i) { return parent->a->g[i]; }
-        tensor::type operator()(size_t i, size_t j) const { return parent->a->g(i, j); }
-        tensor::type& operator()(size_t i, size_t j) { return parent->a->g(i, j); }
-        auto size() const { return parent->a->g.size(); }
-        const auto& shape() const { return parent->a->g.shape(); }
-        operator bool() const { return parent->a->g; }
-        operator tensor(){ return parent->a->g; }
-        operator vtensor&(){ return parent->a->g; }
-    } ga;
+    TensorProperty(a->v, Diff1) va;
+    TensorProperty(a->g, Diff1) ga;
 };
 
 struct Diff2 : public Diff1 {
     Diff2(PDiff a, PDiff b) : Diff1(a), b(b) {}
     vector<PDiff> Inputs() override { return {a, b}; }
     PDiff b;
+
+    TensorProperty(b->v, Diff2) vb;
+    TensorProperty(b->g, Diff2) gb;
 };
 
-struct Diff3 : public Diff1 {
-    Diff3(PDiff a, PDiff b, PDiff c) : Diff1(a), b(b), c(c) {}
+struct Diff3 : public Diff2 {
+    Diff3(PDiff a, PDiff b, PDiff c) : Diff2(a, b), c(c) {}
     vector<PDiff> Inputs() override { return {a, b, c}; }
-    PDiff b, c;
+    PDiff c;
+
+    TensorProperty(b->v, Diff2) vc;
+    TensorProperty(b->g, Diff2) gc;
 };
 
 struct DiffA : public Diff1 {
@@ -821,12 +813,6 @@ struct BatchMeanT : public Diff1 {
 };
 
 Declare1(BatchMean);
-
-#undef vb
-#undef vc
-
-#undef gb
-#undef gc
 
 inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 

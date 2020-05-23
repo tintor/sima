@@ -15,12 +15,6 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
     return out;
 }
 
-#define vb (b->v)
-#define vc (c->v)
-
-#define gb (b->g)
-#define gc (c->g)
-
 bool IsBroadcastable(tensor_shape a, tensor_shape b) {
     return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
 }
@@ -78,12 +72,6 @@ void MaxPool2D::Backward() {
         }
     }
 }
-
-#undef vb
-#undef vc
-
-#undef gb
-#undef gc
 
 void ResetTicks(span<PDiff> nodes) {
     for (PDiff p : nodes) p->forward_ticks = p->backward_ticks = 0;
