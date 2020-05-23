@@ -7,8 +7,8 @@ TEST_CASE("tensor_shape", "[tensor]") {
     REQUIRE(tensor_shape{}.size == 0);
     REQUIRE(tensor_shape{3}.size == 1);
 
-    REQUIRE(tensor_shape{1}.volume() == 1);
-    REQUIRE(tensor_shape{2, 3, 4, 5}.volume() == 2 * 3 * 4 * 5);
+    REQUIRE(tensor_shape{1}.volume == 1);
+    REQUIRE(tensor_shape{2, 3, 4, 5}.volume == 2 * 3 * 4 * 5);
 
     REQUIRE(tensor_shape{2} == tensor_shape{2});
     REQUIRE(tensor_shape{2, 2} == tensor_shape{2, 2});
@@ -56,7 +56,7 @@ TEST_CASE("tensor", "[tensor]") {
 
     REQUIRE(tensor(m.data(), {2}));
     REQUIRE(!tensor());
-    // REQUIRE(!tensor(nullptr, {}));
+    REQUIRE(!tensor(nullptr, {}));
 
     REQUIRE(tensor().size() == 0);
     REQUIRE(tensor() == tensor());

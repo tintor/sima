@@ -34,7 +34,9 @@ struct tensor_shape {
         }
     } size;
 
-    size_t volume() const { return (size == 0) ? 0 : Product<size_t>(cspan<uint>(dim.data(), size)); }
+    Property(tensor_shape) {
+        operator size_t() const { return (parent->size == 0) ? 0 : Product<size_t>(cspan<uint>(parent->dim.data(), parent->size)); }
+    } volume;
 
     tensor_shape remove_zeros() const {
         tensor_shape s;
@@ -142,8 +144,8 @@ class Tensor {
 
     Tensor() : m_data(nullptr) {}
     Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {
-        Check(data || shape.volume() == 0);
-        Check(shape.volume() != 0 || data == nullptr);
+        Check(data || shape.volume == 0);
+        Check(shape.volume != 0 || data == nullptr);
     }
 
     Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) {}
@@ -158,7 +160,7 @@ class Tensor {
     const T* begin() const { return data(); }
     const T* end() const { return data() + size(); }
 
-    size_t size() const { return m_shape.volume(); }
+    size_t size() const { return m_shape.volume; }
     const auto& shape() const { return m_shape; }
     auto rank() const { return m_shape.size; }
 
@@ -216,14 +218,14 @@ class Tensor {
     Tensor slice(size_t a) {
         DCheck(m_shape.size() > 0, "");
         DCheck(a < m_shape[0], "");
-        auto v = m_shape.pop_front().volume();
+        size_t v = m_shape.pop_front().volume;
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
     const Tensor slice(size_t a) const {
         DCheck(m_shape.size() > 0, "");
         DCheck(a < m_shape[0], "");
-        auto v = m_shape.pop_front().volume();
+        size_t v = m_shape.pop_front().volume;
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
@@ -264,7 +266,7 @@ template <typename T>
 class VTensor : public Tensor<T> {
    public:
     VTensor() {}
-    VTensor(tensor_shape shape, T init = T()) : m_vector(shape.volume(), init) {
+    VTensor(tensor_shape shape, T init = T()) : m_vector(shape.volume, init) {
         Tensor<T>::m_shape = shape;
         Tensor<T>::m_data = m_vector.data();
     }
@@ -297,7 +299,7 @@ class VTensor : public Tensor<T> {
 
     void reshape(tensor_shape new_shape, T init = T()) {
         Tensor<T>::m_shape = new_shape;
-        m_vector.resize(new_shape.volume(), init);
+        m_vector.resize(new_shape.volume, init);
         Tensor<T>::m_data = m_vector.data();
     }
 

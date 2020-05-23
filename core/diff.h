@@ -699,7 +699,7 @@ struct VecMatMulT : public Diff2 {
     }
 
     void Forward() override {
-        const size_t m = va.shape().pop_back().volume();
+        const size_t m = va.shape().pop_back().volume;
         const size_t q = vb.shape()[0];
         const size_t p = vb.shape()[1];
 
@@ -714,7 +714,7 @@ struct VecMatMulT : public Diff2 {
     }
 
     void Backward() override {
-        const size_t m = va.shape().pop_back().volume();
+        const size_t m = va.shape().pop_back().volume;
         const size_t q = vb.shape()[0];
         const size_t p = vb.shape()[1];
 
