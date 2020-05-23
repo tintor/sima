@@ -40,7 +40,7 @@ struct BroadcastT : public Diff1 {
 };
 
 PDiff Broadcast(PDiff a, tensor_shape b) {
-    if (a->size() == 1) return make_shared<BroadcastS>(a, b);
+    if (a->size == 1) return make_shared<BroadcastS>(a, b);
     if (a->shape() == b.last(a->shape().size())) return make_shared<BroadcastT>(a, b);
     Check(false);
     return nullptr;

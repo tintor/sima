@@ -3,6 +3,7 @@
 #include <core/range.h>
 #include <core/std.h>
 #include <core/tensor.h>
+#include <core/property.h>
 
 // Stages of Diff graph:
 // - construction - final size of tensors is known
@@ -39,7 +40,10 @@ struct Diff {
     auto str() const { return format("%s %s", TypeName(*this), string(v.shape())); }
     auto shape() const { return v.shape(); }
     auto shape(int i) const { return v.shape()[i]; }
-    auto size() const { return v.size(); }
+
+    Property(Diff) {
+        operator auto() const { return parent->v.size(); }
+    } size;
 
     string name;
     vtensor v, g;
@@ -99,14 +103,14 @@ struct Diff_vv : public Diff2 {
 
 struct Diff_sv : public Diff2 {
     Diff_sv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->size() == 1);
+        Check(a->size == 1);
         Reshape(b->shape());
     }
 };
 
 struct Diff_vs : public Diff2 {
     Diff_vs(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(b->size() == 1);
+        Check(b->size == 1);
         Reshape(a->shape());
     }
 };
@@ -390,10 +394,10 @@ struct Add_mv : public Diff2 {
 };
 
 inline PDiff operator+(PDiff a, PDiff b) {
-    if (a->size() == 1) return make_shared<Add_vs>(b, a);
-    if (b->size() == 1) return make_shared<Add_vs>(a, b);
+    if (a->size == 1) return make_shared<Add_vs>(b, a);
+    if (b->size == 1) return make_shared<Add_vs>(a, b);
     if (a->shape() == b->shape()) return make_shared<Add_vv>(a, b);
-    if (a->size() > b->size()) return make_shared<Add_mv>(a, b);
+    if (a->size > b->size) return make_shared<Add_mv>(a, b);
     return make_shared<Add_mv>(b, a);
 }
 
@@ -428,8 +432,8 @@ struct Sub_sv : public Diff_sv {
 };
 
 inline PDiff operator-(PDiff a, PDiff b) {
-    if (a->size() == 1) return make_shared<Sub_sv>(a, b);
-    if (b->size() == 1) return make_shared<Sub_vs>(a, b);
+    if (a->size == 1) return make_shared<Sub_sv>(a, b);
+    if (b->size == 1) return make_shared<Sub_vs>(a, b);
     return make_shared<Sub_vv>(a, b);
 }
 inline auto operator-(tensor::type a, PDiff b) { return Const(a) - b; }
@@ -445,7 +449,7 @@ inline auto operator-(PDiff a) { return make_shared<Neg>(a); }
 
 struct Mul_vs : public Diff_vs {
     Mul_vs(PDiff a, PDiff b) : Diff_vs(a, b) {
-        Check(b->size() == 1);
+        Check(b->size == 1);
         Reshape(a->shape());
     }
     void Forward() override { EACH(v) v[i] = va[i] * vb[0]; }
@@ -465,8 +469,8 @@ struct Mul_vv : public Diff_vv {
 };
 
 inline PDiff operator*(PDiff a, PDiff b) {
-    if (a->size() == 1) return make_shared<Mul_vs>(b, a);
-    if (b->size() == 1) return make_shared<Mul_vs>(a, b);
+    if (a->size == 1) return make_shared<Mul_vs>(b, a);
+    if (b->size == 1) return make_shared<Mul_vs>(a, b);
     return make_shared<Mul_vv>(a, b);
 }
 inline auto operator*(tensor::type a, PDiff b) { return b * Const(a); }
@@ -500,8 +504,8 @@ struct Div_sv : public Diff_sv {
 };
 
 inline PDiff operator/(PDiff a, PDiff b) {
-    if (a->size() == 1) return make_shared<Div_sv>(a, b);
-    if (b->size() == 1) return make_shared<Div_vs>(a, b);
+    if (a->size == 1) return make_shared<Div_sv>(a, b);
+    if (b->size == 1) return make_shared<Div_vs>(a, b);
     return make_shared<Div_vv>(a, b);
 }
 
@@ -577,7 +581,7 @@ struct Concat : public Diff2 {
         // TODO generalize for more dimensions
         Check(a->shape().size() == 1);
         Check(b->shape().size() == 1);
-        Reshape({uint(a->size() + b->size())});
+        Reshape({uint(a->size + b->size)});
     }
 
     void Forward() override {
@@ -650,7 +654,7 @@ struct MaxPool2D : public Diff1 {
 struct Reshape : public Diff1 {
     Reshape(PDiff a, tensor_shape shape) : Diff1(a) {
         v.reshape(shape);
-        Check(a->size() == v.size());
+        Check(a->size == v.size());
     }
 
     void Forward() override { EACH(v) v[i] = va[i]; }
@@ -793,7 +797,7 @@ Declare1(BatchMean);
 #undef gb
 #undef gc
 
-inline PDiff Mean(PDiff a) { return Sum(a) / a->size(); }
+inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 
 inline PDiff MeanSquareError(PDiff a, PDiff b) { return Mean(Sqr(a - b)); }
 
