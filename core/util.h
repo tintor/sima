@@ -23,6 +23,11 @@ T cube(T a) {
     return a * a * a;
 }
 
+template<typename T, typename P>
+T lerp(T a, T b, P t) {
+    return a + (b - a) * t;
+}
+
 template <typename T>
 T clamp(T a, T min, T max) {
     if (a > max) return max;
@@ -42,16 +47,12 @@ inline bool ordered(T a, T b, T c) {
 
 template <typename T>
 void minimize(T& a, T b) {
-    if (b < a) {
-        a = b;
-    }
+    if (b < a) a = b;
 }
 
 template <typename T>
 void maximize(T& a, T b) {
-    if (b > a) {
-        a = b;
-    }
+    if (b > a) a = b;
 }
 
 template <typename T>
