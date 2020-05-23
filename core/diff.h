@@ -349,29 +349,6 @@ struct SinT : public DiffA {
 };
 Declare1(Sin);
 
-#if 0
-// Y = A * b + c
-// b and c are scalars
-struct BroadcastFMA : public DiffABC {
-    BroadcastFMA(PDiff a, PDiff b, PDiff c) : DiffABC(a, b, c) {
-        Check(b.size() == 1);
-        Check(c.size() == 1);
-        y.reshape(a.shape());
-        dy.reshape(a.shape());
-    }
-
-    void Forward() override {
-        for (auto i : range(v)()) v[i] = va[i] * b[0] + c[0];
-    }
-
-    void Backward() override {
-        for (auto i : range(v)()) ga[i] += g[i] * b[0];
-        for (auto i : range(v)()) gb[0] += g[i] * va[i];
-        if (c.dy) for (auto i : range(v)()) c.g[0] += g[i];
-    }
-};
-#endif
-
 inline tensor::type Sum(const tensor a, tensor::type s = 0) {
     EACH(a) s += a[i];
     return s;
@@ -751,49 +728,6 @@ Declare1(Sum);
 
 // TODO Unary horizontal Min and Max!
 
-#if 0
-struct MeanT : public Diff1 {
-    MeanT(PDiff a) : Diff1(a) { Reshape({1}); }
-    void Forward() override { v[0] = Sum(va) / va.size(); }
-    void Backward() override { EACH(ga) ga[i] += g[0] / va.size(); }
-};
-#endif
-
-// Declare1(Mean, MeanT)
-// Declare1(SoftMax, SoftMaxT)
-
-#if 0
-template<bool mean>
-struct SumSquareDiff : public DiffAB {
-    SumSquareDiff(PDiff a, PDiff b) : DiffAB(a, b) {
-        Check(a->shape() == b->shape() || b->size() == 1);
-        Reshape({1});
-    }
-
-    void Forward() override {
-        tensor::type sum = 0;
-        if (vb.size() == 1)
-            EACH(v) sum += sqr(va[i] - vb[0]);
-        else
-            EACH(v) sum += sqr(va[i] - vb[i]);
-        if (mean) sum /= va.size();
-        v[0] = sum;
-    }
-
-    void Backward() override {
-        auto d = 2 * g[0];
-        if (mean) d /= va.size();
-        if (vb.size() == 1) {
-            EACH(ga) ga[i] += (va[i] - vb[0]) * d;
-            if (gb) for (auto i : range(va)) gb[0] += (vb[0] - va[i]) * d;
-        } else {
-            EACH(ga) ga[i] += (va[i] - vb[i]) * d;
-            EACH(gb) gb[i] += (vb[i] - va[i]) * d;
-        }
-    }
-};
-#endif
-
 struct AveragerT : public Diff1 {
     AveragerT(PDiff a, float k): Diff1(a) { v.reshape(a->shape); }
     void Forward() override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
@@ -826,34 +760,6 @@ inline PDiff Softmax(PDiff a) {
     PDiff e = Exp(a);
     return e / Sum(e) << "softmax";
 }
-
-#if 0
-struct BatchNormT : public Sub_vv {
-    BatchNormT(PDiff a, float k) : Diff2 {
-        Reshape(a->shape());
-        auto mean = Mean(in) << "bn_mean";
-        auto stdev = Sqrt(Mean(Sqr(in - mean))) << "bn_stdev";
-        auto avg_mean = Averager(mean, 0.1) << "bn_avg_mean";
-        auto avg_stdev = Averager(stdev, 0.1) << "bn_avg_stdev";
-        auto scale = 1 / (k + avg_stdev) << "bn_scale";
-        auto shift = avg_mean * scale << "bn_shift";
-        linear = a * scale - shift;
-    }
-
-    vector<PDiff> Inputs() const { return {linear}; }
-
-    void Forward() override {
-        EACH(v) v[i] = linear->v[i]; // TODO use pointer hacks to avoid copying
-    }
-
-    void Backward() override {
-        EACH(g) linear->g[i] = g[i]; // TODO use pointer hacks to avoid copying
-        linear->Backward();
-    }
-
-    PDiff linear;
-};
-#endif
 
 inline PDiff BatchNorm(PDiff a, float k) {
     auto mean = Mean(a) << "bn_mean";
