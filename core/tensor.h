@@ -2,6 +2,7 @@
 #include <core/format.h>
 #include <core/std.h>
 #include <core/util.h>
+#include <core/property.h>
 
 struct tensor_shape {
     tensor_shape() {
@@ -10,6 +11,7 @@ struct tensor_shape {
     }
 
     tensor_shape(std::initializer_list<uint> d) {
+        for (auto e : d) Check(e > 0);
         for (size_t i = 0; i < dim.size(); i++)
             dim[i] = (i < d.size()) ? d.begin()[i] : 0;
     }
@@ -18,18 +20,21 @@ struct tensor_shape {
     uint operator[](int i) const { return dim[i]; }
 
     tensor_shape set(int i, uint v) const {
+        Check(v > 0);
         tensor_shape s = *this;
         s.dim[i] = v;
         return s;
     }
 
-    size_t size() const {
-        for (int i = dim.size() - 1; i >= 0; i--)
-            if (dim[i]) return i + 1;
-        return 0;
-    }
+    Property(tensor_shape) {
+        operator uint() const {
+            for (int i = parent->dim.size() - 1; i >= 0; i--)
+                if (parent->dim[i]) return i + 1;
+            return 0;
+        }
+    } size;
 
-    size_t volume() const { return (size() == 0) ? 0 : Product<size_t>(cspan<uint>(dim.data(), size())); }
+    size_t volume() const { return (size == 0) ? 0 : Product<size_t>(cspan<uint>(dim.data(), size)); }
 
     tensor_shape remove_zeros() const {
         tensor_shape s;
@@ -48,10 +53,10 @@ struct tensor_shape {
     }
 
     tensor_shape concat(tensor_shape o) const {
-        Check(size() + o.size() <= dim.size());
+        Check(size + o.size <= dim.size());
         tensor_shape s = *this;
-        auto m = size();
-        for (int i = 0; i < o.size(); i++) s.dim[m++] = o[i];
+        size_t m = size;
+        for (int i = 0; i < o.size; i++) s.dim[m++] = o[i];
         return s;
     }
 
@@ -73,7 +78,7 @@ struct tensor_shape {
     }
 
     uint back() const {
-        auto s = size();
+        uint s = size;
         return (s == 0) ? 0 : dim[s - 1];
     }
 
@@ -86,29 +91,29 @@ struct tensor_shape {
 
     // last m elements
     tensor_shape last(int m) const {
-        m = min<int>(m, size());
+        m = min<int>(m, size);
         tensor_shape s;
-        for (int i = 0; i < m; i++) s.dim[i] = dim[i + size() - m];
+        for (int i = 0; i < m; i++) s.dim[i] = dim[i + size - m];
         for (int i = m; i < dim.size(); i++) s.dim[i] = 0;
         return s;
     }
 
     tensor_shape push_front(uint a) const {
         Check(dim[3] == 0);
-        return tensor_shape{a, dim[0], dim[1], dim[2]};
+        return tensor_shape({a, dim[0], dim[1], dim[2]}, 0);
     }
 
     tensor_shape push_back(uint a) const {
         Check(dim[3] == 0);
         tensor_shape s = *this;
-        s.dim[s.size()] = a;
+        s.dim[s.size] = a;
         return s;
     }
 
     operator string() const {
         ostringstream os;
         os << '[';
-        for (int i = 0; i < size(); i++) {
+        for (int i = 0; i < size; i++) {
             if (i > 0) os << ' ';
             os << dim[i];
         }
@@ -121,6 +126,12 @@ struct tensor_shape {
 
    private:
     array<uint, 4> dim;
+
+    tensor_shape(std::initializer_list<uint> d, int) {
+        DCheck(d.size() == dim.size(), "");
+        for (size_t i = 0; i < dim.size(); i++)
+            dim[i] = d.begin()[i];
+    }
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)
@@ -149,7 +160,7 @@ class Tensor {
 
     size_t size() const { return m_shape.volume(); }
     const auto& shape() const { return m_shape; }
-    auto rank() const { return m_shape.size(); }
+    auto rank() const { return m_shape.size; }
 
     T& operator[](size_t index) {
         DCheck(index < size(), format("%s < %s", index, size()));

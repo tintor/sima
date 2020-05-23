@@ -41,7 +41,7 @@ struct Diff {
     } shape;
 
     Property(Diff) {
-        operator auto() const { return parent->v.shape().size(); }
+        operator uint() const { return parent->v.shape().size; }
     } rank;
 
     Property(Diff) {
@@ -180,7 +180,7 @@ struct UniformInit : public Init {
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
 inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = make_shared<Init>()) {
     auto p = make_shared<Diff>();
-    Check(shape.size() > 0, "Parameter shape.size() must be non-zero");
+    Check(shape.size > 0, "Parameter shape.size() must be non-zero");
     p->Reshape(shape);
     EACH(p->v) p->v[i] = init->get();
     return p;
@@ -692,8 +692,8 @@ struct Reshape : public Diff1 {
 struct VecMatMulT : public Diff2 {
     VecMatMulT(PDiff a, PDiff b) : Diff2(a, b) {
         tensor_shape as = a->shape, bs = b->shape;
-        Check(as.size() > 0);
-        Check(bs.size() == 2);
+        Check(as.size > 0);
+        Check(bs.size == 2);
         Check(as.back() == bs.back());
         Reshape(as.pop_back().push_back(bs[0]));
     }

@@ -16,7 +16,7 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
 }
 
 bool IsBroadcastable(tensor_shape a, tensor_shape b) {
-    return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
+    return a.size != 0 && (a.volume() == 1 || a == b.last(a.size));
 }
 
 struct BroadcastS : public Diff1 {
