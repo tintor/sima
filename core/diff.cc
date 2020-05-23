@@ -27,8 +27,8 @@ struct BroadcastS : public Diff1 {
 
 struct BroadcastT : public Diff1 {
     BroadcastT(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
-    void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
-    void Backward() override { if (ga) EACH(g) ga[i % ga.size()] += g[i]; }
+    void Forward() override { EACH(v) v[i] = va[i % va.size]; }
+    void Backward() override { if (ga) EACH(g) ga[i % ga.size] += g[i]; }
 };
 
 PDiff Broadcast(PDiff a, tensor_shape b) {
@@ -91,7 +91,7 @@ void ResetGradients(span<PDiff> nodes) {
 }
 
 void Backward(span<PDiff> nodes) {
-    EACH(nodes) {
+    for (auto i : range(nodes.size())) {
         auto p = nodes[nodes.size() - 1 - i];
         Timestamp begin;
         p->Backward();
@@ -116,7 +116,7 @@ bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
 auto ComputeIds(cspan<PDiff> nodes) {
     map<Diff*, string> ids;
     for (PDiff p : nodes) {
-        if (IsConst(p) && p->v.size() == 1 && p->name.empty()) {
+        if (IsConst(p) && p->v.size == 1 && p->name.empty()) {
             ids.emplace(p.get(), format("%s", p->v[0]));
             continue;
         }
@@ -134,7 +134,7 @@ auto ComputeIds(cspan<PDiff> nodes) {
 }
 
 string Summary(const tensor v) {
-    Aggregates<tensor::type> a(v.data(), v.data() + v.size());
+    Aggregates<tensor::type> a(v.data(), v.data() + v.size);
     return format("(%s %s %s) %s", a.min, a.mean, a.max, sqrt(a.variance));
 }
 
@@ -143,7 +143,7 @@ void Print(cspan<PDiff> nodes) {
     vector<string> table = {"id|type|inputs|shape|fticks|bticks|values|gradients|"};
     string os;
     for (PDiff p : nodes)
-        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
+        if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
             os.clear();
 
             // id
@@ -171,9 +171,9 @@ void Print(cspan<PDiff> nodes) {
             format_s(os, "%s|", (p->backward_ticks + 500) / 1000);
 
             size_t summary = 6;
-            format_s(os, "%s|", (p->v.size() >= summary) ? Summary(p->v) : string(p->v));
+            format_s(os, "%s|", (p->v.size >= summary) ? Summary(p->v) : string(p->v));
 
-            format_s(os, "%s|", (p->g.size() >= summary) ? Summary(p->g) : string(p->g));
+            format_s(os, "%s|", (p->g.size >= summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }

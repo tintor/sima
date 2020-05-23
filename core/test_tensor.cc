@@ -58,7 +58,7 @@ TEST_CASE("tensor", "[tensor]") {
     REQUIRE(!tensor());
     REQUIRE(!tensor(nullptr, {}));
 
-    REQUIRE(tensor().size() == 0);
+    REQUIRE(tensor().size == 0);
     REQUIRE(tensor() == tensor());
     REQUIRE(tensor(m.data(), {1}) != tensor());
 }

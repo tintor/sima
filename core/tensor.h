@@ -148,20 +148,26 @@ class Tensor {
     T const* data() const { return m_data; }
 
     T* begin() { return data(); }
-    T* end() { return data() + size(); }
+    T* end() { return data() + size; }
     const T* begin() const { return data(); }
-    const T* end() const { return data() + size(); }
+    const T* end() const { return data() + size; }
 
-    size_t size() const { return m_shape.volume; }
+    Property(Tensor) {
+        operator size_t() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.volume; }
+    } size;
+
     const auto& shape() const { return m_shape; }
-    auto rank() const { return m_shape.size; }
+
+    Property(Tensor) {
+        operator uint() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.size; }
+    } rank;
 
     T& operator[](size_t index) {
-        DCheck(index < size(), format("%s < %s", index, size()));
+        DCheck(index < size(), format("%s < %s", index, size));
         return m_data[index];
     }
     const T& operator[](size_t index) const {
-        DCheck(index < size(), format("%s < %s", index, size()));
+        DCheck(index < size(), format("%s < %s", index, size));
         return m_data[index];
     }
 
@@ -227,7 +233,7 @@ class Tensor {
     }
 
     bool operator==(const Tensor& o) const {
-        return m_shape == o.m_shape && std::equal(m_data, m_data + size(), o.m_data);
+        return m_shape == o.m_shape && std::equal(m_data, m_data + size, o.m_data);
     }
     bool operator!=(const Tensor& o) const { return !operator==(o); }
 
@@ -240,7 +246,7 @@ class Tensor {
     operator string() const {
         string s;
         s += '[';
-        for (size_t i = 0; i < size(); i++) {
+        for (size_t i = 0; i < size; i++) {
             if (i > 0) s += ' ';
             format_s(s, "%s", m_data[i]);
         }
@@ -280,14 +286,17 @@ class VTensor : public Tensor<T> {
     VTensor& operator=(const Tensor<T> o) {
         if (this == &o) return *this;
         Tensor<T>::m_shape = o.shape();
-        m_vector.resize(o.size());
+        m_vector.resize(o.size);
         Tensor<T>::m_data = m_vector.data();
         // TODO not safe if strides are added to Tensor
-        std::copy(o.data(), o.data() + o.size(), m_vector.data());
+        std::copy(o.data(), o.data() + o.size, m_vector.data());
         return *this;
     }
 
-    size_t size() const { return m_vector.size(); }
+    TProperty(Size, VTensor) {
+        //using Prop = PropertyT<VTensor, __LINE__ - 1>;
+        operator size_t() const { return Size::parent->m_vector.size(); }
+    } size;
 
     void reshape(tensor_shape new_shape, T init = T()) {
         Tensor<T>::m_shape = new_shape;

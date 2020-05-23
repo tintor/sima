@@ -45,7 +45,7 @@ struct Diff {
     } rank;
 
     Property(Diff) {
-        operator auto() const { return parent->v.size(); }
+        operator size_t() const { return parent->v.size; }
     } size;
 
     string name;
@@ -60,7 +60,7 @@ inline PDiff operator<<(PDiff a, string_view name) {
     return a;
 }
 
-#define EACH(V) for (auto i : range(V.size()))
+#define EACH(V) for (auto i : range(size_t(V.size)))
 
 #define Declare1(Func) \
     inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
@@ -75,13 +75,13 @@ inline vector<PDiff> LoadModel(string_view filename) { return {}; }
 
 inline void SaveModel(span<PDiff> model, string_view filename) {}
 
-#define TensorProperty(TENSOR, PARENT) \
-    Property(PARENT) { \
+#define TensorProperty(TENSOR, TYPE, PARENT) \
+    TProperty(TYPE, PARENT) { \
         tensor::type operator[](size_t i) const { return parent->TENSOR[i]; } \
         tensor::type& operator[](size_t i) { return parent->TENSOR[i]; } \
         tensor::type operator()(size_t i, size_t j) const { return parent->TENSOR(i, j); } \
         tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); } \
-        auto size() const { return parent->TENSOR.size(); } \
+        Property(TYPE) { operator size_t() const { return parent->parent->TENSOR.size; } } size; \
         const auto& shape() const { return parent->TENSOR.shape(); } \
         operator bool() const { return parent->TENSOR; } \
         operator tensor(){ return parent->TENSOR; } \
@@ -93,8 +93,8 @@ struct Diff1 : public Diff {
     vector<PDiff> Inputs() override { return {a}; }
     PDiff a;
 
-    TensorProperty(a->v, Diff1) va;
-    TensorProperty(a->g, Diff1) ga;
+    TensorProperty(a->v, AV, Diff1) va;
+    TensorProperty(a->g, AG, Diff1) ga;
 };
 
 struct Diff2 : public Diff1 {
@@ -102,8 +102,8 @@ struct Diff2 : public Diff1 {
     vector<PDiff> Inputs() override { return {a, b}; }
     PDiff b;
 
-    TensorProperty(b->v, Diff2) vb;
-    TensorProperty(b->g, Diff2) gb;
+    TensorProperty(b->v, BV, Diff2) vb;
+    TensorProperty(b->g, BG, Diff2) gb;
 };
 
 struct Diff3 : public Diff2 {
@@ -111,8 +111,8 @@ struct Diff3 : public Diff2 {
     vector<PDiff> Inputs() override { return {a, b, c}; }
     PDiff c;
 
-    TensorProperty(b->v, Diff2) vc;
-    TensorProperty(b->g, Diff2) gc;
+    TensorProperty(b->v, CV, Diff2) vc;
+    TensorProperty(b->g, CG, Diff2) gc;
 };
 
 struct DiffA : public Diff1 {
@@ -407,8 +407,8 @@ struct Add_mv : public Diff2 {
         Reshape(a->shape);
     }
     void Forward() override {
-        for (auto i : range<size_t>(0, va.size(), vb.size())) {
-            for (auto j : range(vb.size())) v[i + j] = va[i + j] + vb[j];
+        for (auto i : range<size_t>(0, va.size, vb.size)) {
+            for (auto j : range<size_t>(vb.size)) v[i + j] = va[i + j] + vb[j];
         }
     }
     void Backward() override {
@@ -611,12 +611,12 @@ struct Concat : public Diff2 {
 
     void Forward() override {
         EACH(v) v[i] = va[i];
-        EACH(v) v[i + va.size()] = vb[i];
+        EACH(v) v[i + va.size] = vb[i];
     }
 
     void Backward() override {
         EACH(ga) ga[i] += g[i];
-        EACH(gb) gb[i] += g[i + va.size()];
+        EACH(gb) gb[i] += g[i + va.size];
     }
 };
 
@@ -634,7 +634,7 @@ struct Conv1D : public Diff2 {
             tensor::type sum = 0;
             // TODO check
             size_t begin = (offset > i) ? offset - i : 0;
-            size_t end = min(vb.size(), offset - i + va.size());
+            size_t end = min<size_t>(vb.size, offset - i + va.size);
             for (size_t j = begin; j < end; j++) sum += va[i + j - offset] * vb[j];
             v[i] = sum;
         }
@@ -679,7 +679,7 @@ struct MaxPool2D : public Diff1 {
 struct Reshape : public Diff1 {
     Reshape(PDiff a, tensor_shape shape) : Diff1(a) {
         v.reshape(shape);
-        Check(a->size == v.size());
+        Check(a->size == v.size);
     }
 
     void Forward() override { EACH(v) v[i] = va[i]; }
@@ -805,7 +805,7 @@ inline PDiff Averager(PDiff a, float k) { return make_shared<AveragerT>(a, k); }
 // TODO call end batch after all Forward() and Backward() calls
 struct BatchMeanT : public Diff1 {
     BatchMeanT(PDiff a): Diff1(a) { v.reshape({1}); v[0] = 0; }
-    void Forward() override { EACH(va) sum += va[i]; count += va.size(); }
+    void Forward() override { EACH(va) sum += va[i]; count += va.size; }
     void EndBatch() { v[0] = sum / count; }
 
     double sum;
