@@ -27,51 +27,42 @@ bool IsBroadcastable(tensor_shape a, tensor_shape b) {
     return a.size() != 0 && (a.volume() == 1 || a == b.last(a.size()));
 }
 
-struct BroadcastT : public Diff1 {
-    BroadcastT(PDiff a, tensor_shape b) : Diff1(a) {
-        Check(IsBroadcastable(a->shape(), b), format("%s %s", a->shape(), b));
-        Reshape(b);
-    }
-    void Forward() override {
-        const auto N = va.size();
-        if (N == 1) {
-            EACH(v) v[i] = va[0];
-        } else {
-            EACH(v) v[i] = va[i % N];
-        }
-    }
-    void Backward() override {
-        const auto N = va.size();
-        if (ga) {
-            if (N == 1) {
-                EACH(g) ga[0] += g[i];
-            } else {
-                EACH(g) ga[i % ga.size()] += g[i];
-            }
-        }
-    }
+struct BroadcastS : public Diff1 {
+    BroadcastS(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
+    void Forward() override { EACH(v) v[i] = va[0]; }
+    void Backward() override { if (ga) EACH(g) ga[0] += g[i]; }
 };
 
-PDiff Broadcast(PDiff a, tensor_shape b) { return make_shared<BroadcastT>(a, b); }
+struct BroadcastT : public Diff1 {
+    BroadcastT(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
+    void Forward() override { EACH(v) v[i] = va[i % va.size()]; }
+    void Backward() override { if (ga) EACH(g) ga[i % ga.size()] += g[i]; }
+};
+
+PDiff Broadcast(PDiff a, tensor_shape b) {
+    if (a->size() == 1) return make_shared<BroadcastS>(a, b);
+    if (a->shape() == b.last(a->shape().size())) return make_shared<BroadcastT>(a, b);
+    Check(false);
+    return nullptr;
+}
 
 MaxPool2D::MaxPool2D(PDiff a) : Diff1(a) {
     Check(a->shape().size() == 2);
-    // TODO overflow check
-    const uint16_t m = (a->shape()[0] + 1) / 2;
-    const uint16_t n = (a->shape()[1] + 1) / 2;
+    const uint m = (a->shape(0) + 1) / 2;
+    const uint n = (a->shape(1) + 1) / 2;
     Reshape({m, n});
 }
 
 void MaxPool2D::Forward() {
     // TODO edge condition on last row / column
-    Check(a->shape()[0] % 2 == 0);
-    Check(a->shape()[1] % 2 == 0);
+    Check(a->shape(0) % 2 == 0);
+    Check(a->shape(1) % 2 == 0);
 
-    const size_t m = shape()[0];
-    const size_t n = shape()[1];
-    for (size_t i = 0; i < m; i++) {
-        for (size_t j = 0; j < n; j++) {
-            const size_t p = i * 2, q = j * 2;
+    const uint m = shape(0);
+    const uint n = shape(1);
+    for (uint i = 0; i < m; i++) {
+        for (uint j = 0; j < n; j++) {
+            const uint p = i * 2, q = j * 2;
             v(i, j) = max(va(p, q), va(p + 1, q), va(p, q + 1), va(p + 1, q + 1));
         }
     }
@@ -80,11 +71,11 @@ void MaxPool2D::Forward() {
 void MaxPool2D::Backward() {
     if (!ga) return;
     Check(false);
-    const size_t m = shape()[0];
-    const size_t n = shape()[1];
-    for (size_t i = 0; i < m; i++) {
-        for (size_t j = 0; j < n; j++) {
-            const size_t p = i * 2, q = j * 2;
+    const uint m = shape(0);
+    const uint n = shape(1);
+    for (uint i = 0; i < m; i++) {
+        for (uint j = 0; j < n; j++) {
+            const uint p = i * 2, q = j * 2;
             g(i, j) = max(va(p, q), va(p + 1, q), va(p, q + 1), va(p + 1, q + 1));
         }
     }
@@ -239,7 +230,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
     Check(data.size() > 0);
     const auto B = data[0].first->shape()[0];
     const auto N = data[0].second.shape()[0];
-    Check(N % B == 0);
+    Check(N % B == 0, format("N %% B must be 0. N:%s B:%s", N, B));
 
     for (const auto& [key, value] : data) {
         Check(key->shape()[0] == B);

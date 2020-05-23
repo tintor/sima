@@ -13,8 +13,8 @@ void Iterate(span<PDiff> nodes, float alpha, size_t iterations) {
 }
 
 TEST_CASE("diff: minimize circle", "[diff]") {
-    auto x = Param({1}, "x");
-    auto y = Param({1}, "y");
+    auto x = Param({1}) << "x";
+    auto y = Param({1}) << "y";
     auto loss = Sqr(x) + Sqr(y);
     loss->name = "loss";
 
@@ -40,8 +40,8 @@ void Minimize(PDiff loss, float alpha, size_t iterations) {
 TEST_CASE("diff: minimize booth", "[diff]") {
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto x = Param({1}, "x", init);
-    auto y = Param({1}, "y", init);
+    auto x = Param({1}, init) << "x";
+    auto y = Param({1}, init) << "y";
     Minimize(Sqr(x + 2 * y - 7) + Sqr(2 * x + y - 5), 0.01, 1000);
 
     REQUIRE(abs(x->v[0] - 1) <= 2e-5);
@@ -51,8 +51,8 @@ TEST_CASE("diff: minimize booth", "[diff]") {
 TEST_CASE("diff: minimize rastrigin", "[diff]") {
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto x = Param({1}, "x", init);
-    auto y = Param({1}, "y", init);
+    auto x = Param({1}, init) << "x";
+    auto y = Param({1}, init) << "y";
     Minimize(20 + (x * x - 10 * Cos(2 * PI * x)) + (y * y - 10 * Cos(2 * PI * y)), 0.01, 2000);
 
     // REQUIRE(abs(x->v[0]) < 1e-5);
@@ -79,24 +79,21 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 
 TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     const int Batch = 20;
-    auto x = Data({Batch, 1}, "x");
-    auto y = Data({Batch, 1}, "y");
-    auto ref = Data({Batch, 1}, "ref");
+    auto x = Data({Batch, 1}) << "x";
+    auto y = Data({Batch, 1}) << "y";
+    auto ref = Data({Batch, 1}) << "ref";
 
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto a = Param({1}, "a", init);
-    auto b = Param({1}, "b", init);
-    auto c = Param({1}, "c", init);
-    auto w = Param({1}, "w", init);
-    auto e = Param({1}, "e", init);
+    auto a = Param({1}, init) << "a";
+    auto b = Param({1}, init) << "b";
+    auto c = Param({1}, init) << "c";
+    auto w = Param({1}, init) << "w";
+    auto e = Param({1}, init) << "e";
 
-    auto out = Tanh(x * a + y * b + c) * 0.5 + 0.5;
-    out->name = "out";
-    auto loss = MeanSquareError(out, ref);
-    loss->name = "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5);
-    accuracy->name = "accuracy";
+    auto out = Tanh(x * a + y * b + c) * 0.5 + 0.5 << "out";
+    auto loss = MeanSquareError(out, ref) << "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
     Model model(loss, accuracy);
 
     // dataset
@@ -134,42 +131,36 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     REQUIRE(metrics.at("accuracy") >= 0.9965);
 }
 
-PDiff Neuron(PDiff x, PDiff y, string_view name, shared_ptr<Init> init) {
-    auto a = Param({1}, "a", init);
-    auto b = Param({1}, "b", init);
-    auto c = Param({1}, "c", init);
-    auto h = Logistic(x * a + y * b + c);
-    h->name = name;
-    return h;
+PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
+    auto a = Param({1}, init) << "a";
+    auto b = Param({1}, init) << "b";
+    auto c = Param({1}, init) << "c";
+    return Logistic(x * a + y * b + c);
 }
 
-PDiff Neuron(PDiff x, PDiff y, PDiff z, string_view name, shared_ptr<Init> init) {
-    auto a = Param({1}, "a", init);
-    auto b = Param({1}, "b", init);
-    auto c = Param({1}, "c", init);
-    auto d = Param({1}, "d", init);
-    auto h = Logistic(x * a + y * b + z * c + d);
-    h->name = name;
-    return h;
+PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
+    auto a = Param({1}, init) << "a";
+    auto b = Param({1}, init) << "b";
+    auto c = Param({1}, init) << "c";
+    auto d = Param({1}, init) << "d";
+    return Logistic(x * a + y * b + z * c + d);
 }
 
-TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
+TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     const int Batch = 20;
-    auto x = Data({Batch, 1}, "x");
-    auto y = Data({Batch, 1}, "y");
-    auto ref = Data({Batch, 1}, "ref");
+    auto x = Data({Batch, 1}) << "x";
+    auto y = Data({Batch, 1}) << "y";
+    auto ref = Data({Batch, 1}) << "ref";
 
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto h1 = Neuron(x, y, "h1", init);
-    auto h2 = Neuron(x, y, "h2", init);
-    auto h3 = Neuron(x, y, "h3", init);
-    auto out = Neuron(h1, h2, h3, "out", init);
+    auto h1 = Neuron(x, y, init) << "h1";
+    auto h2 = Neuron(x, y, init) << "h2";
+    auto h3 = Neuron(x, y, init) << "h3";
+    auto out = Neuron(h1, h2, h3, init) << "out";
 
-    auto loss = MeanSquareError(out, ref);
-    loss->name = "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5);
-    accuracy->name = "accuracy";
+    auto loss = MeanSquareError(out, ref) << "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
     Model model(loss, accuracy);
 
     // dataset
@@ -206,20 +197,74 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff_circle]") {
     REQUIRE(metrics.at("accuracy") >= 0.9919);
 }
 
-TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]") {
-    const int Batch = 100;
-    auto in = Data({Batch, 2}, "in");
-    auto ref = Data({Batch, 1}, "ref");
+TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
+    const int Batch = 40;
+    auto in = Data({Batch, 3}) << "in";
+    auto ref = Data({Batch, 1}) << "ref";
 
-    std::mt19937_64 random(1);
+    std::mt19937_64 random(3);
     auto init = make_shared<NormalInit>(1, random);
-    auto hidden = Logistic(FullyConnected(in, 2, init));
-    auto out = Logistic(FullyConnected(hidden, 1, init));
+    auto fc = FullyConnected(in, 1, init);
+    auto out = Tanh(fc) * 0.5 + 0.5 << "out";
 
-    auto loss = MeanSquareError(out, ref);
-    loss->name = "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5);
-    accuracy->name = "accuracy";
+    auto loss = MeanSquareError(out, ref) << "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
+    Model model(loss, accuracy);
+
+    // dataset
+    const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
+    UniformInit gen(-1, 1, random);
+    const int Classes = 2;
+    const int SamplesPerClass = 20000;
+    const int Samples = Classes * SamplesPerClass;
+    vtensor data_in({Samples, 3}, 0);
+    vtensor data_ref({Samples, 1}, 0);
+    int count[2] = {0, 0};
+    int index = 0;
+    while (index < Samples) {
+        float dx = gen.get();
+        float dy = gen.get();
+        float dz = gen.get();
+        float dr = (dx * A + dy * B + dz * C + D >= 0) ? 1 : 0;
+        int c = round(dr);
+        if (count[c] >= SamplesPerClass) continue;
+        count[c] += 1;
+        data_in(index, 0) = dx;
+        data_in(index, 1) = dy;
+        data_in(index, 2) = dz;
+        data_ref[index] = dr;
+        index += 1;
+    }
+    vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+
+    // train!
+    println("train ...");
+    Print(model.nodes);
+    Metrics metrics;
+    for (auto i : range(1000)) {
+        metrics = model.Epoch(dataset, 0.01, random, i % 100 == 99);
+    }
+    Print(model.nodes);
+
+    REQUIRE(metrics.at("accuracy") >= 0.9975);
+}
+
+TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]") {
+    const int Batch = 20;
+    auto in = Data({Batch, 2}) << "in";
+    auto ref = Data({Batch, 1}) << "ref";
+
+    std::mt19937_64 random(2);
+    auto init = make_shared<NormalInit>(1, random);
+
+    auto proc = BatchNorm(in, 1e-10) << "proc";
+
+    auto hidden = Logistic(FullyConnected(proc, 3, init)) << "hidden";
+    // hidden = BatchNorm(hidden, 1e-10);
+    auto out = Logistic(FullyConnected(hidden, 1, init)) << "out";
+
+    auto loss = MeanSquareError(out, ref) << "loss";
+    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
     Model model(loss, accuracy);
 
     // dataset
@@ -249,9 +294,16 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[diff_fc]")
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
+
+    metrics = model.Epoch(dataset, 0.01, random, true);
+    Print(model.nodes);
+    metrics = model.Epoch(dataset, 0.01, random, true);
+    Print(model.nodes);
+
+    return;
     for (auto i : range(1000)) {
-        metrics = model.Epoch(dataset, 0.03, random, i % 25 == 24);
-        if (!Bounded(model.nodes, 1e6)) break;
+        metrics = model.Epoch(dataset, 0.01, random, i % 25 == 24);
+        if (i % 25 == 24) Print(model.nodes);
     }
     Print(model.nodes);
 
