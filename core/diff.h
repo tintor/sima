@@ -17,11 +17,9 @@ struct Diff;
 
 using PDiff = std::shared_ptr<Diff>;
 
-#define va (a->v)
 #define vb (b->v)
 #define vc (c->v)
 
-#define ga (a->g)
 #define gb (b->g)
 #define gc (c->g)
 
@@ -87,18 +85,42 @@ struct Diff1 : public Diff {
     Diff1(PDiff a) : a(a) {}
     vector<PDiff> Inputs() override { return {a}; }
     PDiff a;
+
+    Property(Diff1) {
+        tensor::type operator[](size_t i) const { return parent->a->v[i]; }
+        tensor::type& operator[](size_t i) { return parent->a->v[i]; }
+        tensor::type operator()(size_t i, size_t j) const { return parent->a->v(i, j); }
+        tensor::type& operator()(size_t i, size_t j) { return parent->a->v(i, j); }
+        auto size() const { return parent->a->v.size(); }
+        const auto& shape() const { return parent->a->v.shape(); }
+        operator bool() const { return parent->a->v; }
+        operator tensor(){ return parent->a->v; }
+        operator vtensor&() { return parent->a->v; }
+    } va;
+
+    Property(Diff1) {
+        tensor::type operator[](size_t i) const { return parent->a->g[i]; }
+        tensor::type& operator[](size_t i) { return parent->a->g[i]; }
+        tensor::type operator()(size_t i, size_t j) const { return parent->a->g(i, j); }
+        tensor::type& operator()(size_t i, size_t j) { return parent->a->g(i, j); }
+        auto size() const { return parent->a->g.size(); }
+        const auto& shape() const { return parent->a->g.shape(); }
+        operator bool() const { return parent->a->g; }
+        operator tensor(){ return parent->a->g; }
+        operator vtensor&(){ return parent->a->g; }
+    } ga;
 };
 
-struct Diff2 : public Diff {
-    Diff2(PDiff a, PDiff b) : a(a), b(b) {}
+struct Diff2 : public Diff1 {
+    Diff2(PDiff a, PDiff b) : Diff1(a), b(b) {}
     vector<PDiff> Inputs() override { return {a, b}; }
-    PDiff a, b;
+    PDiff b;
 };
 
-struct Diff3 : public Diff {
-    Diff3(PDiff a, PDiff b, PDiff c) : a(a), b(b), c(c) {}
+struct Diff3 : public Diff1 {
+    Diff3(PDiff a, PDiff b, PDiff c) : Diff1(a), b(b), c(c) {}
     vector<PDiff> Inputs() override { return {a, b, c}; }
-    PDiff a, b, c;
+    PDiff b, c;
 };
 
 struct DiffA : public Diff1 {
@@ -800,11 +822,9 @@ struct BatchMeanT : public Diff1 {
 
 Declare1(BatchMean);
 
-#undef va
 #undef vb
 #undef vc
 
-#undef ga
 #undef gb
 #undef gc
 

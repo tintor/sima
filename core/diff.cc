@@ -15,11 +15,9 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
     return out;
 }
 
-#define va (a->v)
 #define vb (b->v)
 #define vc (c->v)
 
-#define ga (a->g)
 #define gb (b->g)
 #define gc (c->g)
 
@@ -81,11 +79,9 @@ void MaxPool2D::Backward() {
     }
 }
 
-#undef va
 #undef vb
 #undef vc
 
-#undef ga
 #undef gb
 #undef gc
 
