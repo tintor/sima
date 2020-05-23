@@ -9,15 +9,15 @@ struct tensor_shape {
             dim[i] = 0;
     }
 
-    tensor_shape(std::initializer_list<uint16_t> d) {
+    tensor_shape(std::initializer_list<uint> d) {
         for (size_t i = 0; i < dim.size(); i++)
             dim[i] = (i < d.size()) ? d.begin()[i] : 0;
     }
 
     tensor_shape(const tensor_shape& o) : dim{o.dim} {}
-    uint16_t operator[](int i) const { return dim[i]; }
+    uint operator[](int i) const { return dim[i]; }
 
-    tensor_shape set(int i, uint16_t v) const {
+    tensor_shape set(int i, uint v) const {
         tensor_shape s = *this;
         s.dim[i] = v;
         return s;
@@ -29,7 +29,7 @@ struct tensor_shape {
         return 0;
     }
 
-    size_t volume() const { return (size() == 0) ? 0 : Product<size_t>(cspan<uint16_t>(dim.data(), size())); }
+    size_t volume() const { return (size() == 0) ? 0 : Product<size_t>(cspan<uint>(dim.data(), size())); }
 
     tensor_shape remove_zeros() const {
         tensor_shape s;
@@ -72,7 +72,7 @@ struct tensor_shape {
         return s;
     }
 
-    uint16_t back() const {
+    uint back() const {
         auto s = size();
         return (s == 0) ? 0 : dim[s - 1];
     }
@@ -93,12 +93,12 @@ struct tensor_shape {
         return s;
     }
 
-    tensor_shape push_front(uint16_t a) const {
+    tensor_shape push_front(uint a) const {
         Check(dim[3] == 0);
         return tensor_shape{a, dim[0], dim[1], dim[2]};
     }
 
-    tensor_shape push_back(uint16_t a) const {
+    tensor_shape push_back(uint a) const {
         Check(dim[3] == 0);
         tensor_shape s = *this;
         s.dim[s.size()] = a;
@@ -120,7 +120,7 @@ struct tensor_shape {
     bool operator!=(tensor_shape o) const { return dim != o.dim; }
 
    private:
-    array<uint16_t, 4> dim;
+    array<uint, 4> dim;
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)
