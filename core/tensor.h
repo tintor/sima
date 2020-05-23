@@ -38,14 +38,6 @@ struct tensor_shape {
         operator size_t() const { return (parent->size == 0) ? 0 : Product<size_t>(cspan<uint>(parent->dim.data(), parent->size)); }
     } volume;
 
-    tensor_shape remove_zeros() const {
-        tensor_shape s;
-        int w = 0;
-        for (int i = 0; i < dim.size(); i++)
-            if (dim[i]) s.dim[w++] = dim[i];
-        return s;
-    }
-
     tensor_shape remove_ones() const {
         tensor_shape s;
         int w = 0;
