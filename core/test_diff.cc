@@ -32,7 +32,12 @@ TEST_CASE("diff: minimize binary cross entropy ", "[diff]") {
     auto x = Param({1}) << "x";
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
-    auto loss = BinaryCrossEntropy(ref, b);
+    //auto loss = BinaryCrossEntropy(ref, b);
+
+    auto grad_cmp = GradCmp(b);
+    auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
+    auto loss1 = BinaryCrossEntropy(ref, grad_cmp.second) << "loss1";
+    auto loss = ValueCmp(loss0, loss1);
 
     for (float e : range(-1.f, 1.f, 0.1f)) {
         x->v[0] = e;
@@ -110,9 +115,18 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     auto e = Param({1}, init) << "e";
 
     auto out = Logistic(x * a + y * b + c, 15) << "out";
-    auto loss = BinaryCrossEntropy(ref, out) << "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
+
+    // Diffing!
+    //auto loss = XBinaryCrossEntropy(ref, out) << "loss0";
+    auto grad_cmp = GradCmp(out);
+    auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
+    auto loss1 = BinaryCrossEntropy(ref, grad_cmp.second) << "loss1";
+    auto loss = ValueCmp(loss0, loss1);
+
+    auto accuracy = Accuracy(ref, out);
+
     Model model(loss, accuracy);
+    model.Print();
 
     // dataset
     const float A = 0.4, B = 0.6, C = -0.4;

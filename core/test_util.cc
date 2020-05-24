@@ -102,14 +102,6 @@ T ShardedSum(cspan<float> v) {
     return a0 + a1 + a2 + a3;
 }
 
-template <typename Func>
-ulong Duration(const Func& func) {
-    Timestamp begin;
-    func(0);
-    Timestamp end;
-    return begin.elapsed(end);
-}
-
 template <typename T>
 T IncrementalMean(cspan<float> v) {
     size_t count = 0;

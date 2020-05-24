@@ -22,6 +22,13 @@ struct Timestamp {
     static double _ms_per_tick;
 };
 
+template <typename Func>
+ulong Duration(const Func& func) {
+    Timestamp start;
+    func();
+    return start.elapsed();
+}
+
 /*template<typename Func>
 auto measure_internal(string_view name, Func func) {
         Timestamp ts;

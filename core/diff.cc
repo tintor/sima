@@ -1,5 +1,7 @@
 #include <core/diff.h>
 
+thread_local bool Diff::has_overload;
+
 static void DFS(PDiff a, unordered_set<Diff*>& visited, vector<PDiff>& out) {
     if (visited.count(a.get())) return;
     visited.insert(a.get());
@@ -90,6 +92,7 @@ void ResetGradients(span<PDiff> nodes) {
 void Backward(span<PDiff> nodes) {
     for (auto i : range(nodes.size())) {
         auto p = nodes[nodes.size() - 1 - i];
+        if (!p->g) continue;
         Timestamp begin;
         p->Backward();
         Timestamp end;
@@ -143,16 +146,17 @@ string Summary(const tensor v) {
 void Print(cspan<PDiff> nodes) {
     auto ids = ComputeIds(nodes);
 
-    ulong ftotal = 0, btotal = 0, dtotal = 0;
+    ulong ftotal = 0, btotal = 0, dtotal = 0, rtotal = 0;
     for (PDiff p : nodes)
         if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
             ftotal += p->forward_ticks;
             btotal += p->backward_ticks;
             dtotal += p->descend_ticks;
+            rtotal += p->reset_ticks;
         }
-    ulong total = ftotal + btotal + dtotal;
+    ulong total = ftotal + btotal + dtotal + rtotal;
 
-    vector<string> table = {"id|type|inputs|shape|forward|backward|descend|ratio|values|gradients|"};
+    vector<string> table = {"id|type|inputs|shape|forward|backward|descend|reset|ratio|values|gradients|"};
     string os;
     for (PDiff p : nodes)
         if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
@@ -185,8 +189,11 @@ void Print(cspan<PDiff> nodes) {
             // descend
             format_s(os, "%s|", (p->descend_ticks + 500) / 1000);
 
+            // reset
+            format_s(os, "%s|", (p->reset_ticks + 500) / 1000);
+
             // ratio
-            ulong ticks = p->forward_ticks + p->backward_ticks + p->descend_ticks;
+            ulong ticks = p->forward_ticks + p->backward_ticks + p->descend_ticks + p->reset_ticks;
             format_s(os, "%.3f|", 100.0f * ticks / total);
 
             // values
@@ -222,6 +229,9 @@ void Print(cspan<PDiff> nodes) {
     // descend
     format_s(os, "%s|", (dtotal + 500) / 1000);
 
+    // reset
+    format_s(os, "%s|", (rtotal + 500) / 1000);
+
     // ratio
     format_s(os, "%.3f|", 100.0f);
 
@@ -233,14 +243,14 @@ void Print(cspan<PDiff> nodes) {
 
     table << os;
 
-    PrintTable(table, '|', " ", {4, 5, 6, 7});
+    PrintTable(table, '|', " ", {4, 5, 6, 7, 8});
 }
 
 Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy) {
     Check(loss->size == 1);
     Check(accuracy->size == 1);
-    // Recompute TopoSort as Setup can add more nodes.
     nodes = TopoSort({loss, accuracy});
+
     // TODO optimize it here:
     // - remove redundant diffs
     // - replace more expensive diffs with cheaper diffs
@@ -250,21 +260,27 @@ Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy) {
     // - cpu vectorized kernels
     // - gpu vectorized kernels
     // - cpu multi-core kernels
-}
 
-vector<uint32_t> ShuffledInts(uint32_t size, std::mt19937_64& random) {
-    vector<uint32_t> out(size);
-    for (auto i : range(size)) out[i] = i;
-    std::shuffle(out.begin(), out.end(), random);
-    return out;
-}
+    for (PDiff p : nodes) {
+        Diff::has_overload = true;
+        p->Forward();
+        if (Diff::has_overload) forward_nodes.push_back(p.get());
+    }
 
-template <typename Func>
-ulong Duration(const Func& func) {
-    Timestamp begin;
-    func();
-    Timestamp end;
-    return begin.elapsed(end);
+    for (PDiff p : nodes) {
+        Diff::has_overload = true;
+        p->Backward();
+        if (Diff::has_overload) backward_nodes.push_back(p.get());
+        std::reverse(backward_nodes.begin(), backward_nodes.end());
+    }
+
+    for (PDiff p : nodes) if (IsParam(p)) param_nodes.push_back(p.get());
+
+    for (PDiff p : nodes) {
+        Diff::has_overload = true;
+        p->EndEpoch();
+        if (Diff::has_overload) end_epoch_nodes.push_back(p.get());
+    }
 }
 
 Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose, uint epoch) {
@@ -279,34 +295,70 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         Check(value.shape().pop_front() == key->shape->pop_front());
     }
 
-    auto samples = ShuffledInts(N, random);
+    if (samples.size() != N) {
+        samples.resize(N);
+        for (auto i : range(N)) samples[i] = i;
+    }
+    std::shuffle(samples.begin(), samples.end(), random);
 
     string msg;
-    Accumulator<float> a_loss, a_accuracy, a_f_ticks, a_b_ticks, a_gd_ticks;
-    ulong f_ticks = 0, b_ticks = 0, gd_ticks = 0;
+    Accumulator<float> a_loss, a_accuracy, a_f_ticks, a_b_ticks, a_gd_ticks, a_r_ticks;
+    ulong f_ticks = 0, b_ticks = 0, gd_ticks = 0, r_ticks = 0;
     ulong message_ticks = 0;
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
             for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(samples[i + j]));
         }
 
-        f_ticks += Duration([&]() { Forward(); });
+        f_ticks += Duration([&]() {
+            for (Diff* p : forward_nodes) {
+                Timestamp ts;
+                p->Forward();
+                p->forward_ticks += ts.elapsed();
+            }
+        });
 
         a_loss << loss->v[0];
         a_accuracy << accuracy->v[0];
 
         if (alpha != 0) {
-            ResetGradients();
+            r_ticks += Duration([&]() {
+                for (Diff* p : param_nodes) {
+                    Timestamp ts;
+                    EACH(p->v) p->g[i] = 0;
+                    p->reset_ticks += ts.elapsed();
+                }
+                for (Diff* p : backward_nodes) {
+                    Timestamp ts;
+                    EACH(p->v) p->g[i] = 0;
+                    p->reset_ticks += ts.elapsed();
+                }
+            });
             loss->g[0] = 1;
-            b_ticks += Duration([&]() { Backward(); });
-            gd_ticks += Duration([&]() { GradientDescent(alpha); });
+
+            b_ticks += Duration([&]() {
+                for (Diff* p : backward_nodes) {
+                    Timestamp ts;
+                    p->Backward();
+                    p->backward_ticks += ts.elapsed();
+                }
+            });
+
+            gd_ticks += Duration([&]() {
+                for (Diff* p : param_nodes) {
+                    Timestamp ts;
+                    EACH(p->v) p->v[i] -= alpha * p->g[i];
+                    p->descend_ticks += ts.elapsed();
+                }
+            });
         }
 
         a_f_ticks << f_ticks;
+        a_r_ticks << r_ticks;
         a_b_ticks << b_ticks;
         a_gd_ticks << gd_ticks;
 
-        ulong ticks = f_ticks + b_ticks + gd_ticks;
+        ulong ticks = f_ticks + b_ticks + r_ticks + gd_ticks;
         if (ticks - message_ticks > long(1e10) && verbose) {
             message_ticks = ticks;
 
@@ -323,6 +375,8 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         }
     }
 
+    for (Diff* p : end_epoch_nodes) p->EndEpoch();
+
     if (verbose) {
         for (char& c : msg) c = '\r';
         cout << msg;
@@ -331,8 +385,8 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         print("%s: %s/%s", epoch, N, N);
         print(" loss:%.4f", a_loss.mean());
         print(" acc:%.4f", a_accuracy.mean());
-        println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
-                ulong(a_gd_ticks.mean()));
+        println(" f_ticks:%h b_ticks:%h gd_ticks:%h r_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
+                ulong(a_gd_ticks.mean()), ulong(a_r_ticks.mean()));
     }
     return {{"loss", a_loss.mean()}, {"accuracy", a_accuracy.mean()}};
 }

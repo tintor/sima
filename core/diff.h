@@ -21,8 +21,11 @@ struct Diff;
 
 struct Diff {
     virtual vector<PDiff> Inputs() { return {}; }
-    virtual void Forward() {}
-    virtual void Backward() {}
+
+    static thread_local bool has_overload;
+    virtual void Forward() { has_overload = false; }
+    virtual void Backward() { has_overload = false; }
+    virtual void EndEpoch() { has_overload = false; }
 
     void Reshape(tensor_shape s) {
         v.reshape(s);
@@ -54,6 +57,7 @@ struct Diff {
     ulong forward_ticks = 0;
     ulong backward_ticks = 0;
     ulong descend_ticks = 0;
+    ulong reset_ticks = 0;
 };
 
 inline PDiff operator<<(PDiff a, string_view name) {
@@ -726,48 +730,155 @@ Declare1(Sum);
 
 // TODO Unary horizontal Min and Max!
 
-struct AveragerT : public Diff1 {
-    AveragerT(PDiff a, float k): Diff1(a) { v.reshape(a->shape); }
+struct RunningAverageT : public Diff1 {
+    RunningAverageT(PDiff a, float k): Diff1(a), k(k) { v.reshape(a->shape); }
     void Forward() override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
     tensor::type k;
 };
 
-inline PDiff Averager(PDiff a, float k) { return make_shared<AveragerT>(a, k); }
+inline PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverageT>(a, k); }
 
-// TODO call end batch after all Forward() and Backward() calls
-struct BatchMeanT : public Diff1 {
-    BatchMeanT(PDiff a): Diff1(a) { v.reshape({1}); v[0] = 0; }
-    void Forward() override { EACH(va) sum += va[i]; count += va.size; }
-    void EndBatch() { v[0] = sum / count; }
+// Returns mean of all input values from prev epoch OR 0 if first epoch.
+struct EpochMeanT : public Diff1 {
+    EpochMeanT(PDiff a): Diff1(a) {
+        v.reshape({1});
+        v[0] = 0;
+    }
+    void Forward() override {
+        EACH(va) sum += va[i];
+        count += va.size;
+    }
+    void EndEpoch() override {
+        v[0] = sum / count;
+        sum = 0;
+        count = 0;
+    }
 
-    double sum;
-    uint count;
+    double sum = 0;
+    uint count = 0;
 };
 
-Declare1(BatchMean);
+Declare1(EpochMean);
 
 inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 
 inline PDiff MeanSquareError(PDiff a, PDiff b) { return Mean(Sqr(a - b)); }
 
-inline PDiff BinaryCrossEntropy(PDiff a, PDiff b) {
+template<typename T>
+inline T RelativeError(T a, T b) {
+    auto abs_error = abs(a - b);
+    return abs_error / max(abs(a), abs(b));
+}
+
+template<typename T>
+inline bool EqualFP(T a, T b) {
+    auto abs_error = abs(a - b);
+    if (a == 0 || b == 0)
+        return abs_error <= 1e-6;
+    return abs_error / max(abs(a), abs(b)) <= 1e-6;
+}
+
+template<typename T>
+inline void CheckEqualFP(T a, T b) {
+    if (!EqualFP(a, b))
+        Fail(format("Expected equality of %.10f and %.10f (abs error %g, rel error %g)", a, b, abs(a - b), RelativeError(a, b)));
+}
+
+struct ValueCmpT : public Diff_vv {
+    ValueCmpT(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    void Forward() override {
+        EACH(v) {
+            v[i] = va[i];
+            CheckEqualFP(va[i], vb[i]);
+        }
+    }
+    void Backward() override {
+        EACH(ga) ga[i] = g[i];
+        EACH(gb) gb[i] = g[i];
+    }
+};
+
+Declare2(ValueCmp, ValueCmpT);
+
+struct GradCmpT : public DiffA {
+    GradCmpT(PDiff a) : DiffA(a) {}
+    void Forward() override { EACH(v) v[i] = va[i]; }
+    void Backward() override {
+        if (++counter != other->counter) return;
+        EACH(ga) ga[i] = g[i];
+        EACH(g) CheckEqualFP(g[i], other->g[i]);
+    }
+    void EndEpoch() override { if (counter != other->counter) Fail(format("%s != %s", counter, other->counter)); }
+
+    uint counter = 0;
+    GradCmpT* other; // can't use shared_ptr because cyclic references
+};
+
+inline pair<PDiff, PDiff> GradCmp(PDiff a) {
+    auto p = make_shared<GradCmpT>(a);
+    auto q = make_shared<GradCmpT>(a);
+    p->other = q.get();
+    q->other = p.get();
+    return {p, q};
+}
+
+struct BinaryCrossEntropyT : public Diff2 {
+    BinaryCrossEntropyT(PDiff ref, PDiff out) : Diff2(ref, out) {
+        Check(a->shape == b->shape);
+        Check(out->g);
+        Check(!ref->g);
+        Reshape({1});
+    }
+    void Forward() override {
+        double s = 0;
+        const tensor::type eps = 1e-6, one = 1;
+        EACH(va) {
+            s -= va[i] * log(max(eps, vb[i]));
+            s -= (one - va[i]) * log(max(eps, one - vb[i]));
+        }
+        v[0] = s / a->size;
+    }
+    void Backward() override {
+        const tensor::type eps = 1e-6, one = 1;
+        EACH(gb) {
+            auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
+            auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
+            gb[i] -= (p - q) * g[0] / a->size;
+        }
+    }
+};
+
+inline PDiff XBinaryCrossEntropy(PDiff a, PDiff b) {
     return Mean(-(a * Log(Max(0.000001, b)) + (1 - a) * Log(Max(0.000001, 1 - b))));
 }
+
+Declare2(BinaryCrossEntropy, BinaryCrossEntropyT);
+
+struct AccuracyT : public Diff2 {
+    AccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
+        Check(a->shape == b->shape);
+        Check(!ref->g);
+        v.reshape({1});
+    }
+    void Forward() override {
+        double s = 0;
+        EACH(va) s += std::abs(va[i] - vb[i]) < 0.5f;
+        v[0] = s / a->size;
+    }
+};
+
+Declare2(Accuracy, AccuracyT);
 
 inline PDiff Softmax(PDiff a) {
     PDiff e = Exp(a);
     return e / Sum(e) << "softmax";
 }
 
-inline PDiff BatchNorm(PDiff a, float k) {
-    auto mean = Mean(a) << "bn_mean";
-    auto stdev = Sqrt(Mean(Sqr(a - mean))) << "bn_stdev";
-    auto avg_mean = Averager(mean, 0.1) << "bn_avg_mean";
-    avg_mean->v[0] = 0;
-    auto avg_stdev = Averager(stdev, 0.1) << "bn_avg_stdev";
-    avg_stdev->v[0] = 1;
-    auto scale = 1 / (k + avg_stdev) << "bn_scale";
-    auto shift = avg_mean * scale << "bn_shift";
+inline PDiff BatchNorm(PDiff a, tensor::type k) {
+    auto mean = EpochMean(a) << "bn_mean";
+    auto stdev = Sqrt(EpochMean(Sqr(a - mean))) << "bn_stdev";
+    auto scale = 1 / (k + stdev) << "bn_scale";
+    auto shift = mean * scale << "bn_shift";
     return a * scale - shift << "bn";
 }
 
@@ -783,7 +894,6 @@ inline bool IsDiff(PDiff a) {
 }
 
 inline bool IsParam(PDiff a) { return IsDiff(a) && a->g; }
-
 inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g; }
 
 void InitBatches(span<PDiff> nodes, int batch_size);
@@ -802,7 +912,8 @@ struct Model {
     PDiff loss;
     PDiff accuracy;
     vector<PDiff> nodes;
-    // TODO filtered lists of nodes for forward, reset_gradients, backward, gradient_descent
+    vector<Diff*> forward_nodes, backward_nodes, end_epoch_nodes, param_nodes;
+    vector<uint32_t> samples;
 
     void Forward() { ::Forward(nodes); }
     void ResetGradients() { ::ResetGradients(nodes); }
