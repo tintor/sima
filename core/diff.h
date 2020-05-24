@@ -288,6 +288,7 @@ struct ErfT : public DiffA {
 };
 Declare1(Erf);
 
+// TODO variation: atan(pi*x/2)*2/pi
 struct AtanT : public DiffA {
     AtanT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = atan(va[i]); }
@@ -310,9 +311,6 @@ struct SoxT : public DiffA {
     void Backward() override { EACH(ga) ga[i] -= g[i] * va[i] * cube(v[i]); }
 };
 Declare1(Sox);
-
-// TODO non-linealities to try:
-// atan(pi*x/2)*2/pi
 
 struct SqrT : public DiffA {
     SqrT(PDiff a) : DiffA(a) {}
