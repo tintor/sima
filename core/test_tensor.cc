@@ -1,5 +1,5 @@
-#include <core/tensor.h>
 #include <core/format.h>
+#include <core/tensor.h>
 
 #include <catch.hpp>
 

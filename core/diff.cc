@@ -17,20 +17,22 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
     return out;
 }
 
-bool IsBroadcastable(tensor_shape a, tensor_shape b) {
-    return a.size != 0 && (a.volume == 1 || a == b.last(a.size));
-}
+bool IsBroadcastable(tensor_shape a, tensor_shape b) { return a.size != 0 && (a.volume == 1 || a == b.last(a.size)); }
 
 struct BroadcastS : public Diff1 {
     BroadcastS(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
     void Forward() override { EACH(v) v[i] = va[0]; }
-    void Backward() override { if (ga) EACH(g) ga[0] += g[i]; }
+    void Backward() override {
+        if (ga) EACH(g) ga[0] += g[i];
+    }
 };
 
 struct BroadcastT : public Diff1 {
     BroadcastT(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
     void Forward() override { EACH(v) v[i] = va[i % va.size]; }
-    void Backward() override { if (ga) EACH(g) ga[i % ga.size] += g[i]; }
+    void Backward() override {
+        if (ga) EACH(g) ga[i % ga.size] += g[i];
+    }
 };
 
 PDiff Broadcast(PDiff a, tensor_shape b) {
@@ -112,8 +114,10 @@ void GradientDescent(span<PDiff> nodes, const float alpha) {
 
 bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
     for (PDiff p : nodes) {
-        for (auto e : p->v) if (!std::isfinite(e) || abs(e) > limit) return false;
-        for (auto e : p->g) if (!std::isfinite(e) || abs(e) > limit) return false;
+        for (auto e : p->v)
+            if (!std::isfinite(e) || abs(e) > limit) return false;
+        for (auto e : p->g)
+            if (!std::isfinite(e) || abs(e) > limit) return false;
     }
     return true;
 }
@@ -274,7 +278,8 @@ Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy) {
         std::reverse(backward_nodes.begin(), backward_nodes.end());
     }
 
-    for (PDiff p : nodes) if (IsParam(p)) param_nodes.push_back(p.get());
+    for (PDiff p : nodes)
+        if (IsParam(p)) param_nodes.push_back(p.get());
 
     for (PDiff p : nodes) {
         Diff::has_overload = true;
@@ -283,7 +288,8 @@ Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy) {
     }
 }
 
-Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose, uint epoch) {
+Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose,
+                     uint epoch) {
     Check(data.size() > 0);
     const auto B = data[0].first->shape(0);
     const auto N = data[0].second.shape()[0];

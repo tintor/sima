@@ -32,7 +32,7 @@ TEST_CASE("diff: minimize binary cross entropy ", "[diff]") {
     auto x = Param({1}) << "x";
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
-    //auto loss = BinaryCrossEntropy(ref, b);
+    // auto loss = BinaryCrossEntropy(ref, b);
 
     auto grad_cmp = GradCmp(b);
     auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
@@ -117,7 +117,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     auto out = Logistic(x * a + y * b + c, 15) << "out";
 
     // Diffing!
-    //auto loss = XBinaryCrossEntropy(ref, out) << "loss0";
+    // auto loss = XBinaryCrossEntropy(ref, out) << "loss0";
     auto grad_cmp = GradCmp(out);
     auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
     auto loss1 = BinaryCrossEntropy(ref, grad_cmp.second) << "loss1";
@@ -160,7 +160,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     for (auto i : range(100)) metrics = model.Epoch(dataset, 0.1, random, true, i);
     Print(model.nodes);
 
-    //REQUIRE(metrics.at("accuracy") >= 0.9960);
+    // REQUIRE(metrics.at("accuracy") >= 0.9960);
 }
 
 PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
@@ -289,7 +289,7 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
     std::mt19937_64 random(2);
     auto init = make_shared<NormalInit>(1, random);
 
-    //auto proc = BatchNorm(in, 1e-10) << "proc";
+    // auto proc = BatchNorm(in, 1e-10) << "proc";
 
     auto hidden = Logistic(FullyConnected(in, 3, init)) << "hidden";
     // hidden = BatchNorm(hidden, 1e-10);

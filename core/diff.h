@@ -1,9 +1,9 @@
 #pragma once
 #include <core/auto.h>
+#include <core/property.h>
 #include <core/range.h>
 #include <core/std.h>
 #include <core/tensor.h>
-#include <core/property.h>
 
 // Stages of Diff graph:
 // - construction - final size of tensors is known
@@ -41,15 +41,18 @@ struct Diff {
         bool operator==(const Shape& o) const { return parent->v.shape() == o; }
         bool operator==(const tensor_shape& o) const { return parent->v.shape() == o; }
         operator string() const { return string(parent->v.shape()); }
-    } shape;
+    }
+    shape;
 
     Property(Diff) {
         operator uint() const { return parent->v.shape().size; }
-    } rank;
+    }
+    rank;
 
     Property(Diff) {
         operator size_t() const { return parent->v.size; }
-    } size;
+    }
+    size;
 
     string name;
     vtensor v, g;
@@ -80,17 +83,20 @@ inline vector<PDiff> LoadModel(string_view filename) { return {}; }
 
 inline void SaveModel(span<PDiff> model, string_view filename) {}
 
-#define TensorProperty(TENSOR, TYPE, PARENT) \
-    TProperty(TYPE, PARENT) { \
-        tensor::type operator[](size_t i) const { return parent->TENSOR[i]; } \
-        tensor::type& operator[](size_t i) { return parent->TENSOR[i]; } \
+#define TensorProperty(TENSOR, TYPE, PARENT)                                               \
+    TProperty(TYPE, PARENT) {                                                              \
+        tensor::type operator[](size_t i) const { return parent->TENSOR[i]; }              \
+        tensor::type& operator[](size_t i) { return parent->TENSOR[i]; }                   \
         tensor::type operator()(size_t i, size_t j) const { return parent->TENSOR(i, j); } \
-        tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); } \
-        Property(TYPE) { operator size_t() const { return parent->parent->TENSOR.size; } } size; \
-        const auto& shape() const { return parent->TENSOR.shape(); } \
-        operator bool() const { return parent->TENSOR; } \
-        operator tensor(){ return parent->TENSOR; } \
-        operator vtensor&() { return parent->TENSOR; } \
+        tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); }      \
+        Property(TYPE) {                                                                   \
+            operator size_t() const { return parent->parent->TENSOR.size; }                \
+        }                                                                                  \
+        size;                                                                              \
+        const auto& shape() const { return parent->TENSOR.shape(); }                       \
+        operator bool() const { return parent->TENSOR; }                                   \
+        operator tensor() { return parent->TENSOR; }                                       \
+        operator vtensor&() { return parent->TENSOR; }                                     \
     }
 
 struct Diff1 : public Diff {
@@ -201,7 +207,9 @@ inline PDiff Data(tensor_shape shape) {
 
 struct GaussianT : public Diff {
     GaussianT(tensor_shape shape, tensor::type mean, tensor::type stdev, size_t seed)
-        : normal(mean, stdev), random(seed) { v.reshape(shape); }
+        : normal(mean, stdev), random(seed) {
+        v.reshape(shape);
+    }
     void Forward() override { EACH(v) v[i] = normal(random); }
     std::normal_distribution<tensor::type> normal;
     std::mt19937_64 random;
@@ -219,9 +227,7 @@ struct ReluT : public DiffA {
 Declare1(Relu);
 
 PDiff operator+(PDiff a, PDiff b);
-inline PDiff NoisyRelu(PDiff a, size_t seed) {
-    return Relu(a + Gaussian(a->shape, 0, 1, seed));
-}
+inline PDiff NoisyRelu(PDiff a, size_t seed) { return Relu(a + Gaussian(a->shape, 0, 1, seed)); }
 
 // SmoothRelu
 struct SoftplusT : public DiffA {
@@ -239,7 +245,7 @@ struct LeakyReluT : public DiffA {
 Declare1(LeakyRelu);
 
 struct ParametricReluT : public Diff_vv {
-    ParametricReluT(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    ParametricReluT(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] * vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] * vb[i]);
@@ -254,9 +260,7 @@ struct ELUT : public DiffA {
     void Backward() override { Check(false, "not implemented"); }
     double k;
 };
-inline PDiff ELU(PDiff a, double k) {
-    return make_shared<ELUT>(a, k);
-}
+inline PDiff ELU(PDiff a, double k) { return make_shared<ELUT>(a, k); }
 
 struct LogisticT : public DiffA {
     LogisticT(PDiff a) : DiffA(a) {}
@@ -373,7 +377,7 @@ inline tensor::type Dot(const tensor a, const tensor b, tensor::type s = 0) {
 }
 
 struct Add_vv : public Diff_vv {
-    Add_vv(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    Add_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] + vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -382,7 +386,7 @@ struct Add_vv : public Diff_vv {
 };
 
 struct Add_vs : public Diff_vs {
-    Add_vs(PDiff a, PDiff b) : Diff_vs(a, b) { }
+    Add_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] + vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -419,7 +423,7 @@ inline auto operator+(tensor::type a, PDiff b) { return b + Const(a); }
 inline auto operator+(PDiff a, tensor::type b) { return a + Const(b); }
 
 struct Sub_vv : public Diff_vv {
-    Sub_vv(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    Sub_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] - vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -428,7 +432,7 @@ struct Sub_vv : public Diff_vv {
 };
 
 struct Sub_vs : public Diff_vs {
-    Sub_vs(PDiff a, PDiff b) : Diff_vs(a, b) { }
+    Sub_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] - vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -437,7 +441,7 @@ struct Sub_vs : public Diff_vs {
 };
 
 struct Sub_sv : public Diff_sv {
-    Sub_sv(PDiff a, PDiff b) : Diff_sv(a, b) { }
+    Sub_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
     void Forward() override { EACH(v) v[i] = va[0] - vb[i]; }
     void Backward() override {
         if (ga) ga[0] += Sum(g, ga[0]);
@@ -454,7 +458,7 @@ inline auto operator-(tensor::type a, PDiff b) { return Const(a) - b; }
 inline auto operator-(PDiff a, tensor::type b) { return a - Const(b); }
 
 struct Neg : public DiffA {
-    Neg(PDiff a) : DiffA(a) { }
+    Neg(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = -va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i]; }
 };
@@ -491,7 +495,7 @@ inline auto operator*(tensor::type a, PDiff b) { return b * Const(a); }
 inline auto operator*(PDiff a, tensor::type b) { return a * Const(b); }
 
 struct Div_vv : public Diff_vv {
-    Div_vv(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    Div_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] / vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[i];
@@ -500,7 +504,7 @@ struct Div_vv : public Diff_vv {
 };
 
 struct Div_vs : public Diff_vs {
-    Div_vs(PDiff a, PDiff b) : Diff_vs(a, b) { }
+    Div_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
     void Forward() override { EACH(v) v[i] = va[i] / vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[0];
@@ -509,7 +513,7 @@ struct Div_vs : public Diff_vs {
 };
 
 struct Div_sv : public Diff_sv {
-    Div_sv(PDiff a, PDiff b) : Diff_sv(a, b) { }
+    Div_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
     void Forward() override { EACH(v) v[i] = va[0] / vb[i]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i] / vb[i];
@@ -524,23 +528,21 @@ inline PDiff operator/(PDiff a, PDiff b) {
 }
 
 struct InvT : public DiffA {
-    InvT(PDiff a) : DiffA(a) { }
+    InvT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = 1 / va[i]; }
-    void Backward() override {
-        EACH(ga) ga[i] -= g[i] * sqr(v[i]);
-    }
+    void Backward() override { EACH(ga) ga[i] -= g[i] * sqr(v[i]); }
 };
 
 Declare1(Inv);
 inline auto operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
 inline auto operator/(PDiff a, tensor::type b) { return a / Const(b); }
 
-#define RELATION(NAME, OP)                                                   \
-    struct NAME : public Diff_vv {                                           \
-        NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                            \
-        void Forward() override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; } \
-    };                                                                       \
-    Declare2(operator OP, NAME); \
+#define RELATION(NAME, OP)                                                                          \
+    struct NAME : public Diff_vv {                                                                  \
+        NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                                                   \
+        void Forward() override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; }                        \
+    };                                                                                              \
+    Declare2(operator OP, NAME);                                                                    \
     inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape) OP b; } \
     inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape); }
 
@@ -564,7 +566,7 @@ inline auto Min(tensor::type a, PDiff b) { return Min(Broadcast(Const(a), b->sha
 inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->shape)); }
 
 struct MaxT : public Diff_vv {
-    MaxT(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    MaxT(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = max(va[i], vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] > vb[i]) * g[i];
@@ -680,8 +682,7 @@ struct VecMatMulT : public Diff2 {
         for (auto im : range(m)) {
             for (auto iq : range(q)) {
                 tensor::type s = 0;
-                for (auto ip : range(p))
-                    s += va[im * p + ip] * vb[iq * p + ip];
+                for (auto ip : range(p)) s += va[im * p + ip] * vb[iq * p + ip];
                 v[im * q + iq] = s;
             }
         }
@@ -696,8 +697,7 @@ struct VecMatMulT : public Diff2 {
             for (auto im : range(m))
                 for (auto ip : range(p)) {
                     tensor::type s = ga[im * p + ip];
-                    for (auto iq : range(q))
-                        s += g[im * q + iq] * vb[iq * p + ip];
+                    for (auto iq : range(q)) s += g[im * q + iq] * vb[iq * p + ip];
                     ga[im * p + ip] = s;
                 }
         }
@@ -705,8 +705,7 @@ struct VecMatMulT : public Diff2 {
             for (auto iq : range(q))
                 for (auto ip : range(p)) {
                     tensor::type s = gb[iq * p + ip];
-                    for (auto im : range(m))
-                        s += g[im * q + iq] * va[im * p + ip];
+                    for (auto im : range(m)) s += g[im * q + iq] * va[im * p + ip];
                     gb[iq * p + ip] = s;
                 }
         }
@@ -726,7 +725,7 @@ Declare1(Sum);
 // TODO Unary horizontal Min and Max!
 
 struct RunningAverageT : public Diff1 {
-    RunningAverageT(PDiff a, float k): Diff1(a), k(k) { v.reshape(a->shape); }
+    RunningAverageT(PDiff a, float k) : Diff1(a), k(k) { v.reshape(a->shape); }
     void Forward() override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
     tensor::type k;
 };
@@ -735,7 +734,7 @@ inline PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverag
 
 // Returns mean of all input values from prev epoch OR 0 if first epoch.
 struct EpochMeanT : public Diff1 {
-    EpochMeanT(PDiff a): Diff1(a) {
+    EpochMeanT(PDiff a) : Diff1(a) {
         v.reshape({1});
         v[0] = 0;
     }
@@ -759,28 +758,28 @@ inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 
 inline PDiff MeanSquareError(PDiff a, PDiff b) { return Mean(Sqr(a - b)); }
 
-template<typename T>
+template <typename T>
 inline T RelativeError(T a, T b) {
     auto abs_error = abs(a - b);
     return abs_error / max(abs(a), abs(b));
 }
 
-template<typename T>
+template <typename T>
 inline bool EqualFP(T a, T b) {
     auto abs_error = abs(a - b);
-    if (a == 0 || b == 0)
-        return abs_error <= 1e-6;
+    if (a == 0 || b == 0) return abs_error <= 1e-6;
     return abs_error / max(abs(a), abs(b)) <= 1e-6;
 }
 
-template<typename T>
+template <typename T>
 inline void CheckEqualFP(T a, T b) {
     if (!EqualFP(a, b))
-        Fail(format("Expected equality of %.10f and %.10f (abs error %g, rel error %g)", a, b, abs(a - b), RelativeError(a, b)));
+        Fail(format("Expected equality of %.10f and %.10f (abs error %g, rel error %g)", a, b, abs(a - b),
+                    RelativeError(a, b)));
 }
 
 struct ValueCmpT : public Diff_vv {
-    ValueCmpT(PDiff a, PDiff b) : Diff_vv(a, b) { }
+    ValueCmpT(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override {
         EACH(v) {
             v[i] = va[i];
@@ -803,10 +802,12 @@ struct GradCmpT : public DiffA {
         EACH(ga) ga[i] = g[i];
         EACH(g) CheckEqualFP(g[i], other->g[i]);
     }
-    void EndEpoch() override { if (counter != other->counter) Fail(format("%s != %s", counter, other->counter)); }
+    void EndEpoch() override {
+        if (counter != other->counter) Fail(format("%s != %s", counter, other->counter));
+    }
 
     uint counter = 0;
-    GradCmpT* other; // can't use shared_ptr because cyclic references
+    GradCmpT* other;  // can't use shared_ptr because cyclic references
 };
 
 inline pair<PDiff, PDiff> GradCmp(PDiff a) {
@@ -916,5 +917,6 @@ struct Model {
     void GradientDescent(tensor::type alpha) { ::GradientDescent(nodes, alpha); }
     void Print() const { ::Print(nodes); }
 
-    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
+    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true,
+                  uint epoch = 0);
 };

@@ -1,19 +1,17 @@
 #pragma once
 #include <core/format.h>
+#include <core/property.h>
 #include <core/std.h>
 #include <core/util.h>
-#include <core/property.h>
 
 struct tensor_shape {
     tensor_shape() {
-        for (size_t i = 0; i < dim.size(); i++)
-            dim[i] = 0;
+        for (size_t i = 0; i < dim.size(); i++) dim[i] = 0;
     }
 
     tensor_shape(std::initializer_list<uint> d) {
         for (auto e : d) Check(e > 0);
-        for (size_t i = 0; i < dim.size(); i++)
-            dim[i] = (i < d.size()) ? d.begin()[i] : 0;
+        for (size_t i = 0; i < dim.size(); i++) dim[i] = (i < d.size()) ? d.begin()[i] : 0;
     }
 
     tensor_shape(const tensor_shape& o) : dim{o.dim} {}
@@ -32,11 +30,15 @@ struct tensor_shape {
                 if (parent->dim[i]) return i + 1;
             return 0;
         }
-    } size;
+    }
+    size;
 
     Property(tensor_shape) {
-        operator size_t() const { return (parent->size == 0) ? 0 : Product<size_t>(cspan<uint>(parent->dim.data(), parent->size)); }
-    } volume;
+        operator size_t() const {
+            return (parent->size == 0) ? 0 : Product<size_t>(cspan<uint>(parent->dim.data(), parent->size));
+        }
+    }
+    volume;
 
     tensor_shape remove_ones() const {
         tensor_shape s;
@@ -123,8 +125,7 @@ struct tensor_shape {
 
     tensor_shape(std::initializer_list<uint> d, int) {
         DCheck(d.size() == dim.size(), "");
-        for (size_t i = 0; i < dim.size(); i++)
-            dim[i] = d.begin()[i];
+        for (size_t i = 0; i < dim.size(); i++) dim[i] = d.begin()[i];
     }
 };
 
@@ -154,13 +155,15 @@ class Tensor {
 
     Property(Tensor) {
         operator size_t() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.volume; }
-    } size;
+    }
+    size;
 
     const auto& shape() const { return m_shape; }
 
     Property(Tensor) {
         operator uint() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.size; }
-    } rank;
+    }
+    rank;
 
     T& operator[](size_t index) {
         DCheck(index < size(), format("%s < %s", index, size));
@@ -294,9 +297,10 @@ class VTensor : public Tensor<T> {
     }
 
     TProperty(Size, VTensor) {
-        //using Prop = PropertyT<VTensor, __LINE__ - 1>;
+        // using Prop = PropertyT<VTensor, __LINE__ - 1>;
         operator size_t() const { return Size::parent->m_vector.size(); }
-    } size;
+    }
+    size;
 
     void reshape(tensor_shape new_shape, T init = T()) {
         Tensor<T>::m_shape = new_shape;

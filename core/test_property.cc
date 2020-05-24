@@ -8,12 +8,14 @@ struct M {
     Property(M) {
         void operator=(const long i) { parent->value = i; }
         operator long() const { return parent->value; }
-    } a;
+    }
+    a;
 
     Property(M) {
         void operator=(const long i) { parent->value = i * 2; }
         operator long() const { return parent->value / 2; }
-    } half_a;
+    }
+    half_a;
 };
 
 static_assert(sizeof(M) == 8);

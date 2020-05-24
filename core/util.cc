@@ -24,9 +24,11 @@ void PrintTable(cspan<string> rows, char separator, string_view splitter, cspan<
         auto s = split(row, separator, false);
         for (size_t i = 0; i < s.size(); i++) {
             if (i > 0) cout << splitter;
-            if (is_right[i]) for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
+            if (is_right[i])
+                for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
             cout << s[i];
-            if (!is_right[i]) for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
+            if (!is_right[i])
+                for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
         }
         cout << '\n';
     }

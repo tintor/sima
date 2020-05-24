@@ -23,7 +23,7 @@ T cube(T a) {
     return a * a * a;
 }
 
-template<typename T, typename P>
+template <typename T, typename P>
 T lerp(T a, T b, P t) {
     return a + (b - a) * t;
 }
