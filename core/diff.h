@@ -535,17 +535,14 @@ Declare1(Inv);
 inline auto operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
 inline auto operator/(PDiff a, tensor::type b) { return a / Const(b); }
 
-#define CONST_OVERLOAD(OP)                                                                            \
-    inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape) OP b; } \
-    inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape); }
-
 #define RELATION(NAME, OP)                                                   \
     struct NAME : public Diff_vv {                                           \
         NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                            \
         void Forward() override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; } \
     };                                                                       \
     Declare2(operator OP, NAME); \
-    CONST_OVERLOAD(OP)
+    inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape) OP b; } \
+    inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape); }
 
 RELATION(Greater, >);
 RELATION(Less_, <);
