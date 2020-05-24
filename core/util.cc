@@ -10,20 +10,23 @@ string Demangle(const char* name) {
     return out;
 }
 
-void PrintTable(cspan<string> rows, char separator, string_view splitter) {
+void PrintTable(cspan<string> rows, char separator, string_view splitter, cspan<int> right) {
     vector<size_t> columns;
     for (const string& row : rows) {
         auto s = split(row, separator, false);
         if (s.size() > columns.size()) columns.resize(s.size());
         for (size_t i = 0; i < s.size(); i++) columns[i] = max(columns[i], s[i].size());
     }
+    vector<bool> is_right(columns.size(), false);
+    for (auto e : right) is_right[e] = true;
 
     for (const string& row : rows) {
         auto s = split(row, separator, false);
         for (size_t i = 0; i < s.size(); i++) {
             if (i > 0) cout << splitter;
+            if (is_right[i]) for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
             cout << s[i];
-            for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
+            if (!is_right[i]) for (size_t j = s[i].size(); j < columns[i]; j++) cout << ' ';
         }
         cout << '\n';
     }

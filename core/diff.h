@@ -53,6 +53,7 @@ struct Diff {
 
     ulong forward_ticks = 0;
     ulong backward_ticks = 0;
+    ulong descend_ticks = 0;
 };
 
 inline PDiff operator<<(PDiff a, string_view name) {
@@ -260,6 +261,15 @@ struct LogisticT : public DiffA {
 };
 Declare1(Logistic);
 
+struct ClampLogisticT : public DiffA {
+    ClampLogisticT(PDiff a, tensor::type limit) : DiffA(a), limit(limit) {}
+    void Forward() override { EACH(v) v[i] = 1 / (1 + exp(clamp(-va[i], -limit, limit))); }
+    void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
+    tensor::type limit;
+};
+
+inline PDiff Logistic(PDiff a, float limit) { return make_shared<ClampLogisticT>(a, limit); }
+
 struct TanhT : public DiffA {
     TanhT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = tanh(va[i]); }
@@ -429,7 +439,7 @@ struct Sub_sv : public Diff_sv {
     void Forward() override { EACH(v) v[i] = va[0] - vb[i]; }
     void Backward() override {
         if (ga) ga[0] += Sum(g, ga[0]);
-        EACH(gb) gb[i] += g[i];
+        EACH(gb) gb[i] -= g[i];
     }
 };
 
@@ -457,7 +467,7 @@ struct Mul_vs : public Diff_vs {
     void Forward() override { EACH(v) v[i] = va[i] * vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] * vb[0];
-        if (gb) gb[0] += Dot(g, va, gb[0]);
+        if (gb) gb[0] += Dot(g, va);
     }
 };
 
@@ -753,7 +763,7 @@ inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 inline PDiff MeanSquareError(PDiff a, PDiff b) { return Mean(Sqr(a - b)); }
 
 inline PDiff BinaryCrossEntropy(PDiff a, PDiff b) {
-    return -(a * Log(b) + (1 - a) * Log(1 - b));
+    return Mean(-(a * Log(Max(0.000001, b)) + (1 - a) * Log(Max(0.000001, 1 - b))));
 }
 
 inline PDiff Softmax(PDiff a) {
@@ -789,7 +799,6 @@ inline bool IsParam(PDiff a) { return IsDiff(a) && a->g; }
 inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g; }
 
 void InitBatches(span<PDiff> nodes, int batch_size);
-void ResetTicks(span<PDiff> nodes);
 void Forward(span<PDiff> nodes);
 void ResetGradients(span<PDiff> nodes);
 void Backward(span<PDiff> nodes);
@@ -813,5 +822,5 @@ struct Model {
     void GradientDescent(tensor::type alpha) { ::GradientDescent(nodes, alpha); }
     void Print() const { ::Print(nodes); }
 
-    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true);
+    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 };

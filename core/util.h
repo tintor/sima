@@ -281,4 +281,4 @@ inline string TypeName(const T& value) {
     return Demangle(typeid(value).name());
 }
 
-void PrintTable(cspan<string> rows, char separator, string_view splitter);
+void PrintTable(cspan<string> rows, char separator, string_view splitter, cspan<int> right = {});

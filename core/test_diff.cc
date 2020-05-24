@@ -12,29 +12,47 @@ void Iterate(span<PDiff> nodes, float alpha, size_t iterations) {
     }
 }
 
+void Minimize(PDiff loss, float alpha, size_t iterations) {
+    auto nodes = TopoSort({loss});
+    Iterate(nodes, alpha, iterations);
+}
+
 TEST_CASE("diff: minimize circle", "[diff]") {
     auto x = Param({1}) << "x";
     auto y = Param({1}) << "y";
-    auto loss = Sqr(x) + Sqr(y);
-    loss->name = "loss";
-
-    auto nodes = TopoSort({loss});
     x->v[0] = 3.14f;
     y->v[0] = 2.16f;
-    Forward(nodes);
-    REQUIRE(loss->v[0] == sqr(3.14f) + sqr(2.16f));
-
-    Iterate(nodes, 0.1, 70);
-    Print(nodes);
+    Minimize(Sqr(x) + Sqr(y), 0.1, 70);
 
     REQUIRE(abs(x->v[0]) < 1e-6);
     REQUIRE(abs(y->v[0]) < 1e-6);
 }
 
-void Minimize(PDiff loss, float alpha, size_t iterations) {
-    auto nodes = TopoSort({loss});
-    Iterate(nodes, alpha, iterations);
-    Print(nodes);
+TEST_CASE("diff: minimize binary cross entropy ", "[diff]") {
+    auto x = Param({1}) << "x";
+    auto ref = Const(0);
+    auto b = Logistic(x) << "b";
+    auto loss = BinaryCrossEntropy(ref, b);
+
+    for (float e : range(-1.f, 1.f, 0.1f)) {
+        x->v[0] = e;
+        ref->v[0] = 0;
+        auto nodes = TopoSort({loss});
+        Forward(nodes);
+        println("x:%s r:%s b:%s", x->v[0], ref->v[0], b->v[0]);
+        Minimize(loss, 0.05, 500);
+        REQUIRE(b->v[0] <= 0.05);
+    }
+
+    for (float e : range(-1.f, 1.f, 0.1f)) {
+        x->v[0] = e;
+        ref->v[0] = 1;
+        auto nodes = TopoSort({loss});
+        Forward(nodes);
+        println("x:%s r:%s b:%s", x->v[0], ref->v[0], b->v[0]);
+        Minimize(loss, 0.05, 500);
+        REQUIRE(b->v[0] >= 0.95);
+    }
 }
 
 TEST_CASE("diff: minimize booth", "[diff]") {
@@ -77,7 +95,7 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
     Optimize("hölder table", 10, return -abs(sin(x)*cos(y)*exp(abs(1 - sqrt(x*x + y*y)/PI))));
 #endif
 
-TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
+TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     const int Batch = 20;
     auto x = Data({Batch, 1}) << "x";
     auto y = Data({Batch, 1}) << "y";
@@ -91,8 +109,8 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     auto w = Param({1}, init) << "w";
     auto e = Param({1}, init) << "e";
 
-    auto out = Tanh(x * a + y * b + c) * 0.5 + 0.5 << "out";
-    auto loss = MeanSquareError(out, ref) << "loss";
+    auto out = Logistic(x * a + y * b + c, 15) << "out";
+    auto loss = BinaryCrossEntropy(ref, out) << "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
     Model model(loss, accuracy);
 
@@ -125,10 +143,10 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     println("train ...");
     Print(model.nodes);
     Metrics metrics;
-    for (auto i : range(800)) metrics = model.Epoch(dataset, 0.1, random, false);
+    for (auto i : range(100)) metrics = model.Epoch(dataset, 0.1, random, true, i);
     Print(model.nodes);
 
-    REQUIRE(metrics.at("accuracy") >= 0.9965);
+    //REQUIRE(metrics.at("accuracy") >= 0.9960);
 }
 
 PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
@@ -257,20 +275,20 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
     std::mt19937_64 random(2);
     auto init = make_shared<NormalInit>(1, random);
 
-    auto proc = BatchNorm(in, 1e-10) << "proc";
+    //auto proc = BatchNorm(in, 1e-10) << "proc";
 
-    auto hidden = Logistic(FullyConnected(proc, 3, init)) << "hidden";
+    auto hidden = Logistic(FullyConnected(in, 3, init)) << "hidden";
     // hidden = BatchNorm(hidden, 1e-10);
     auto out = Logistic(FullyConnected(hidden, 1, init)) << "out";
 
-    auto loss = MeanSquareError(out, ref) << "loss";
+    auto loss = BinaryCrossEntropy(ref, out) << "loss";
     auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
     Model model(loss, accuracy);
 
     // dataset
     UniformInit gen(-1, 1, random);
     const int Classes = 2;
-    const int SamplesPerClass = 20000;
+    const int SamplesPerClass = 10000;
     const int Samples = Classes * SamplesPerClass;
     vtensor data_in({Samples, 2}, 0);
     vtensor data_ref({Samples, 1}, 0);
@@ -297,11 +315,9 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
 
     metrics = model.Epoch(dataset, 0.01, random, true);
     Print(model.nodes);
-    metrics = model.Epoch(dataset, 0.01, random, true);
-    Print(model.nodes);
-
     return;
-    for (auto i : range(1000)) {
+
+    for (auto i : range(10000)) {
         metrics = model.Epoch(dataset, 0.01, random, i % 25 == 24);
         if (i % 25 == 24) Print(model.nodes);
     }

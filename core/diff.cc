@@ -32,6 +32,7 @@ struct BroadcastT : public Diff1 {
 };
 
 PDiff Broadcast(PDiff a, tensor_shape b) {
+    if (a->shape == b) return a;
     if (a->size == 1) return make_shared<BroadcastS>(a, b);
     if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
     Check(false);
@@ -73,10 +74,6 @@ void MaxPool2D::Backward() {
     }
 }
 
-void ResetTicks(span<PDiff> nodes) {
-    for (PDiff p : nodes) p->forward_ticks = p->backward_ticks = 0;
-}
-
 void Forward(span<PDiff> nodes) {
     for (PDiff p : nodes) {
         Timestamp begin;
@@ -102,7 +99,12 @@ void Backward(span<PDiff> nodes) {
 
 void GradientDescent(span<PDiff> nodes, const float alpha) {
     for (PDiff p : nodes)
-        if (IsParam(p)) EACH(p->v) p->v[i] -= alpha * p->g[i];
+        if (IsParam(p)) {
+            Timestamp begin;
+            EACH(p->v) p->v[i] -= alpha * p->g[i];
+            Timestamp end;
+            p->descend_ticks += begin.elapsed(end);
+        }
 }
 
 bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
@@ -140,7 +142,17 @@ string Summary(const tensor v) {
 
 void Print(cspan<PDiff> nodes) {
     auto ids = ComputeIds(nodes);
-    vector<string> table = {"id|type|inputs|shape|fticks|bticks|values|gradients|"};
+
+    ulong ftotal = 0, btotal = 0, dtotal = 0;
+    for (PDiff p : nodes)
+        if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
+            ftotal += p->forward_ticks;
+            btotal += p->backward_ticks;
+            dtotal += p->descend_ticks;
+        }
+    ulong total = ftotal + btotal + dtotal;
+
+    vector<string> table = {"id|type|inputs|shape|forward|backward|descend|ratio|values|gradients|"};
     string os;
     for (PDiff p : nodes)
         if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
@@ -164,23 +176,69 @@ void Print(cspan<PDiff> nodes) {
             // shape
             format_s(os, "%s|", string(p->shape));
 
-            // fticks
+            // forward
             format_s(os, "%s|", (p->forward_ticks + 500) / 1000);
 
-            // bticks
+            // backward
             format_s(os, "%s|", (p->backward_ticks + 500) / 1000);
 
+            // descend
+            format_s(os, "%s|", (p->descend_ticks + 500) / 1000);
+
+            // ratio
+            ulong ticks = p->forward_ticks + p->backward_ticks + p->descend_ticks;
+            format_s(os, "%.3f|", 100.0f * ticks / total);
+
+            // values
             size_t summary = 6;
             format_s(os, "%s|", (p->v.size >= summary) ? Summary(p->v) : string(p->v));
 
+            // gradients
             format_s(os, "%s|", (p->g.size >= summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }
-    PrintTable(table, '|', " ");
+
+    os.clear();
+
+    // id
+    os += '|';
+
+    // type
+    os += '|';
+
+    // inputs
+    os += '|';
+
+    // shape
+    os += '|';
+
+    // forward
+    format_s(os, "%s|", (ftotal + 500) / 1000);
+
+    // backward
+    format_s(os, "%s|", (btotal + 500) / 1000);
+
+    // descend
+    format_s(os, "%s|", (dtotal + 500) / 1000);
+
+    // ratio
+    format_s(os, "%.3f|", 100.0f);
+
+    // values
+    os += '|';
+
+    // gradients
+    os += '|';
+
+    table << os;
+
+    PrintTable(table, '|', " ", {4, 5, 6, 7});
 }
 
-Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy), nodes(TopoSort({loss, accuracy})) {
+Model::Model(PDiff loss, PDiff accuracy) : loss(loss), accuracy(accuracy) {
+    Check(loss->size == 1);
+    Check(accuracy->size == 1);
     // Recompute TopoSort as Setup can add more nodes.
     nodes = TopoSort({loss, accuracy});
     // TODO optimize it here:
@@ -209,7 +267,7 @@ ulong Duration(const Func& func) {
     return begin.elapsed(end);
 }
 
-Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose) {
+Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose, uint epoch) {
     Check(data.size() > 0);
     const auto B = data[0].first->shape(0);
     const auto N = data[0].second.shape()[0];
@@ -256,7 +314,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
             cout << msg;
             msg.clear();
 
-            format_s(msg, "%s/%s", i + B, N);
+            format_s(msg, "%s: %s/%s", epoch, i + B, N);
             format_s(msg, " loss:%.4f", a_loss.mean());
             format_s(msg, " acc:%.4f", a_accuracy.mean());
             msg += "   ";
@@ -270,7 +328,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt
         cout << msg;
         msg.clear();
 
-        print("%s/%s", N, N);
+        print("%s: %s/%s", epoch, N, N);
         print(" loss:%.4f", a_loss.mean());
         print(" acc:%.4f", a_accuracy.mean());
         println(" f_ticks:%h b_ticks:%h gd_ticks:%h", ulong(a_f_ticks.mean()), ulong(a_b_ticks.mean()),
