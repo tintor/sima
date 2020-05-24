@@ -28,13 +28,6 @@ T lerp(T a, T b, P t) {
     return a + (b - a) * t;
 }
 
-template <typename T>
-T clamp(T a, T min, T max) {
-    if (a > max) return max;
-    if (a < min) return min;
-    return a;
-}
-
 template <size_t S>
 bool aligned(const void* ptr) {
     return (reinterpret_cast<size_t>(ptr) % S) == 0;

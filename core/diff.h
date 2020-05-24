@@ -263,7 +263,7 @@ Declare1(Logistic);
 
 struct ClampLogisticT : public DiffA {
     ClampLogisticT(PDiff a, tensor::type limit) : DiffA(a), limit(limit) {}
-    void Forward() override { EACH(v) v[i] = 1 / (1 + exp(clamp(-va[i], -limit, limit))); }
+    void Forward() override { EACH(v) v[i] = 1 / (1 + exp(std::clamp(-va[i], -limit, limit))); }
     void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
     tensor::type limit;
 };
@@ -556,14 +556,8 @@ struct MinT : public Diff_vv {
     MinT(PDiff a, PDiff b) : Diff_vv(a, b) {}
     void Forward() override { EACH(v) v[i] = min(va[i], vb[i]); }
     void Backward() override {
-        EACH(ga) {
-            if (va[i] < vb[i]) ga[i] += g[i];
-            if (va[i] == vb[i]) ga[i] += g[i] / 2;
-        }
-        EACH(gb) {
-            if (vb[i] < va[i]) gb[i] += g[i];
-            if (vb[i] == va[i]) gb[i] += g[i] / 2;
-        }
+        EACH(ga) ga[i] += (va[i] < vb[i]) * g[i];
+        EACH(gb) gb[i] += (vb[i] < va[i]) * g[i];
     }
 };
 Declare2(Min, MinT);
@@ -574,14 +568,8 @@ struct MaxT : public Diff_vv {
     MaxT(PDiff a, PDiff b) : Diff_vv(a, b) { }
     void Forward() override { EACH(v) v[i] = max(va[i], vb[i]); }
     void Backward() override {
-        EACH(ga) {
-            if (va[i] > vb[i]) ga[i] += g[i];
-            if (va[i] == vb[i]) ga[i] += g[i] / 2;
-        }
-        EACH(gb) {
-            if (vb[i] > va[i]) gb[i] += g[i];
-            if (vb[i] == va[i]) gb[i] += g[i] / 2;
-        }
+        EACH(ga) ga[i] += (va[i] > vb[i]) * g[i];
+        EACH(gb) gb[i] += (vb[i] > va[i]) * g[i];
     }
 };
 Declare2(Max, MaxT);
