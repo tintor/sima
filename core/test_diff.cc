@@ -128,8 +128,6 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
     auto c = Param({1}, init) << "c";
-    auto w = Param({1}, init) << "w";
-    auto e = Param({1}, init) << "e";
 
     auto out = Logistic(x * a + y * b + c, 15) << "out";
     auto loss = BinaryCrossEntropy(ref, out) << "loss";
@@ -163,6 +161,8 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
         index += 1;
     }
     vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
+    NormalizeDataset(data_x);
+    NormalizeDataset(data_y);
 
     // train!
     println("train ...");

@@ -751,7 +751,11 @@ struct EpochMeanT : public Diff1 {
     uint count = 0;
 };
 
-Declare1(EpochMean);
+inline PDiff EpochMean(PDiff a, float init) {
+    auto p = make_shared<EpochMeanT>(a);
+    p->v[0] = init;
+    return p;
+}
 
 inline PDiff Mean(PDiff a) { return Sum(a) / a->size; }
 
@@ -875,8 +879,8 @@ inline PDiff Softmax(PDiff a) {
 }
 
 inline PDiff BatchNorm(PDiff a, tensor::type k) {
-    auto mean = EpochMean(a) << "bn_mean";
-    auto stdev = Sqrt(EpochMean(Sqr(a - mean))) + k << "bn_stdev";
+    auto mean = EpochMean(a, 0) << "bn_mean";
+    auto stdev = Sqrt(EpochMean(Sqr(a - mean), 1)) + k << "bn_stdev";
 
     auto beta = ScalarParam(1) << "bn_beta";
     auto gamma = ScalarParam(0) << "bn_gamma";
