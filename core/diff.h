@@ -562,6 +562,16 @@ inline PDiff operator/(PDiff a, PDiff b) {
 inline auto operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
 inline auto operator/(PDiff a, tensor::type b) { return a * Const(1 / b); }
 
+inline PDiff& operator+=(PDiff& a, PDiff b) { return a = a + b; }
+inline PDiff& operator-=(PDiff& a, PDiff b) { return a = a - b; }
+inline PDiff& operator*=(PDiff& a, PDiff b) { return a = a * b; }
+inline PDiff& operator/=(PDiff& a, PDiff b) { return a = a / b; }
+
+inline PDiff& operator+=(PDiff& a, tensor::type b) { return a = a + b; }
+inline PDiff& operator-=(PDiff& a, tensor::type b) { return a = a - b; }
+inline PDiff& operator*=(PDiff& a, tensor::type b) { return a = a * b; }
+inline PDiff& operator/=(PDiff& a, tensor::type b) { return a = a / b; }
+
 #define RELATION(NAME, OP)                                                                          \
     struct NAME : public Diff_vv {                                                                  \
         NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                                                   \
