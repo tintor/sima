@@ -914,8 +914,8 @@ inline PDiff Softmax(PDiff a) {
 }
 
 inline PDiff BatchNorm(PDiff a, tensor::type k) {
-    auto mean = EpochMean(a, 0) << "bn_mean";
-    auto stdev = Sqrt(EpochMean(Sqr(a - mean), 1)) + k << "bn_stdev";
+    auto mean = Mean(a) << "bn_mean";
+    auto stdev = Sqrt(Mean(Sqr(a - mean))) + k << "bn_stdev";
 
     auto scale = 1 / stdev << "bn_scale";
     auto shift = mean / stdev << "bn_shift";
