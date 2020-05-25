@@ -169,6 +169,15 @@ void Model::Print() const {
     PrintTable(table, '|', " ", {4, 5, 6});
 }
 
+bool HasBackward(PDiff p) {
+    // BinaryCrossEntropyT has Check() which fails for empty gradients
+    if (dynamic_cast<BinaryCrossEntropyT*>(p.get())) return true;
+
+    Diff::has_overload = true;
+    p->Backward();
+    return Diff::has_overload;
+}
+
 Model::Model(PDiff loss, PDiff accuracy)
         : m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({loss, accuracy})) {
     Check(loss->size == 1);
@@ -191,9 +200,7 @@ Model::Model(PDiff loss, PDiff accuracy)
     }
 
     for (PDiff p : m_nodes) {
-        Diff::has_overload = true;
-        p->Backward();
-        if (Diff::has_overload) m_backward_nodes.push_back(p.get());
+        if (HasBackward(p)) m_backward_nodes.push_back(p.get());
     }
     std::reverse(m_backward_nodes.begin(), m_backward_nodes.end());
 

@@ -840,10 +840,11 @@ struct BinaryCrossEntropyT : public Diff2 {
         v[0] = s / a->size;
     }
     void Backward() override {
+        Check(g[0] == 1);
         EACH(gb) {
             auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
             auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
-            gb[i] -= (p - q) * g[0] / a->size;
+            gb[i] -= (p - q) / a->size; // not multiplying with g[0] == 1
         }
     }
 };
