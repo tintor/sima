@@ -163,7 +163,6 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     NormalizeDataset(data_y);
 
     // train!
-    println("train ...");
     Metrics metrics;
     for (auto i : range(600)) metrics = model.Epoch(dataset, random, false, i);
     REQUIRE(metrics.at("accuracy") >= 0.9990);
@@ -320,7 +319,6 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
     vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
 
     // train!
-    println("train ...");
     Metrics metrics;
 
     metrics = model.Epoch(dataset, random, true);

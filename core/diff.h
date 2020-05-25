@@ -193,10 +193,10 @@ inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = nullptr) {
     return p;
 }
 
-inline PDiff ScalarParam(tensor::type init) {
+inline PDiff Param(tensor_shape shape, tensor::type init) {
     auto p = make_shared<ParamT>();
-    p->Reshape({1});
-    p->v[0] = init;
+    p->v.reshape(shape, init);
+    p->g.reshape(shape);
     return p;
 }
 
@@ -884,12 +884,18 @@ inline PDiff BatchNorm(PDiff a, tensor::type k) {
     auto mean = EpochMean(a, 0) << "bn_mean";
     auto stdev = Sqrt(EpochMean(Sqr(a - mean), 1)) + k << "bn_stdev";
 
-    auto beta = ScalarParam(1) << "bn_beta";
-    auto gamma = ScalarParam(0) << "bn_gamma";
+    auto scale = 1 / stdev << "bn_scale";
+    auto shift = mean / stdev << "bn_shift";
+    auto norm = a * scale - shift << "bn_norm";
 
-    auto scale = beta / stdev << "bn_scale";
-    auto shift = mean * gamma / stdev << "bn_shift";
-    return a * scale - shift << "bn";
+    auto gamma = Param(a->shape, 1) << "bn_gamma";
+    auto beta = Param(a->shape, 0) << "bn_beta";
+    return norm * gamma + beta << "bn";
+}
+
+inline PDiff FullyConnectedNB(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
+    auto w = Param({size, a->shape->back()}, w_init) << "fc_w";
+    return VecMatMul(a, w) << "fc";
 }
 
 inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
