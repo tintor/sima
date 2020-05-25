@@ -124,10 +124,11 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     auto ref = Data({Batch, 1}) << "ref";
 
     std::mt19937_64 random(1);
-    auto init = make_shared<NormalInit>(1, random);
+    auto init = make_shared<NormalInit>(1 / sqrt(2), random);
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
-    auto c = Param({1}, init) << "c";
+    auto c = Param({1}) << "c";
+
     auto out = Logistic(x * a + y * b + c, 15) << "out";
     auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
@@ -165,13 +166,13 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     // train!
     Metrics metrics;
     for (auto i : range(600)) metrics = model.Epoch(dataset, random, false, i);
-    REQUIRE(metrics.at("accuracy") >= 0.9990);
+    REQUIRE(metrics.at("accuracy") >= 0.9993);
 }
 
 PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
-    auto c = Param({1}, init) << "c";
+    auto c = Param({1}) << "c";
     return Logistic(x * a + y * b + c);
 }
 
@@ -179,7 +180,7 @@ PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
     auto c = Param({1}, init) << "c";
-    auto d = Param({1}, init) << "d";
+    auto d = Param({1}) << "d";
     return Logistic(x * a + y * b + z * c + d);
 }
 
