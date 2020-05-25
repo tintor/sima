@@ -319,19 +319,17 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
     std::mt19937_64 random(seed);
     auto init = make_shared<NormalInit>(1, random);
 
-    // auto proc = BatchNorm(in, 1e-10) << "proc";
+    auto x = in;
+    x = FullyConnected(x, 3, init) << "fc";
+    x = Logistic(x, 15);
+    x = FullyConnected(x, 1, init);
+    x = Logistic(x, 15);
 
-    auto hidden = Logistic(FullyConnected(in, 3, init), 15) << "hidden";
-    // hidden = BatchNorm(hidden, 1e-10);
-    auto out = Logistic(FullyConnected(hidden, 1, init), 15) << "out";
-
+    auto out = x << "out";
     auto loss = MeanSquareError(ref, out) << "loss";
-    //auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
     Model model(loss, Accuracy(ref, out));
     model.optimizer->alpha = 0.1;
-    //model.optimizer = make_shared<Adam>();
-    //model.optimizer->alpha = 0.0003;
 
     // dataset
     UniformInit gen(-1, 1, random);
