@@ -308,7 +308,49 @@ Action AutoClimber(const Board& board) {
     return choice;
 }
 
-ValueFunction g_value_fn(BoardBits);
+struct MyModel {
+    MyModel() {
+        in = Data({100, BoardBits}) << "input";
+        ref = Data({100, 1}) << "reference";
+
+        std::mt19937_64 random(1);
+        auto w_init = make_shared<NormalInit>(1 / sqrt(128), random);
+
+        // TODO input normalization
+        auto fc1 = FullyConnected(in, 128, w_init);
+        fc1 = BatchNorm(fc1, 1e-8);
+        auto act1 = Relu(fc1);
+        auto fc2 = FullyConnected(act1, 1, w_init);
+        out = Sigmoid(fc2);
+        auto loss = BinaryCrossEntropy(ref, out);
+        train_model = make_shared<Model>(loss, Accuracy(ref, out));
+
+        // TODO inference model:
+        // - apply the same input normalization from training
+        // - use the same parameters
+        // - no loss / no acc
+        // - EpochMean in BatchNorm?
+        // - Is it possible to use training model directly? (reshape vectors to batch 1, temporarily?)
+    }
+
+    void Train(const Values& values) {
+        // reinitialize all weights?
+        // hyper params?
+    }
+
+    float Predict(const tensor input) {
+    }
+
+    PDiff in;
+    PDiff ref;
+    PDiff out;
+    PDiff loss;
+    shared_ptr<Model> train_model;
+    shared_ptr<Model> inf_model;
+};
+
+MyModel g_value_fn;
+
 
 // 1 - current player wins always
 // 0 - current player looses alwaya

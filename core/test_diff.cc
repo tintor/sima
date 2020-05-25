@@ -173,7 +173,7 @@ PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
     auto c = Param({1}) << "c";
-    return Logistic(x * a + y * b + c);
+    return Logistic(x * a + y * b + c, 15);
 }
 
 PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
@@ -181,7 +181,7 @@ PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
     auto b = Param({1}, init) << "b";
     auto c = Param({1}, init) << "c";
     auto d = Param({1}) << "d";
-    return Logistic(x * a + y * b + z * c + d);
+    return Logistic(x * a + y * b + z * c + d, 15);
 }
 
 TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
@@ -195,9 +195,9 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     auto h1 = Neuron(x, y, init) << "h1";
     auto h2 = Neuron(x, y, init) << "h2";
     auto h3 = Neuron(x, y, init) << "h3";
-    auto out = Neuron(h1, h2, h3, init) << "out";
-    auto loss = MeanSquareError(out, ref) << "loss";
-
+    auto init2 = make_shared<NormalInit>(1, random);
+    auto out = Neuron(h1, h2, h3, init2) << "out";
+    auto loss = MeanSquareError(ref, out) << "loss";
     Model model(loss, Accuracy(ref, out));
     model.optimizer->alpha = 0.1;
 
@@ -227,8 +227,10 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
 
     // train!
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    REQUIRE(metrics.at("accuracy") >= 0.9919);
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, i % 100 == 99, i);
+    println("accuracy: %s", metrics.at("accuracy"));
+    model.Print();
+    REQUIRE(metrics.at("accuracy") >= 0.9924);
 }
 
 TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
@@ -239,11 +241,12 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
     std::mt19937_64 random(3);
     auto init = make_shared<NormalInit>(1, random);
     auto fc = FullyConnected(in, 1, init);
-    auto out = Tanh(fc) * 0.5 + 0.5 << "out";
-    auto loss = MeanSquareError(out, ref) << "loss";
+    auto out = Logistic(fc, 15) << "out";
+    auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
     Model model(loss, Accuracy(ref, out));
-    model.optimizer->alpha = 0.01;
+    model.optimizer = make_shared<Adam>();
+    model.optimizer->alpha = 0.02;
 
     // dataset
     const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
@@ -270,15 +273,16 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
         index += 1;
     }
     vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+    NormalizeDataset(data_in);
 
     // train!
     Metrics metrics;
     for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    REQUIRE(metrics.at("accuracy") >= 0.9975);
+    REQUIRE(metrics.at("accuracy") >= 0.9994);
 }
 
 TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]") {
-    const int Batch = 20;
+    const int Batch = 100;
     auto in = Data({Batch, 2}) << "in";
     auto ref = Data({Batch, 1}) << "ref";
 
@@ -287,19 +291,20 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
 
     // auto proc = BatchNorm(in, 1e-10) << "proc";
 
-    auto hidden = Logistic(FullyConnected(in, 3, init)) << "hidden";
-    // hidden = BatchNorm(hidden, 1e-10);
-    auto out = Logistic(FullyConnected(hidden, 1, init)) << "out";
+    auto hidden = Logistic(FullyConnected(in, 10, init), 15) << "hidden";
+    hidden = BatchNorm(hidden, 1e-10);
+    auto out = Logistic(FullyConnected(hidden, 1, init), 15) << "out";
 
     auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
     Model model(loss, Accuracy(ref, out));
-    model.optimizer->alpha = 0.01;
+    model.optimizer = make_shared<Adam>();
+    model.optimizer->alpha = 0.0003;
 
     // dataset
     UniformInit gen(-1, 1, random);
     const int Classes = 2;
-    const int SamplesPerClass = 10000;
+    const int SamplesPerClass = 20000;
     const int Samples = Classes * SamplesPerClass;
     vtensor data_in({Samples, 2}, 0);
     vtensor data_ref({Samples, 1}, 0);
@@ -318,6 +323,7 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
         index += 1;
     }
     vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+    NormalizeDataset(data_in);
 
     // train!
     Metrics metrics;
@@ -325,10 +331,7 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
     metrics = model.Epoch(dataset, random, true);
     return;
 
-    for (auto i : range(10000)) {
-        metrics = model.Epoch(dataset, random, i % 25 == 24);
-        if (i % 25 == 24) model.Print();
-    }
+    for (auto i : range(10000)) metrics = model.Epoch(dataset, random, i % 25 == 24, i);
     model.Print();
 
     REQUIRE(metrics.at("accuracy") >= 0.9919);
