@@ -258,11 +258,11 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     });
 }
 
-TEST_CASE("diff: learn FC perceptron, plane in 2d", "[diff]") {
-    constexpr bool D3 = false;
+TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
+    constexpr int N = 2;
     parallel(5, [&](size_t seed) {
     const int Batch = 24;
-    auto in = Data({Batch, D3 ? 3 : 2}) << "in";
+    auto in = Data({Batch, N}) << "in";
     auto ref = Data({Batch, 1}) << "ref";
 
     std::mt19937_64 random(seed);
@@ -273,29 +273,32 @@ TEST_CASE("diff: learn FC perceptron, plane in 2d", "[diff]") {
 
     Model model(loss, Accuracy(ref, out));
     model.optimizer = make_shared<Adam>();
-    model.optimizer->alpha = 0.1; //02;
+    model.optimizer->alpha = 0.1;
 
     // dataset
-    const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
     UniformInit gen(-1, 1, random);
+    vector<float> W;
+    for (int i : range(N)) W.push_back(gen.get() / 2);
+    float B = gen.get() / 10;
+
     const int Classes = 2;
     const int SamplesPerClass = 20000 - 8;
     const int Samples = Classes * SamplesPerClass;
-    vtensor data_in({Samples, 2}, 0);
+    vtensor data_in({Samples, N}, 0);
     vtensor data_ref({Samples, 1}, 0);
     int count[2] = {0, 0};
     int index = 0;
+    vector<float> d;
     while (index < Samples) {
-        float dx = gen.get();
-        float dy = gen.get();
-        float dz = D3 ? gen.get() : 0;
-        float dr = (dx * A + dy * B + dz * C + D >= 0) ? 1 : 0;
+        d.clear();
+        for (int i : range(N)) d.push_back(gen.get());
+        float s = B;
+        for (int i : range(N)) s += d[i] * W[i];
+        float dr = (s >= 0) ? 1 : 0;
         int c = round(dr);
         if (count[c] >= SamplesPerClass) continue;
         count[c] += 1;
-        data_in(index, 0) = dx;
-        data_in(index, 1) = dy;
-        if (D3) data_in(index, 2) = dz;
+        for (int i : range(N)) data_in(index, i) = d[i];
         data_ref[index] = dr;
         index += 1;
     }
