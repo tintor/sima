@@ -117,7 +117,7 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
     Optimize("hölder table", 10, return -abs(sin(x)*cos(y)*exp(abs(1 - sqrt(x*x + y*y)/PI))));
 #endif
 
-TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
+TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     const int Batch = 20;
     auto x = Data({Batch, 1}) << "x";
     auto y = Data({Batch, 1}) << "y";
@@ -128,14 +128,12 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     auto a = Param({1}, init) << "a";
     auto b = Param({1}, init) << "b";
     auto c = Param({1}, init) << "c";
-
     auto out = Logistic(x * a + y * b + c, 15) << "out";
     auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
     Model model(loss, Accuracy(ref, out));
     model.optimizer = make_shared<Adam>();
     model.optimizer->alpha = 0.1;
-    model.Print();
 
     // dataset
     const float A = 0.4, B = 0.6, C = -0.4;
@@ -166,11 +164,8 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
 
     // train!
     println("train ...");
-    model.Print();
     Metrics metrics;
-    for (auto i : range(600)) metrics = model.Epoch(dataset, random, true, i);
-    model.Print();
-
+    for (auto i : range(600)) metrics = model.Epoch(dataset, random, false, i);
     REQUIRE(metrics.at("accuracy") >= 0.9990);
 }
 
@@ -201,12 +196,10 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     auto h2 = Neuron(x, y, init) << "h2";
     auto h3 = Neuron(x, y, init) << "h3";
     auto out = Neuron(h1, h2, h3, init) << "out";
-
     auto loss = MeanSquareError(out, ref) << "loss";
 
     Model model(loss, Accuracy(ref, out));
     model.optimizer->alpha = 0.1;
-    model.Print();
 
     // dataset
     UniformInit gen(-1, 1, random);
@@ -233,12 +226,8 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
 
     // train!
-    println("train ...");
-    model.Print();
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, i % 25 == 24);
-    model.Print();
-
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
     REQUIRE(metrics.at("accuracy") >= 0.9919);
 }
 
@@ -251,7 +240,6 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
     auto init = make_shared<NormalInit>(1, random);
     auto fc = FullyConnected(in, 1, init);
     auto out = Tanh(fc) * 0.5 + 0.5 << "out";
-
     auto loss = MeanSquareError(out, ref) << "loss";
 
     Model model(loss, Accuracy(ref, out));
@@ -284,12 +272,8 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
     vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
 
     // train!
-    println("train ...");
-    model.Print();
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, i % 100 == 99);
-    model.Print();
-
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
     REQUIRE(metrics.at("accuracy") >= 0.9975);
 }
 
@@ -337,11 +321,9 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
 
     // train!
     println("train ...");
-    model.Print();
     Metrics metrics;
 
     metrics = model.Epoch(dataset, random, true);
-    model.Print();
     return;
 
     for (auto i : range(10000)) {
@@ -355,7 +337,6 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
 
 // Classification:
 // learn hyper plane in Nd
-// learn circle in 2d
 // learn hyper sphere in Nd
 // spiral in 2d
 
