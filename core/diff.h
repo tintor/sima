@@ -4,6 +4,7 @@
 #include <core/range.h>
 #include <core/std.h>
 #include <core/tensor.h>
+#include <arrayfire.h>
 
 // Stages of Diff graph:
 // - construction - final size of tensors is known

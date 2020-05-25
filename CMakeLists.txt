@@ -18,6 +18,15 @@ add_definitions(-O3 -mavx2 -mfma -ffast-math -ffp-contract=fast -DNDEBUG -Wfatal
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
+# ArrayFire
+# ---------
+# arrayfire.org/download
+find_package(ArrayFire REQUIRED)
+set(LIBRARIES ${LIBRARIES} ArrayFire::af)
+if (APPLE)
+    include_directories(/opt/arrayfire/include)
+endif()
+
 # GLM
 # ---
 # Apple: brew install glm
