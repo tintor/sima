@@ -153,6 +153,12 @@ inline PDiff Const(tensor::type c) {
     return p;
 }
 
+inline PDiff Const(tensor_shape shape, tensor::type c) {
+    auto p = make_shared<Diff>();
+    p->v.reshape(shape, c);
+    return p;
+}
+
 inline PDiff Const(const tensor c) {
     auto p = make_shared<Diff>();
     p->v = c;
@@ -195,6 +201,7 @@ inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = nullptr) {
 
 inline PDiff Param(tensor_shape shape, tensor::type init) {
     auto p = make_shared<ParamT>();
+    Check(shape.size > 0, "Parameter shape.size() must be non-zero");
     p->v.reshape(shape, init);
     p->g.reshape(shape);
     return p;
@@ -314,7 +321,7 @@ Declare1(Sax);
 // 1/sqrt(1+x^2)
 struct SoxT : public DiffA {
     SoxT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = 1 / sqrt(1 + sqr(va[i])); }
+    void Forward() override { EACH(v) v[i] = 1 / std::sqrt(1 + sqr(va[i])); }
     void Backward() override { EACH(ga) ga[i] -= g[i] * va[i] * cube(v[i]); }
 };
 Declare1(Sox);
@@ -415,6 +422,7 @@ struct Add_mv : public Diff2 {
 };
 
 inline PDiff operator+(PDiff a, PDiff b) {
+    if (a->size == 1 && b->size == 1) return make_shared<Add_vv>(a, b);
     if (a->size == 1) return make_shared<Add_vs>(b, a);
     if (b->size == 1) return make_shared<Add_vs>(a, b);
     if (a->shape == b->shape) return make_shared<Add_vv>(a, b);
@@ -422,8 +430,8 @@ inline PDiff operator+(PDiff a, PDiff b) {
     return make_shared<Add_mv>(b, a);
 }
 
-inline auto operator+(tensor::type a, PDiff b) { return b + Const(a); }
-inline auto operator+(PDiff a, tensor::type b) { return a + Const(b); }
+inline auto operator+(tensor::type a, PDiff b) { return (a == 0) ? b : (b + Const(a)); }
+inline auto operator+(PDiff a, tensor::type b) { return b + a; }
 
 struct Sub_vv : public Diff_vv {
     Sub_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
@@ -452,21 +460,22 @@ struct Sub_sv : public Diff_sv {
     }
 };
 
-inline PDiff operator-(PDiff a, PDiff b) {
-    if (a->size == 1) return make_shared<Sub_sv>(a, b);
-    if (b->size == 1) return make_shared<Sub_vs>(a, b);
-    return make_shared<Sub_vv>(a, b);
-}
-inline auto operator-(tensor::type a, PDiff b) { return Const(a) - b; }
-inline auto operator-(PDiff a, tensor::type b) { return a - Const(b); }
-
 struct Neg : public DiffA {
     Neg(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = -va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i]; }
 };
 
-inline auto operator-(PDiff a) { return make_shared<Neg>(a); }
+inline PDiff operator-(PDiff a, PDiff b) {
+    if (a->size == 1 && b->size == 1) return make_shared<Sub_vv>(a, b);
+    if (a->size == 1) return make_shared<Sub_sv>(a, b);
+    if (b->size == 1) return make_shared<Sub_vs>(a, b);
+    return make_shared<Sub_vv>(a, b);
+}
+
+inline PDiff operator-(tensor::type a, PDiff b) { return (a == 0) ? make_shared<Neg>(b) : (Const(a) - b); }
+inline PDiff operator-(PDiff a, tensor::type b) { return (b == 0) ? a : (a - Const(b)); }
+inline PDiff operator-(PDiff a) { return make_shared<Neg>(a); }
 
 struct Mul_vs : public Diff_vs {
     Mul_vs(PDiff a, PDiff b) : Diff_vs(a, b) {
@@ -490,12 +499,23 @@ struct Mul_vv : public Diff_vv {
 };
 
 inline PDiff operator*(PDiff a, PDiff b) {
+    if (a->size == 1 && b->size == 1) return make_shared<Mul_vv>(a, b);
     if (a->size == 1) return make_shared<Mul_vs>(b, a);
     if (b->size == 1) return make_shared<Mul_vs>(a, b);
     return make_shared<Mul_vv>(a, b);
 }
-inline auto operator*(tensor::type a, PDiff b) { return b * Const(a); }
-inline auto operator*(PDiff a, tensor::type b) { return a * Const(b); }
+
+inline PDiff operator*(tensor::type a, PDiff b) {
+    if (a == 1) return b;
+    if (a == 0) return Const(b->shape, 0);
+    return b * Const(a);
+}
+
+inline PDiff operator*(PDiff a, tensor::type b) {
+    if (b == 1) return a;
+    if (b == 0) return Const(a->shape, 0);
+    return a * Const(b);
+}
 
 struct Div_vv : public Diff_vv {
     Div_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
@@ -524,12 +544,6 @@ struct Div_sv : public Diff_sv {
     }
 };
 
-inline PDiff operator/(PDiff a, PDiff b) {
-    if (a->size == 1) return make_shared<Div_sv>(a, b);
-    if (b->size == 1) return make_shared<Div_vs>(a, b);
-    return make_shared<Div_vv>(a, b);
-}
-
 struct InvT : public DiffA {
     InvT(PDiff a) : DiffA(a) {}
     void Forward() override { EACH(v) v[i] = 1 / va[i]; }
@@ -537,8 +551,16 @@ struct InvT : public DiffA {
 };
 
 Declare1(Inv);
+
+inline PDiff operator/(PDiff a, PDiff b) {
+    if (a->size == 1 && b->size == 1) return make_shared<Div_vv>(a, b);
+    if (a->size == 1) return make_shared<Div_sv>(a, b);
+    if (b->size == 1) return make_shared<Mul_vs>(a, Inv(b));
+    return make_shared<Div_vv>(a, b);
+}
+
 inline auto operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
-inline auto operator/(PDiff a, tensor::type b) { return a / Const(b); }
+inline auto operator/(PDiff a, tensor::type b) { return a * Const(1 / b); }
 
 #define RELATION(NAME, OP)                                                                          \
     struct NAME : public Diff_vv {                                                                  \
@@ -834,14 +856,15 @@ struct BinaryCrossEntropyT : public Diff2 {
     void Forward() override {
         double s = 0;
         EACH(va) {
-            s -= va[i] * log(max(eps, vb[i]));
-            s -= (one - va[i]) * log(max(eps, one - vb[i]));
+            s -= va[i] * std::log(max(eps, vb[i]));
+            s -= (one - va[i]) * std::log(max(eps, one - vb[i]));
         }
         v[0] = s / a->size;
     }
     void Backward() override {
         Check(g[0] == 1);
         EACH(gb) {
+            // TODO try removing the max
             auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
             auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
             gb[i] -= (p - q) / a->size; // not multiplying with g[0] == 1
