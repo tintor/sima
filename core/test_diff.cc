@@ -1,21 +1,6 @@
-#include <core/diff.h>
+#include <core/model.h>
 
 #include <catch.hpp>
-
-void Iterate(span<PDiff> nodes, float alpha, size_t iterations) {
-    for (size_t i = 0; i < iterations; i++) {
-        Forward(nodes);
-        ResetGradients(nodes);
-        nodes.back()->g[0] = 1;
-        Backward(nodes);
-        GradientDescent(nodes, alpha);
-    }
-}
-
-void Minimize(PDiff loss, float alpha, size_t iterations) {
-    auto nodes = TopoSort({loss});
-    Iterate(nodes, alpha, iterations);
-}
 
 TEST_CASE("diff: minimize circle", "[diff]") {
     auto x = Param({1}) << "x";
@@ -28,36 +13,68 @@ TEST_CASE("diff: minimize circle", "[diff]") {
     REQUIRE(abs(y->v[0]) < 1e-6);
 }
 
-TEST_CASE("diff: minimize binary cross entropy ", "[diff]") {
+void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<string>& table) {
+    auto row = table.begin();
+    if (name == "sgd") format_s(*row, "b|");
+    format_s(*row++, "%s|", name);
+
+    for (float e : range(-1.f, 1.01f, 0.1f)) {
+        x->v[0] = e;
+        ref->v[0] = 0;
+        model.optimizer->Reset();
+        model.Forward();
+        if (name == "sgd") format_s(*row, "%s|", b->v[0]);
+        int count = 250;
+        for (int i = 0; i < 250; i++) {
+            model.Forward();
+            model.Backward();
+            if (b->v[0] <= 0.05) { count = i + 1; break; }
+        }
+        REQUIRE(b->v[0] <= 0.05);
+        format_s(*row++, "%s|", count);
+    }
+
+    for (float e : range(-1.f, 1.01f, 0.1f)) {
+        x->v[0] = e;
+        ref->v[0] = 1;
+        model.optimizer->Reset();
+        model.Forward();
+        if (name == "sgd") format_s(*row, "%s|", b->v[0]);
+        int count = 250;
+        for (int i = 0; i < 250; i++) {
+            model.Forward();
+            model.Backward();
+            if (b->v[0] >= 0.95) { count = i + 1; break; }
+        }
+        REQUIRE(b->v[0] >= 0.95);
+        format_s(*row++, "%s|", count);
+    }
+}
+
+TEST_CASE("diff: minimize binary cross entropy", "[diff]") {
     auto x = Param({1}) << "x";
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
-    // auto loss = BinaryCrossEntropy(ref, b);
+    auto loss = BinaryCrossEntropy<true>(ref, b);
+    Model model(loss);
 
-    auto grad_cmp = GradCmp(b);
-    auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
-    auto loss1 = BinaryCrossEntropy(ref, grad_cmp.second) << "loss1";
-    auto loss = ValueCmp(loss0, loss1);
+    vector<string> table;
+    table << format("x|r|");
+    for (float e : range(-1.f, 1.01f, 0.1f)) table << format("%+.1f|0|", e);
+    for (float e : range(-1.f, 1.01f, 0.1f)) table << format("%+.1f|1|", e);
 
-    for (float e : range(-1.f, 1.f, 0.1f)) {
-        x->v[0] = e;
-        ref->v[0] = 0;
-        auto nodes = TopoSort({loss});
-        Forward(nodes);
-        println("x:%s r:%s b:%s", x->v[0], ref->v[0], b->v[0]);
-        Minimize(loss, 0.05, 500);
-        REQUIRE(b->v[0] <= 0.05);
-    }
+    Test("sgd", model, x, ref, b, table);
 
-    for (float e : range(-1.f, 1.f, 0.1f)) {
-        x->v[0] = e;
-        ref->v[0] = 1;
-        auto nodes = TopoSort({loss});
-        Forward(nodes);
-        println("x:%s r:%s b:%s", x->v[0], ref->v[0], b->v[0]);
-        Minimize(loss, 0.05, 500);
-        REQUIRE(b->v[0] >= 0.95);
-    }
+    model.optimizer = make_shared<Momentum>();
+    Test("momentum", model, x, ref, b, table);
+
+    model.optimizer = make_shared<RMSProp>();
+    Test("rmsprop", model, x, ref, b, table);
+
+    model.optimizer = make_shared<Adam>();
+    Test("adam", model, x, ref, b, table);
+
+    PrintTable(table, '|', " ", {3, 4, 5, 6});
 }
 
 TEST_CASE("diff: minimize booth", "[diff]") {
@@ -115,17 +132,11 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
     auto e = Param({1}, init) << "e";
 
     auto out = Logistic(x * a + y * b + c, 15) << "out";
+    auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
-    // Diffing!
-    // auto loss = XBinaryCrossEntropy(ref, out) << "loss0";
-    auto grad_cmp = GradCmp(out);
-    auto loss0 = XBinaryCrossEntropy(ref, grad_cmp.first) << "loss0";
-    auto loss1 = BinaryCrossEntropy(ref, grad_cmp.second) << "loss1";
-    auto loss = ValueCmp(loss0, loss1);
-
-    auto accuracy = Accuracy(ref, out);
-
-    Model model(loss, accuracy);
+    Model model(loss, Accuracy(ref, out));
+    model.optimizer = make_shared<Adam>();
+    model.optimizer->alpha = 0.1;
     model.Print();
 
     // dataset
@@ -155,12 +166,12 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff_x]") {
 
     // train!
     println("train ...");
-    Print(model.nodes);
+    model.Print();
     Metrics metrics;
-    for (auto i : range(100)) metrics = model.Epoch(dataset, 0.1, random, true, i);
-    Print(model.nodes);
+    for (auto i : range(600)) metrics = model.Epoch(dataset, random, true, i);
+    model.Print();
 
-    // REQUIRE(metrics.at("accuracy") >= 0.9960);
+    REQUIRE(metrics.at("accuracy") >= 0.9990);
 }
 
 PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
@@ -192,8 +203,10 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     auto out = Neuron(h1, h2, h3, init) << "out";
 
     auto loss = MeanSquareError(out, ref) << "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
-    Model model(loss, accuracy);
+
+    Model model(loss, Accuracy(ref, out));
+    model.optimizer->alpha = 0.1;
+    model.Print();
 
     // dataset
     UniformInit gen(-1, 1, random);
@@ -221,10 +234,10 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
 
     // train!
     println("train ...");
-    Print(model.nodes);
+    model.Print();
     Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, 0.1, random, i % 25 == 24);
-    Print(model.nodes);
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, i % 25 == 24);
+    model.Print();
 
     REQUIRE(metrics.at("accuracy") >= 0.9919);
 }
@@ -240,8 +253,9 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
     auto out = Tanh(fc) * 0.5 + 0.5 << "out";
 
     auto loss = MeanSquareError(out, ref) << "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
-    Model model(loss, accuracy);
+
+    Model model(loss, Accuracy(ref, out));
+    model.optimizer->alpha = 0.01;
 
     // dataset
     const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
@@ -271,12 +285,10 @@ TEST_CASE("diff: learn FC perceptron, plane in 3d", "[diff]") {
 
     // train!
     println("train ...");
-    Print(model.nodes);
+    model.Print();
     Metrics metrics;
-    for (auto i : range(1000)) {
-        metrics = model.Epoch(dataset, 0.01, random, i % 100 == 99);
-    }
-    Print(model.nodes);
+    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, i % 100 == 99);
+    model.Print();
 
     REQUIRE(metrics.at("accuracy") >= 0.9975);
 }
@@ -296,8 +308,9 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
     auto out = Logistic(FullyConnected(hidden, 1, init)) << "out";
 
     auto loss = BinaryCrossEntropy(ref, out) << "loss";
-    auto accuracy = Mean(Abs(out - ref) < 0.5) << "accuracy";
-    Model model(loss, accuracy);
+
+    Model model(loss, Accuracy(ref, out));
+    model.optimizer->alpha = 0.01;
 
     // dataset
     UniformInit gen(-1, 1, random);
@@ -324,18 +337,18 @@ TEST_CASE("diff: fully connected, two layer network, circle in 2d", "[.][diff_p]
 
     // train!
     println("train ...");
-    Print(model.nodes);
+    model.Print();
     Metrics metrics;
 
-    metrics = model.Epoch(dataset, 0.01, random, true);
-    Print(model.nodes);
+    metrics = model.Epoch(dataset, random, true);
+    model.Print();
     return;
 
     for (auto i : range(10000)) {
-        metrics = model.Epoch(dataset, 0.01, random, i % 25 == 24);
-        if (i % 25 == 24) Print(model.nodes);
+        metrics = model.Epoch(dataset, random, i % 25 == 24);
+        if (i % 25 == 24) model.Print();
     }
-    Print(model.nodes);
+    model.Print();
 
     REQUIRE(metrics.at("accuracy") >= 0.9919);
 }

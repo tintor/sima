@@ -274,4 +274,10 @@ inline string TypeName(const T& value) {
     return Demangle(typeid(value).name());
 }
 
+template<typename Type, typename Base>
+inline bool IsType(shared_ptr<Base> a) {
+    const auto& e = *a.get();
+    return typeid(e) == typeid(Type);
+}
+
 void PrintTable(cspan<string> rows, char separator, string_view splitter, cspan<int> right = {});

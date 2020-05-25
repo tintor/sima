@@ -11,7 +11,7 @@
 // - Forward() - v tensors populated
 // - ResetGradients() - g tensors cleared
 // - Backward() - g tensors accumulated
-// - GradientDescent() - v tensors adjusted using g tensors
+// - Optimize() - v tensors adjusted using g tensors
 
 struct Diff;
 
@@ -59,8 +59,6 @@ struct Diff {
 
     ulong forward_ticks = 0;
     ulong backward_ticks = 0;
-    ulong descend_ticks = 0;
-    ulong reset_ticks = 0;
 };
 
 inline PDiff operator<<(PDiff a, string_view name) {
@@ -74,14 +72,6 @@ inline PDiff operator<<(PDiff a, string_view name) {
     inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
 #define Declare2(Func, Type) \
     inline PDiff Func(PDiff a, PDiff b) { return make_shared<Type>(a, b); }
-
-// Returns a list of all diffs that need to be computed (in order) before all goal diffs.
-// Goal diffs are also ordered if one depends on any other.
-vector<PDiff> TopoSort(const cspan<PDiff> heads);
-
-inline vector<PDiff> LoadModel(string_view filename) { return {}; }
-
-inline void SaveModel(span<PDiff> model, string_view filename) {}
 
 #define TensorProperty(TENSOR, TYPE, PARENT)                                               \
     TProperty(TYPE, PARENT) {                                                              \
@@ -162,11 +152,13 @@ inline PDiff Const(tensor::type c) {
     return p;
 }
 
-inline PDiff Constant(const tensor c) {
+inline PDiff Const(const tensor c) {
     auto p = make_shared<Diff>();
     p->v = c;
     return p;
 }
+
+inline bool IsConst(PDiff a) { return IsType<Diff>(a) && !a->g; }
 
 struct Init {
     virtual tensor::type get() { return 0; }
@@ -188,12 +180,22 @@ struct UniformInit : public Init {
     std::mt19937_64& random;
 };
 
+struct ParamT : public Diff {
+};
+
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
-inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = make_shared<Init>()) {
-    auto p = make_shared<Diff>();
+inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = nullptr) {
+    auto p = make_shared<ParamT>();
     Check(shape.size > 0, "Parameter shape.size() must be non-zero");
     p->Reshape(shape);
-    EACH(p->v) p->v[i] = init->get();
+    if (init) EACH(p->v) p->v[i] = init->get();
+    return p;
+}
+
+inline PDiff ScalarParam(tensor::type init) {
+    auto p = make_shared<ParamT>();
+    p->Reshape({1});
+    p->v[0] = init;
     return p;
 }
 
@@ -734,10 +736,7 @@ inline PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverag
 
 // Returns mean of all input values from prev epoch OR 0 if first epoch.
 struct EpochMeanT : public Diff1 {
-    EpochMeanT(PDiff a) : Diff1(a) {
-        v.reshape({1});
-        v[0] = 0;
-    }
+    EpochMeanT(PDiff a) : Diff1(a) { v.reshape({1}); }
     void Forward() override {
         EACH(va) sum += va[i];
         count += va.size;
@@ -819,6 +818,8 @@ inline pair<PDiff, PDiff> GradCmp(PDiff a) {
 }
 
 struct BinaryCrossEntropyT : public Diff2 {
+    constexpr static tensor::type eps = 1e-6, one = 1;
+
     BinaryCrossEntropyT(PDiff ref, PDiff out) : Diff2(ref, out) {
         Check(a->shape == b->shape);
         Check(out->g);
@@ -827,7 +828,6 @@ struct BinaryCrossEntropyT : public Diff2 {
     }
     void Forward() override {
         double s = 0;
-        const tensor::type eps = 1e-6, one = 1;
         EACH(va) {
             s -= va[i] * log(max(eps, vb[i]));
             s -= (one - va[i]) * log(max(eps, one - vb[i]));
@@ -835,7 +835,6 @@ struct BinaryCrossEntropyT : public Diff2 {
         v[0] = s / a->size;
     }
     void Backward() override {
-        const tensor::type eps = 1e-6, one = 1;
         EACH(gb) {
             auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
             auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
@@ -844,11 +843,16 @@ struct BinaryCrossEntropyT : public Diff2 {
     }
 };
 
-inline PDiff XBinaryCrossEntropy(PDiff a, PDiff b) {
-    return Mean(-(a * Log(Max(0.000001, b)) + (1 - a) * Log(Max(0.000001, 1 - b))));
+template<bool Checker = false>
+inline PDiff BinaryCrossEntropy(PDiff ref, PDiff out) {
+    if (Checker) {
+        auto [out0, out1] = GradCmp(out);
+        auto one = Mean(-(ref * Log(Max(1e-6, out0)) + (1 - ref) * Log(Max(1e-6, 1 - out0))));
+        auto two = make_shared<BinaryCrossEntropyT>(ref, out1);
+        return ValueCmp(one, two);
+    }
+    return make_shared<BinaryCrossEntropyT>(ref, out);
 }
-
-Declare2(BinaryCrossEntropy, BinaryCrossEntropyT);
 
 struct AccuracyT : public Diff2 {
     AccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
@@ -872,9 +876,13 @@ inline PDiff Softmax(PDiff a) {
 
 inline PDiff BatchNorm(PDiff a, tensor::type k) {
     auto mean = EpochMean(a) << "bn_mean";
-    auto stdev = Sqrt(EpochMean(Sqr(a - mean))) << "bn_stdev";
-    auto scale = 1 / (k + stdev) << "bn_scale";
-    auto shift = mean * scale << "bn_shift";
+    auto stdev = Sqrt(EpochMean(Sqr(a - mean))) + k << "bn_stdev";
+
+    auto beta = ScalarParam(1) << "bn_beta";
+    auto gamma = ScalarParam(0) << "bn_gamma";
+
+    auto scale = beta / stdev << "bn_scale";
+    auto shift = mean * gamma / stdev << "bn_shift";
     return a * scale - shift << "bn";
 }
 
@@ -883,40 +891,3 @@ inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_s
     auto b = Param({size}) << "fc_b";
     return VecMatMul(a, w) + b << "fc";
 }
-
-inline bool IsDiff(PDiff a) {
-    const auto& e = *a.get();
-    return typeid(e) == typeid(Diff);
-}
-
-inline bool IsParam(PDiff a) { return IsDiff(a) && a->g; }
-inline bool IsConst(PDiff a) { return IsDiff(a) && !a->g; }
-
-void InitBatches(span<PDiff> nodes, int batch_size);
-void Forward(span<PDiff> nodes);
-void ResetGradients(span<PDiff> nodes);
-void Backward(span<PDiff> nodes);
-void GradientDescent(span<PDiff> nodes, const float alpha);
-bool Bounded(cspan<PDiff> nodes, const tensor::type limit);
-void Print(cspan<PDiff> nodes);
-
-using Metrics = unordered_map<string, float>;
-
-struct Model {
-    Model(PDiff loss, PDiff accuracy);
-
-    PDiff loss;
-    PDiff accuracy;
-    vector<PDiff> nodes;
-    vector<Diff*> forward_nodes, backward_nodes, end_epoch_nodes, param_nodes;
-    vector<uint32_t> samples;
-
-    void Forward() { ::Forward(nodes); }
-    void ResetGradients() { ::ResetGradients(nodes); }
-    void Backward() { ::Backward(nodes); }
-    void GradientDescent(tensor::type alpha) { ::GradientDescent(nodes, alpha); }
-    void Print() const { ::Print(nodes); }
-
-    Metrics Epoch(cspan<pair<PDiff, tensor>> data, const float alpha, std::mt19937_64& random, bool verbose = true,
-                  uint epoch = 0);
-};

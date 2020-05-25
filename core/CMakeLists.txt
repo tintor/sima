@@ -2,6 +2,8 @@ add_library(core
 	callstack.cc
 	diff.cc
 	file.cc
+    model.cc
+    optimizer.cc
 	util.cc
 	timestamp.cc)
 
