@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 	
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include(FetchContent)
 
 add_definitions(-O3 -mavx2 -mfma -ffast-math -ffp-contract=fast -DNDEBUG -Wfatal-errors -g)
 #add_definitions(-O3 -mavx2 -lgmpxx -lgmp)
@@ -20,8 +21,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
 # Abseil
 # ------
-add_subdirectory(abseil-cpp)
-include_directories(abseil-cpp)
+FetchContent_Declare(
+    abseil-cpp
+    GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+    GIT_TAG 20200225.2
+)
+FetchContent_MakeAvailable(abseil-cpp)
+include_directories(_deps/abseil-cpp-src)
 set(LIBRARIES ${LIBRARIES}
 absl::algorithm
 absl::base
@@ -37,6 +43,25 @@ absl::synchronization
 absl::time
 absl::utility)
 
+# {fmt}
+# -----
+#FetchContent_Declare(
+#    fmt
+#    GIT_REPOSITORY https://github.com/fmtlib/fmt
+#    GIT_TAG 6.0.0
+#)
+#FetchContent_MakeAvailable(fmt)
+
+# std::ranges
+# -----------
+FetchContent_Declare(
+    ranges
+    GIT_REPOSITORY https://github.com/ericniebler/range-v3
+    GIT_TAG 0.10.0
+)
+FetchContent_MakeAvailable(ranges)
+include_directories(_deps/ranges-src/include)
+
 # ArrayFire
 # ---------
 # arrayfire.org/download
@@ -45,6 +70,16 @@ set(LIBRARIES ${LIBRARIES} ArrayFire::af)
 if (APPLE)
     include_directories(/opt/arrayfire/include)
 endif()
+
+# Klein - 3d geometric algebra
+# ----------------------------
+FetchContent_Declare(
+    klein
+    GIT_REPOSITORY https://github.com/jeremyong/Klein.git
+    GIT_TAG v2.2.1
+)
+FetchContent_MakeAvailable(klein)
+set(LIBRARIES ${LIBRARIES} klein::klein_sse42)
 
 # GLM
 # ---

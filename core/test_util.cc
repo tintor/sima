@@ -4,8 +4,14 @@
 #include <core/string_util.h>
 #include <core/util.h>
 #include <immintrin.h>
+#include <range/v3/algorithm.hpp>
 
 #include <catch.hpp>
+
+TEST_CASE("ranges basic", "[ranges]") {
+    vector<int> v = {6, 2, 3, 4, 5, 6};
+    cout << "vector:   " << ranges::count_if(v, [](int i) { return i == 6; }) << endl;
+}
 
 TEST_CASE("min", "[util]") {
     REQUIRE(min(2, 1) == 1);

@@ -1,10 +1,10 @@
+_deps
 CMakeCache.txt
 CMakeFiles/*
 */CMakeFiles/*
 */*/CMakeFiles/*
 Makefile
 */Makefile
-abseil-cpp/CMake/*
 */*/Makefile
 *.cmake
 */*.cmake
@@ -23,7 +23,4 @@ collision
 piano_mover
 compile_commands.json
 benchmark.cc
-temp/*
-glfw/src/glfw3.pc
-glfw/src/glfw_config.h
 tags
