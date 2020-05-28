@@ -1,7 +1,8 @@
 #pragma once
-#include "core/auto.h"
-#include "core/std.h"
-#include "core/thread.h"
+#include <core/auto.h>
+#include <core/std.h>
+#include <core/int.h>
+#include <core/thread.h>
 #include "phmap/phmap.h"
 
 struct FrozenCell {

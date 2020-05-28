@@ -1,5 +1,4 @@
 #pragma once
-#include <core/span.h>
 #include <geom/triangle.h>
 
 // 8x vec3 in component order,

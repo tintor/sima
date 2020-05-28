@@ -835,7 +835,7 @@ const Node* eval_while(span<const Node*> args) {
     if (args.size() < 1) FAIL("(while) min 1 arg");
 
     auto cond = args[0];
-    auto body = args.pop_front();
+    auto body = args.subspan(1);
     while (true) {
         const Node* a = eval(cond);
         if (a == FALSE) return EMPTY;

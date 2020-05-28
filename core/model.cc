@@ -43,7 +43,7 @@ void Model::Backward() {
         p->backward_ticks += ts.elapsed();
     }
 
-    optimizer->Optimize(m_params);
+    optimizer->Optimize(span<ParamT*>(m_params));
 }
 
 bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {

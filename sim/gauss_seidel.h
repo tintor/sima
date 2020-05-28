@@ -1,7 +1,6 @@
 #pragma once
 
 #include <core/range.h>
-#include <core/span.h>
 #include <core/std.h>
 
 inline double dot(cspan<double> a, cspan<double> b) {

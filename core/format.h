@@ -7,7 +7,6 @@
 // ostream is heavy).
 #include <core/int.h>
 #include <core/interval.h>
-#include <core/span.h>
 #include <core/std.h>
 #include <core/string_util.h>
 #include <core/timestamp.h>

@@ -25,11 +25,11 @@ class xpolygon {
     }
 
     cspan<Vec> operator[](uint idx) const {
-        return cspan<Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
+        return {_vertices.data() + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
     }
 
     span<Vec> operator[](uint idx) {
-        return span<Vec>(_vertices.data() + _offsets[idx], _vertices.data() + _offsets[idx + 1]);
+        return {_vertices.data() + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
     }
 
     uint size() const { return _offsets.size() - 1; }

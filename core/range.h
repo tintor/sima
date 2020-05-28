@@ -1,7 +1,5 @@
 #pragma once
 #include <core/format.h>
-#include <core/span.h>
-#include <core/std.h>
 
 // T can be any number-like type
 template <typename T>

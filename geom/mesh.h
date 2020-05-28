@@ -64,14 +64,14 @@ class array_iterator {
 struct face {
     face(const double3* vertices, cspan<uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) {}
     cspan<double3> operator[](uint idx) const {
-        return cspan<double3>(_vertices + _offsets[idx], _vertices + _offsets[idx + 1]);
+        return {_vertices + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
     }
     plane plane() const { return _plane; }
     uint size() const { return _offsets.size() - 1; }
     uint vertex_size() const { return _offsets.back() - _offsets[0]; }
 
     cspan<uint> offsets() const { return _offsets; }
-    cspan<double3> vertices() const { return cspan<double3>(_vertices + _offsets[0], _vertices + _offsets.back()); }
+    cspan<double3> vertices() const { return {_vertices + _offsets[0], _offsets.back() - _offsets[0]}; }
 
     auto begin() const { return array_iterator<face>(0, *this); }
     auto end() const { return array_iterator<face>(size(), *this); }
@@ -115,7 +115,7 @@ class xmesh3 {
 
         _offsets.reserve(_offsets.size() + f.offsets().size() - 1);
         uint a = _offsets.back();
-        for (uint offset : f.offsets().pop_front()) _offsets.push_back(offset + a);
+        for (uint offset : f.offsets().subspan(1)) _offsets.push_back(offset + a);
 
         _ring_offsets.push_back(_ring_offsets.back() + f.size());
     }
@@ -123,7 +123,7 @@ class xmesh3 {
     uint size() const { return _ring_offsets.size() - 1; }
 
     face operator[](uint idx) const {
-        cspan<uint> offsets(_offsets.data() + _ring_offsets[idx], _offsets.data() + _ring_offsets[idx + 1]);
+        cspan<uint> offsets(_offsets.data() + _ring_offsets[idx], _ring_offsets[idx + 1] - _ring_offsets[idx]);
         return face(_vertices.data(), offsets, _facePlanes[idx]);
     }
 

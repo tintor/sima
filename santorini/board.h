@@ -1,7 +1,7 @@
 #pragma once
 #include <core/hash.h>
 #include <core/std.h>
-#include <core/tensor.h>
+#include <core/arrayfire.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
 
@@ -116,14 +116,14 @@ ostream& operator<<(ostream& os, const Board& board) {
     return os;
 }
 
-void Serialize(const Board& board, tensor out) {
-    Check(out.shape().size() == 1);
-    Check(out.shape()[0] == BoardBits);
+void Serialize(const Board& board, af::array& out) {
+    Check(out.dims() == 1);
+    Check(out.elements() == BoardBits);
     ostringstream os;
     os.str().reserve(BoardBits);
     os << board;
     Check(os.str().size() == BoardBits);
-    for (size_t i = 0; i < BoardBits; i++) out[i] = (os.str()[i] == '1') ? 1.0f : 0.0f;
+    for (size_t i = 0; i < BoardBits; i++) out(i) = (os.str()[i] == '1') ? 1.f : 0.f;
 }
 
 class Values {

@@ -1,0 +1,24 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/marko/repos/sima/abseil-cpp/absl/base/dynamic_annotations.cc
+stdlib.h
+-
+string.h
+-
+absl/base/dynamic_annotations.h
+/Users/marko/repos/sima/abseil-cpp/absl/base/absl/base/dynamic_annotations.h
+sanitizer/msan_interface.h
+-
+
+abseil-cpp/absl/base/dynamic_annotations.h
+stddef.h
+-
+sanitizer/common_interface_defs.h
+-
+

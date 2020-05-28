@@ -1,6 +1,6 @@
 #pragma once
+#include <core/std.h>
 #include <core/format.h>
-#include <core/span.h>
 #include <geom/vector.h>
 
 class sphere {

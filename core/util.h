@@ -79,6 +79,13 @@ auto max(const Container& container) {
 }
 
 template <typename T>
+T clamp(T a, T low, T high) {
+    if (a < low) return low;
+    if (a > high) return high;
+    return a;
+}
+
+template <typename T>
 T median(T x, T y, T z) {
     if (x <= y) {
         if (z <= x) return x;

@@ -4,6 +4,7 @@ CMakeFiles/*
 */*/CMakeFiles/*
 Makefile
 */Makefile
+abseil-cpp/CMake/*
 */*/Makefile
 *.cmake
 */*.cmake

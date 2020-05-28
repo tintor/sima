@@ -114,7 +114,7 @@ sphere minimal_sphere(cspan<double3> interior, array<double3, 4>& surface, int s
     if (surface_size == 0 && interior.size() == 2) return sphere_from(interior[0], interior[1]);
 
     auto a = interior[0];
-    interior = interior.pop_front();
+    interior = interior.subspan(1);
 
     auto s = minimal_sphere(interior, surface, surface_size);
     if (!s.contains(a)) {

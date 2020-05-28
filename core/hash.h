@@ -1,5 +1,6 @@
 #pragma once
 #include <core/std.h>
+#include <core/int.h>
 #include <immintrin.h>
 
 #include <functional>

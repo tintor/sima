@@ -19,6 +19,8 @@
 #include <variant>
 #include <vector>
 
+#include <absl/types/span.h>
+
 namespace fs = std::filesystem;
 
 using std::complex;
@@ -30,6 +32,11 @@ using std::string_view;
 using std::variant;
 
 using std::array;
+
+template<typename T>
+using span = absl::Span<T>;
+template<typename T>
+using cspan = span<const T>;
 
 using std::map;
 using std::set;
@@ -60,7 +67,6 @@ using std::atomic;
 
 using namespace std::literals;
 
-#include <core/span.h>
 #include <core/vector.h>
 
 #ifdef NDEBUG

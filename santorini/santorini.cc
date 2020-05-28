@@ -3,9 +3,9 @@
 #include <core/hash.h>
 #include <core/thread.h>
 #include <core/util.h>
+#include <core/model.h>
 #include <santorini/action.h>
 #include <santorini/board.h>
-#include <santorini/model.h>
 #include <view/font.h>
 #include <view/glm.h>
 #include <view/shader.h>
@@ -321,7 +321,7 @@ struct MyModel {
         fc1 = BatchNorm(fc1, 1e-8);
         auto act1 = Relu(fc1);
         auto fc2 = FullyConnected(act1, 1, w_init);
-        out = Sigmoid(fc2);
+        out = Logistic(fc2, 15);
         auto loss = BinaryCrossEntropy(ref, out);
         train_model = make_shared<Model>(loss, Accuracy(ref, out));
 
@@ -338,7 +338,8 @@ struct MyModel {
         // hyper params?
     }
 
-    float Predict(const tensor input) {
+    float Predict(const af::array input) {
+        return 0;
     }
 
     PDiff in;
@@ -355,7 +356,7 @@ MyModel g_value_fn;
 // 1 - current player wins always
 // 0 - current player looses alwaya
 double WinValue(const Board& board) {
-    vtensor input(tensor_shape{BoardBits});
+    af::array input(BoardBits);
     Serialize(board, input);
     return g_value_fn.Predict(input);
 }

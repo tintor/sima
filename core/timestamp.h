@@ -1,6 +1,6 @@
 #pragma once
 #include <core/std.h>
-//#include <core/format.h>
+#include <core/int.h>
 #include <core/auto.h>
 
 struct Timestamp {
