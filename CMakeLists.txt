@@ -23,7 +23,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 # ---------
 add_definitions(-DHAVE_IPP)
 include_directories(/opt/intel/ipp/include)
-link_directories(/opt/intel/ipp/lib)
+if(APPLE)
+  link_directories(/opt/intel/ipp/lib)
+else()
+  link_directories(/opt/intel/ipp/lib/intel64)
+endif()
 set(LIBRARIES ${LIBRARIES} ippi ipps ippvm ippcore)
 
 # Abseil
@@ -74,9 +78,7 @@ include_directories(_deps/ranges-src/include)
 # arrayfire.org/download
 find_package(ArrayFire REQUIRED)
 set(LIBRARIES ${LIBRARIES} ArrayFire::af)
-if (APPLE)
-    include_directories(/opt/arrayfire/include)
-endif()
+include_directories(/opt/arrayfire/include)
 
 # Klein - 3d geometric algebra
 # ----------------------------
