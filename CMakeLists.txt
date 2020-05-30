@@ -19,6 +19,13 @@ add_definitions(-O3 -mavx2 -mfma -ffast-math -ffp-contract=fast -DNDEBUG -Wfatal
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
+# Intel IPP
+# ---------
+add_definitions(-DHAVE_IPP)
+include_directories(/opt/intel/ipp/include)
+link_directories(/opt/intel/ipp/lib)
+set(LIBRARIES ${LIBRARIES} ippi ipps ippvm ippcore)
+
 # Abseil
 # ------
 FetchContent_Declare(

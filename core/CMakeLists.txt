@@ -24,6 +24,7 @@ add_executable(core_test
 	test_util.cc
 	test_string_util.cc
 	test_zip.cc
+    test_ipp.cc
 	test_bplustree.cc)
 
 target_link_libraries(core_test core ${LIBRARIES})
