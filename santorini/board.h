@@ -151,12 +151,17 @@ class Values {
 
     void Export(string_view filename) {
         std::ofstream os((string(filename)));
+        vector<Board> outs;
         for (const auto& [board, wins] : m_data) {
+            outs.clear();
             double w = wins.player1 / double(wins.player1 + wins.player2);
             for (int transform = 0; transform < 8; transform++) {
                 // TODO(Marko) deduplicate
                 Board out;
                 out.cell = Transform(board.cell, transform);
+                if (!contains(outs, out)) outs << out;
+            }
+            for (const auto& out : outs) {
                 os << out << ' ' << std::setprecision(10) << w << '\n';
             }
         }
