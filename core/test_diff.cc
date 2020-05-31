@@ -362,7 +362,7 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
     Metrics metrics;
     for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
     println("accuracy: %s", metrics.at("accuracy"));
-    REQUIRE(metrics.at("accuracy") >= 0.9771);
+    REQUIRE(metrics.at("accuracy") >= 0.9617);
     });
 }
 

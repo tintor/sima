@@ -9,6 +9,7 @@ add_library(core
 
 add_executable(core_test
 	../test.cc
+    test_cublas.cc
 	test_array_deque.cc
 	test_array_set.cc
  	test_auto.cc

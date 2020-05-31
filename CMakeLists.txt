@@ -19,6 +19,15 @@ add_definitions(-O3 -mavx2 -mfma -ffast-math -ffp-contract=fast -DNDEBUG -Wfatal
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
+# CUDA
+# ----
+if (NOT APPLE)
+  add_definitions(-DHAVE_CUDA)
+  find_package(CUDA 10.1 REQUIRED)
+  include_directories(/usr/local/cuda-10.1/targets/x86_64-linux/include)
+  set(LIBRARIES ${LIBRARIES} ${CUDA_LIBRARIES} cublas cudnn)
+endif()
+
 # Intel IPP
 # ---------
 add_definitions(-DHAVE_IPP)
