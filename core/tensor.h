@@ -89,7 +89,7 @@ class Tensor {
     const auto& shape() const { return m_shape; }
 
     Property(Tensor) {
-        operator uint() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.size; }
+        operator uint() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.rank(); }
     }
     rank;
 

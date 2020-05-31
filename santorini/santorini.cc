@@ -338,7 +338,7 @@ struct MyModel {
         // hyper params?
     }
 
-    float Predict(const af::array input) { return 0; }
+    float Predict(const tensor input) { return 0; }
 
     PDiff in;
     PDiff ref;
@@ -353,7 +353,7 @@ MyModel g_value_fn;
 // 1 - current player wins always
 // 0 - current player looses alwaya
 double WinValue(const Board& board) {
-    af::array input(BoardBits);
+    vtensor input(BoardBits);
     Serialize(board, input);
     return g_value_fn.Predict(input);
 }

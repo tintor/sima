@@ -115,9 +115,9 @@ ostream& operator<<(ostream& os, const Board& board) {
     return os;
 }
 
-void Serialize(const Board& board, af::array& out) {
-    Check(out.dims() == 1);
-    Check(out.elements() == BoardBits);
+void Serialize(const Board& board, tensor out) {
+    Check(out.rank == 1);
+    Check(out.size == BoardBits);
     ostringstream os;
     os.str().reserve(BoardBits);
     os << board;
