@@ -3,6 +3,7 @@
 #include <core/std.h>
 #include <santorini/cell.h>
 #include <santorini/coord.h>
+#include <absl/container/flat_hash_map.h>
 
 #include <fstream>
 
@@ -162,5 +163,5 @@ class Values {
     }
 
    private:
-    unordered_map<Board, Wins> m_data;
+    absl::flat_hash_map<Board, Wins> m_data;
 };
