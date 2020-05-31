@@ -4,128 +4,56 @@
 #include <core/std.h>
 #include <core/util.h>
 
-struct tensor_shape {
-    tensor_shape() {
-        for (size_t i = 0; i < dim.size(); i++) dim[i] = 0;
+using dim_t = uint;
+
+struct dim4 {
+    std::array<dim_t, 4> d;
+
+    dim4(dim_t a = 1, dim_t b = 1, dim_t c = 1, dim_t d = 1) : d{a, b, c, d} {}
+    int ndims() const {
+        if (elements() == 0) return 0;
+        if (d[3] != 1) return 4;
+        if (d[2] != 1) return 3;
+        if (d[1] != 1) return 2;
+        return 1;
     }
+    dim_t elements() const { return d[0] * d[1] * d[2] * d[3]; }
+    dim_t operator[](int i) const { return d[i]; }
+    dim_t& operator[](int i) { return d[i]; }
+    bool operator==(dim4 o) const { return d == o.d; }
+    bool operator!=(dim4 o) const { return d != o.d; }
 
-    tensor_shape(std::initializer_list<uint> d) {
-        for (auto e : d) Check(e > 0);
-        for (size_t i = 0; i < dim.size(); i++) dim[i] = (i < d.size()) ? d.begin()[i] : 0;
+    dim_t back() const { return d[ndims() - 1]; }
+    dim4 pop_front() const { return {d[1], d[2], d[3], 1}; }
+    dim4 pop_back() const {
+        int r = rank();
+        if (r <= 0) return *this;
+        dim4 e = *this;
+        e[r - 1] = 1;
+        return e;
     }
+    dim4 push_front(dim_t a) const { return {a, d[0], d[1], d[2]}; }
 
-    tensor_shape(const tensor_shape& o) : dim{o.dim} {}
-    uint operator[](int i) const { return dim[i]; }
-
-    tensor_shape set(int i, uint v) const {
-        Check(v > 0);
-        tensor_shape s = *this;
-        s.dim[i] = v;
-        return s;
-    }
-
-    Property(tensor_shape) {
-        operator uint() const {
-            for (int i = parent->dim.size() - 1; i >= 0; i--)
-                if (parent->dim[i]) return i + 1;
-            return 0;
+    // -1 empty : if any dimension is 0
+    // 0 scalar : all dimensions are 1
+    // 1 vector : if one dimension is >1 and rest are 1
+    // 2 matrix
+    // 3 cuboid
+    // 4 hyper-cuboid
+    int rank() const {
+        int r = 0;
+        for (int i = 0; i < 4; i++) {
+            if (d[i] == 0) return -1;
+            if (d[i] > 1) r += 1;
         }
-    }
-    size;
-
-    Property(tensor_shape) {
-        operator size_t() const {
-            return (parent->size == 0) ? 0 : Product<size_t>(cspan<uint>(parent->dim.data(), parent->size));
-        }
-    }
-    volume;
-
-    tensor_shape remove_ones() const {
-        tensor_shape s;
-        int w = 0;
-        for (int i = 0; i < dim.size(); i++)
-            if (dim[i] != 1) s.dim[w++] = dim[i];
-        return s;
+        return r;
     }
 
-    tensor_shape concat(tensor_shape o) const {
-        Check(size + o.size <= dim.size());
-        tensor_shape s = *this;
-        size_t m = size;
-        for (int i = 0; i < o.size; i++) s.dim[m++] = o[i];
-        return s;
-    }
-
-    tensor_shape pop_front() const {
-        tensor_shape s;
-        for (int i = 1; i < dim.size(); i++) s.dim[i - 1] = dim[i];
-        s.dim[dim.size() - 1] = 0;
-        return s;
-    }
-
-    tensor_shape pop_back() const {
-        tensor_shape s = *this;
-        for (int i = dim.size() - 1; i >= 0; i--)
-            if (dim[i]) {
-                s.dim[i] = 0;
-                break;
-            }
-        return s;
-    }
-
-    uint back() const {
-        uint s = size;
-        return (s == 0) ? 0 : dim[s - 1];
-    }
-
-    // first m elements
-    tensor_shape first(int m) const {
-        tensor_shape s = *this;
-        for (int i = m; i < dim.size(); i++) s.dim[i] = 0;
-        return s;
-    }
-
-    // last m elements
-    tensor_shape last(int m) const {
-        m = min<int>(m, size);
-        tensor_shape s;
-        for (int i = 0; i < m; i++) s.dim[i] = dim[i + size - m];
-        for (int i = m; i < dim.size(); i++) s.dim[i] = 0;
-        return s;
-    }
-
-    tensor_shape push_front(uint a) const {
-        Check(dim[3] == 0);
-        return tensor_shape({a, dim[0], dim[1], dim[2]}, 0);
-    }
-
-    tensor_shape push_back(uint a) const {
-        Check(dim[3] == 0);
-        tensor_shape s = *this;
-        s.dim[s.size] = a;
-        return s;
-    }
-
-    operator string() const {
-        ostringstream os;
-        os << '[';
-        for (int i = 0; i < size; i++) {
-            if (i > 0) os << ' ';
-            os << dim[i];
-        }
-        os << ']';
-        return os.str();
-    }
-
-    bool operator==(tensor_shape o) const { return dim == o.dim; }
-    bool operator!=(tensor_shape o) const { return dim != o.dim; }
-
-   private:
-    array<uint, 4> dim;
-
-    tensor_shape(std::initializer_list<uint> d, int) {
-        DCheck(d.size() == dim.size(), "");
-        for (size_t i = 0; i < dim.size(); i++) dim[i] = d.begin()[i];
+    string str() const {
+        if (d[3] != 1) return format("[%s %s %s %s]", d[0], d[1], d[2], d[3]);
+        if (d[2] != 1) return format("[%s %s %s]", d[0], d[1], d[2]);
+        if (d[1] != 1) return format("[%s %s]", d[0], d[1]);
+        return (d[0] != 1) ? format("[%s]", d[0]) : "[]";
     }
 };
 
@@ -136,9 +64,9 @@ class Tensor {
     using type = T;
 
     Tensor() : m_data(nullptr) {}
-    Tensor(T* data, tensor_shape shape) : m_data(data), m_shape(shape) {
-        Check(data || shape.volume == 0);
-        Check(shape.volume != 0 || data == nullptr);
+    Tensor(T* data, dim4 shape) : m_data(data), m_shape(shape) {
+        Check(data || shape.elements() == 0);
+        Check(shape.elements() != 0 || data == nullptr);
     }
 
     Tensor(const Tensor<T>& o) : m_data(o.m_data), m_shape(o.m_shape) {}
@@ -154,7 +82,7 @@ class Tensor {
     const T* end() const { return data() + size; }
 
     Property(Tensor) {
-        operator size_t() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.volume; }
+        operator size_t() const { return PropertyT<Tensor, __LINE__ - 1>::parent->m_shape.elements(); }
     }
     size;
 
@@ -213,20 +141,20 @@ class Tensor {
         return ((a * m_shape[1] + b) * m_shape[2] + c) * m_shape[3] + d;
     }
 
-    const T& operator()(tensor_shape index) const { return operator[](offset(index)); }
+    const T& operator()(dim4 index) const { return operator[](offset(index)); }
 
     // sub-tensor for the fixed value of the first dimension
     Tensor slice(size_t a) {
         DCheck(m_shape.size() > 0, "");
         DCheck(a < m_shape[0], "");
-        size_t v = m_shape.pop_front().volume;
+        size_t v = m_shape.pop_front().elements();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
     const Tensor slice(size_t a) const {
         DCheck(m_shape.size() > 0, "");
         DCheck(a < m_shape[0], "");
-        size_t v = m_shape.pop_front().volume;
+        size_t v = m_shape.pop_front().elements();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
@@ -259,7 +187,7 @@ class Tensor {
 
    protected:
     T* m_data;
-    tensor_shape m_shape;
+    dim4 m_shape;
 };
 
 // VTensor is multi-dimensional vector (owns memory)
@@ -267,7 +195,7 @@ template <typename T>
 class VTensor : public Tensor<T> {
    public:
     VTensor() {}
-    VTensor(tensor_shape shape, T init = T()) : m_vector(shape.volume, init) {
+    VTensor(dim4 shape, T init = T()) : m_vector(shape.elements(), init) {
         Tensor<T>::m_shape = shape;
         Tensor<T>::m_data = m_vector.data();
     }
@@ -282,7 +210,7 @@ class VTensor : public Tensor<T> {
         Tensor<T>::m_data = m_vector.data();
 
         o.m_data = nullptr;
-        o.m_shape = tensor_shape();
+        o.m_shape = dim4();
         return *this;
     }
 
@@ -302,9 +230,9 @@ class VTensor : public Tensor<T> {
     }
     size;
 
-    void reshape(tensor_shape new_shape, T init = T()) {
+    void reshape(dim4 new_shape, T init = T()) {
         Tensor<T>::m_shape = new_shape;
-        m_vector.resize(new_shape.volume, init);
+        m_vector.resize(new_shape.elements(), init);
         Tensor<T>::m_data = m_vector.data();
     }
 

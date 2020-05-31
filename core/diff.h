@@ -4,7 +4,6 @@
 #include <core/range.h>
 #include <core/std.h>
 #include <core/tensor.h>
-#include <arrayfire.h>
 
 // Stages of Diff graph:
 // - construction - final size of tensors is known
@@ -28,25 +27,25 @@ struct Diff {
     virtual void Backward() { has_overload = false; }
     virtual void EndEpoch() { has_overload = false; }
 
-    void Reshape(tensor_shape s) {
+    void Reshape(dim4 s) {
         v.reshape(s);
         g.reshape(s);
     }
 
-    operator string() const { return format("%s %s", TypeName(*this), string(v.shape())); }
+    operator string() const { return format("%s %s", TypeName(*this), v.shape().str()); }
 
     TProperty(Shape, Diff) {
         operator auto() const { return parent->v.shape(); }
         auto operator->() const { return &parent->v.shape(); }
         auto operator()(int i) const { return parent->v.shape()[i]; }
         bool operator==(const Shape& o) const { return parent->v.shape() == o; }
-        bool operator==(const tensor_shape& o) const { return parent->v.shape() == o; }
-        operator string() const { return string(parent->v.shape()); }
+        bool operator==(const dim4& o) const { return parent->v.shape() == o; }
+        operator string() const { return parent->v.shape().str(); }
     }
     shape;
 
     Property(Diff) {
-        operator uint() const { return parent->v.shape().size; }
+        operator uint() const { return parent->v.shape().rank(); }
     }
     rank;
 
@@ -142,8 +141,8 @@ struct Diff_vs : public Diff2 {
     }
 };
 
-bool IsBroadcastable(tensor_shape a, tensor_shape b);
-PDiff Broadcast(PDiff a, tensor_shape b);
+bool IsBroadcastable(dim4 a, dim4 b);
+PDiff Broadcast(PDiff a, dim4 b);
 
 // Ignores gradients and batches.
 inline PDiff Const(tensor::type c) {
@@ -153,7 +152,7 @@ inline PDiff Const(tensor::type c) {
     return p;
 }
 
-inline PDiff Const(tensor_shape shape, tensor::type c) {
+inline PDiff Const(dim4 shape, tensor::type c) {
     auto p = make_shared<Diff>();
     p->v.reshape(shape, c);
     return p;
@@ -191,17 +190,17 @@ struct ParamT : public Diff {
 };
 
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
-inline PDiff Param(tensor_shape shape, shared_ptr<Init> init = nullptr) {
+inline PDiff Param(dim4 shape, shared_ptr<Init> init = nullptr) {
     auto p = make_shared<ParamT>();
-    Check(shape.size > 0, "Parameter shape.size() must be non-zero");
+    Check(shape.elements() > 0, "Parameter shape.elements() must be non-zero");
     p->Reshape(shape);
     if (init) EACH(p->v) p->v[i] = init->get();
     return p;
 }
 
-inline PDiff Param(tensor_shape shape, tensor::type init) {
+inline PDiff Param(dim4 shape, tensor::type init) {
     auto p = make_shared<ParamT>();
-    Check(shape.size > 0, "Parameter shape.size() must be non-zero");
+    Check(shape.elements() > 0, "Parameter shape.elements() must be non-zero");
     p->v.reshape(shape, init);
     p->g.reshape(shape);
     return p;
@@ -209,14 +208,14 @@ inline PDiff Param(tensor_shape shape, tensor::type init) {
 
 // Input and reference value. Not saved.
 // Ignores gradients, requires batches.
-inline PDiff Data(tensor_shape shape) {
+inline PDiff Data(dim4 shape) {
     auto p = make_shared<Diff>();
     p->v.reshape(shape);
     return p;
 }
 
 struct GaussianT : public Diff {
-    GaussianT(tensor_shape shape, tensor::type mean, tensor::type stdev, size_t seed)
+    GaussianT(dim4 shape, tensor::type mean, tensor::type stdev, size_t seed)
         : normal(mean, stdev), random(seed) {
         v.reshape(shape);
     }
@@ -225,7 +224,7 @@ struct GaussianT : public Diff {
     std::mt19937_64 random;
 };
 
-inline PDiff Gaussian(tensor_shape shape, tensor::type mean, tensor::type stdev, size_t seed) {
+inline PDiff Gaussian(dim4 shape, tensor::type mean, tensor::type stdev, size_t seed) {
     return make_shared<GaussianT>(shape, mean, stdev, seed);
 }
 
@@ -688,7 +687,7 @@ struct MaxPool2D : public Diff1 {
 };
 
 struct Reshape : public Diff1 {
-    Reshape(PDiff a, tensor_shape shape) : Diff1(a) {
+    Reshape(PDiff a, dim4 shape) : Diff1(a) {
         v.reshape(shape);
         Check(a->size == v.size);
     }
@@ -702,15 +701,17 @@ struct Reshape : public Diff1 {
 // v{m,p} x m{q,p} -> {m,q}
 struct VecMatMulT : public Diff2 {
     VecMatMulT(PDiff a, PDiff b) : Diff2(a, b) {
-        tensor_shape as = a->shape, bs = b->shape;
-        Check(as.size > 0);
-        Check(bs.size == 2);
+        dim4 as = a->shape, bs = b->shape;
+        Check(as.ndims() > 0);
+        Check(bs.ndims() == 2);
         Check(as.back() == bs.back());
-        Reshape(as.pop_back().push_back(bs[0]));
+        dim4 cs = as;
+        cs[cs.rank() - 1] = bs[0];
+        Reshape(cs);
     }
 
     void Forward() override {
-        const size_t m = va.shape().pop_back().volume;
+        const size_t m = va.shape().elements() / va.shape().back();
         const size_t q = vb.shape()[0];
         const size_t p = vb.shape()[1];
 
@@ -724,7 +725,7 @@ struct VecMatMulT : public Diff2 {
     }
 
     void Backward() override {
-        const size_t m = va.shape().pop_back().volume;
+        const size_t m = va.shape().elements() / va.shape().back();
         const size_t q = vb.shape()[0];
         const size_t p = vb.shape()[1];
 

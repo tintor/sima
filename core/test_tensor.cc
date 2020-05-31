@@ -3,34 +3,40 @@
 
 #include <catch.hpp>
 
-TEST_CASE("tensor_shape", "[tensor]") {
-    REQUIRE(tensor_shape{}.size == 0);
-    REQUIRE(tensor_shape{3}.size == 1);
+TEST_CASE("dim4", "[tensor]") {
+    REQUIRE(dim4{}.rank() == 0);
+    REQUIRE(dim4{1}.rank() == 0);
+    REQUIRE(dim4{3}.rank() == 1);
+    REQUIRE(dim4{1, 3, 1}.rank() == 1);
+    REQUIRE(dim4{0, 3, 1}.rank() == 0);
 
-    REQUIRE(tensor_shape{1}.volume == 1);
-    REQUIRE(tensor_shape{2, 3, 4, 5}.volume == 2 * 3 * 4 * 5);
+    REQUIRE(dim4{1}.elements() == 1);
+    REQUIRE(dim4{2, 3, 4, 5}.elements() == 2 * 3 * 4 * 5);
 
-    REQUIRE(tensor_shape{2} == tensor_shape{2});
-    REQUIRE(tensor_shape{2, 2} == tensor_shape{2, 2});
-    REQUIRE(tensor_shape{2, 1} != tensor_shape{2});
+    REQUIRE(dim4{2} == dim4{2});
+    REQUIRE(dim4{2, 2} == dim4{2, 2});
+    REQUIRE(dim4{2, 1} != dim4{2});
 
-    REQUIRE(tensor_shape{2, 1}.pop_front() == tensor_shape{1});
-    REQUIRE(tensor_shape{2}.pop_front() == tensor_shape{});
-    REQUIRE(tensor_shape{}.pop_front() == tensor_shape{});
+    REQUIRE(dim4{2, 1}.pop_front() == dim4{1});
+    REQUIRE(dim4{2}.pop_front() == dim4{});
+    REQUIRE(dim4{}.pop_front() == dim4{});
 
-    REQUIRE(tensor_shape{2, 1}.pop_back() == tensor_shape{2});
-    REQUIRE(tensor_shape{2}.pop_back() == tensor_shape{});
-    REQUIRE(tensor_shape{}.pop_back() == tensor_shape{});
+    REQUIRE(dim4{2, 1}.pop_back() == dim4{2});
+    REQUIRE(dim4{2}.pop_back() == dim4{});
+    REQUIRE(dim4{}.pop_back() == dim4{});
 
-    REQUIRE(tensor_shape{2, 1}.push_front(3) == tensor_shape{3, 2, 1});
+    REQUIRE(dim4{2, 1}.push_front(3) == dim4{3, 2, 1});
 
-    REQUIRE(tensor_shape{2, 4, 5}.first(1) == tensor_shape{2});
-    REQUIRE(tensor_shape{2, 4, 5}.first(2) == tensor_shape{2, 4});
+    // REQUIRE(dim4{2, 4, 5}.first(1) == dim4{2});
+    // REQUIRE(dim4{2, 4, 5}.first(2) == dim4{2, 4});
 
-    REQUIRE(tensor_shape{2, 4, 5}.last(1) == tensor_shape{5});
-    REQUIRE(tensor_shape{2, 4, 5}.last(2) == tensor_shape{4, 5});
+    // REQUIRE(dim4{2, 4, 5}.last(1) == dim4{5});
+    // REQUIRE(dim4{2, 4, 5}.last(2) == dim4{4, 5});
 
-    REQUIRE(string(tensor_shape{2, 4, 5}) == "[2 4 5]");
+    REQUIRE(dim4{2, 4, 5}.str() == "[2 4 5]");
+    REQUIRE(dim4{2}.str() == "[2]");
+    REQUIRE(dim4{1}.str() == "[]");
+    REQUIRE(dim4{}.str() == "[]");
 }
 
 TEST_CASE("tensor", "[tensor]") {

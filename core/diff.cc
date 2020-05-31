@@ -2,28 +2,28 @@
 
 thread_local bool Diff::has_overload;
 
-bool IsBroadcastable(tensor_shape a, tensor_shape b) { return a.size != 0 && (a.volume == 1 || a == b.last(a.size)); }
+bool IsBroadcastable(dim4 a, dim4 b) { return a.rank() != 0 && (a.elements() == 1 /*|| a == b.last(a.size)*/); }
 
 struct BroadcastS : public Diff1 {
-    BroadcastS(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
+    BroadcastS(PDiff a, dim4 b) : Diff1(a) { Reshape(b); }
     void Forward() override { EACH(v) v[i] = va[0]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i];
     }
 };
 
-struct BroadcastT : public Diff1 {
-    BroadcastT(PDiff a, tensor_shape b) : Diff1(a) { Reshape(b); }
+/*struct BroadcastT : public Diff1 {
+    BroadcastT(PDiff a, dim4 b) : Diff1(a) { Reshape(b); }
     void Forward() override { EACH(v) v[i] = va[i % va.size]; }
     void Backward() override {
         if (ga) EACH(g) ga[i % ga.size] += g[i];
     }
-};
+};*/
 
-PDiff Broadcast(PDiff a, tensor_shape b) {
+PDiff Broadcast(PDiff a, dim4 b) {
     if (a->shape == b) return a;
     if (a->size == 1) return make_shared<BroadcastS>(a, b);
-    if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
+    //if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
     Check(false);
     return nullptr;
 }
