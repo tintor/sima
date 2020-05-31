@@ -10,6 +10,7 @@ add_library(core
 add_executable(core_test
 	../test.cc
     test_cublas.cc
+    test_cuda.cu
 	test_array_deque.cc
 	test_array_set.cc
  	test_auto.cc
@@ -28,4 +29,5 @@ add_executable(core_test
     test_ipp.cc
 	test_bplustree.cc)
 
+set_target_properties(core_test PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(core_test core ${LIBRARIES})

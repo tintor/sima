@@ -22,10 +22,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 # CUDA
 # ----
 if (NOT APPLE)
-  add_definitions(-DHAVE_CUDA)
   find_package(CUDA 10.1 REQUIRED)
+  add_definitions(-DHAVE_CUDA)
+  add_definitions(--cuda-gpu-arch=sm_75 -Wno-unused-command-line-argument)
   include_directories(/usr/local/cuda-10.1/targets/x86_64-linux/include)
-  set(LIBRARIES ${LIBRARIES} ${CUDA_LIBRARIES} cublas cudnn)
+  link_directories(/usr/local/cuda-10.1/targets/x86_64-linux/lib)
+  set(LIBRARIES ${LIBRARIES} ${CUDA_LIBRARIES} cublas cudnn cudart_static)
 endif()
 
 # Intel IPP

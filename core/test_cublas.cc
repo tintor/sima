@@ -15,7 +15,7 @@ static __inline__ void modify (cublasHandle_t handle, float *m, int ldm, int n, 
     cublasSscal (handle, ldm-p+1, &beta, &m[IDX2F(p,q,ldm)], 1);
 }
 
-TEST_CASE("basic_cublas", "[cb]") {
+TEST_CASE("basic_cublas", "[cublas]") {
     cudaError_t cudaStat;    
     cublasStatus_t stat;
     cublasHandle_t handle;
