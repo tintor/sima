@@ -1,7 +1,7 @@
 #include <geom/vector.h>
-#include <klein/klein.hpp>
 
 #include <catch.hpp>
+#include <klein/klein.hpp>
 
 using namespace kln;
 

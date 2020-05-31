@@ -178,8 +178,7 @@ bool HasBackward(PDiff p) {
     return Diff::has_overload;
 }
 
-Model::Model(PDiff loss, PDiff accuracy)
-        : m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({loss, accuracy})) {
+Model::Model(PDiff loss, PDiff accuracy) : m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({loss, accuracy})) {
     Check(loss->size == 1);
     Check(accuracy == nullptr || accuracy->size == 1);
 

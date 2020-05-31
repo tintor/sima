@@ -14,7 +14,7 @@ inline void SaveModel(span<PDiff> model, string_view filename) {}
 using Metrics = unordered_map<string, float>;
 
 class Model {
-public:
+   public:
     shared_ptr<Optimizer> optimizer = make_shared<Optimizer>();
 
     Model(PDiff loss, PDiff accuracy = nullptr);
@@ -32,7 +32,7 @@ public:
 
     Metrics Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 
-private:
+   private:
     const PDiff m_loss;
     const PDiff m_accuracy;
     vector<PDiff> m_nodes;

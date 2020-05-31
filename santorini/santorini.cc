@@ -1,9 +1,9 @@
 #include <core/callstack.h>
 #include <core/format.h>
 #include <core/hash.h>
+#include <core/model.h>
 #include <core/thread.h>
 #include <core/util.h>
-#include <core/model.h>
 #include <santorini/action.h>
 #include <santorini/board.h>
 #include <view/font.h>
@@ -338,9 +338,7 @@ struct MyModel {
         // hyper params?
     }
 
-    float Predict(const af::array input) {
-        return 0;
-    }
+    float Predict(const af::array input) { return 0; }
 
     PDiff in;
     PDiff ref;
@@ -351,7 +349,6 @@ struct MyModel {
 };
 
 MyModel g_value_fn;
-
 
 // 1 - current player wins always
 // 0 - current player looses alwaya

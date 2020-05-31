@@ -186,8 +186,7 @@ struct UniformInit : public Init {
     std::mt19937_64& random;
 };
 
-struct ParamT : public Diff {
-};
+struct ParamT : public Diff {};
 
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
 inline PDiff Param(dim4 shape, shared_ptr<Init> init = nullptr) {
@@ -215,8 +214,7 @@ inline PDiff Data(dim4 shape) {
 }
 
 struct GaussianT : public Diff {
-    GaussianT(dim4 shape, tensor::type mean, tensor::type stdev, size_t seed)
-        : normal(mean, stdev), random(seed) {
+    GaussianT(dim4 shape, tensor::type mean, tensor::type stdev, size_t seed) : normal(mean, stdev), random(seed) {
         v.reshape(shape);
     }
     void Forward() override { EACH(v) v[i] = normal(random); }
@@ -878,12 +876,12 @@ struct BinaryCrossEntropyT : public Diff2 {
             // TODO try removing the max
             auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
             auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
-            gb[i] -= (p - q) / a->size; // not multiplying with g[0] == 1
+            gb[i] -= (p - q) / a->size;  // not multiplying with g[0] == 1
         }
     }
 };
 
-template<bool Checker = false>
+template <bool Checker = false>
 inline PDiff BinaryCrossEntropy(PDiff ref, PDiff out) {
     if (Checker) {
         auto [out0, out1] = GradCmp(out);

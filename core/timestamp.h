@@ -1,7 +1,7 @@
 #pragma once
-#include <core/std.h>
-#include <core/int.h>
 #include <core/auto.h>
+#include <core/int.h>
+#include <core/std.h>
 
 struct Timestamp {
     Timestamp() : _ticks(__builtin_readcyclecounter()) {}

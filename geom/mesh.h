@@ -63,9 +63,7 @@ class array_iterator {
 // first ring is exterior, other rings are interior and oriented opposite
 struct face {
     face(const double3* vertices, cspan<uint> offsets, plane p) : _vertices(vertices), _offsets(offsets), _plane(p) {}
-    cspan<double3> operator[](uint idx) const {
-        return {_vertices + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
-    }
+    cspan<double3> operator[](uint idx) const { return {_vertices + _offsets[idx], _offsets[idx + 1] - _offsets[idx]}; }
     plane plane() const { return _plane; }
     uint size() const { return _offsets.size() - 1; }
     uint vertex_size() const { return _offsets.back() - _offsets[0]; }

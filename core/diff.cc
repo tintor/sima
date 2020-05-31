@@ -23,7 +23,7 @@ struct BroadcastS : public Diff1 {
 PDiff Broadcast(PDiff a, dim4 b) {
     if (a->shape == b) return a;
     if (a->size == 1) return make_shared<BroadcastS>(a, b);
-    //if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
+    // if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
     Check(false);
     return nullptr;
 }

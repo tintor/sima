@@ -1,4 +1,6 @@
 #pragma once
+#include <absl/types/span.h>
+
 #include <array>
 #include <atomic>
 #include <complex>
@@ -19,8 +21,6 @@
 #include <variant>
 #include <vector>
 
-#include <absl/types/span.h>
-
 namespace fs = std::filesystem;
 
 using std::complex;
@@ -33,9 +33,9 @@ using std::variant;
 
 using std::array;
 
-template<typename T>
+template <typename T>
 using span = absl::Span<T>;
-template<typename T>
+template <typename T>
 using cspan = span<const T>;
 
 using std::map;

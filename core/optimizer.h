@@ -16,7 +16,8 @@ struct Momentum : public Optimizer {
         for (auto& e : ags) EACH(e) e[i] = 0;
     }
     void Optimize(span<ParamT*> params) override;
-private:
+
+   private:
     float momentum_exp = 1;
     vector<vtensor> ags;
 };
@@ -30,7 +31,8 @@ struct RMSProp : public Optimizer {
         for (auto& e : aggs) EACH(e) e[i] = 0;
     }
     void Optimize(span<ParamT*> params) override;
-private:
+
+   private:
     float rmsprop_exp = 1;
     vector<vtensor> aggs;
 };
@@ -46,7 +48,8 @@ struct Adam : public Optimizer {
         for (auto& e : aggs) EACH(e) e[i] = 0;
     }
     void Optimize(span<ParamT*> params) override;
-private:
+
+   private:
     float momentum_exp = 1;
     float rmsprop_exp = 1;
     vector<vtensor> ags, aggs;

@@ -1,4 +1,3 @@
 #include <catch.hpp>
 
-TEST_CASE("santorini model") {
-}
+TEST_CASE("santorini model") {}

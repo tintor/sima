@@ -1,6 +1,6 @@
 #include <core/optimizer.h>
 
-void Optimizer::Optimize(span<ParamT*> params) {
+void Optimizer::Optimize(span<ParamT *> params) {
     for (auto p : params) {
         Timestamp ts;
         EACH(p->v) p->v[i] -= alpha * p->g[i];
@@ -8,7 +8,7 @@ void Optimizer::Optimize(span<ParamT*> params) {
     }
 }
 
-void Momentum::Optimize(span<ParamT*> params) {
+void Momentum::Optimize(span<ParamT *> params) {
     if (ags.size() != params.size()) {
         ags.resize(params.size());
         for (auto i : range(params.size())) ags[i].reshape(params[i]->shape);
@@ -28,8 +28,8 @@ void Momentum::Optimize(span<ParamT*> params) {
     }
 }
 
-template<bool Correct>
-void RMSPropUpdate(ParamT* p, tensor agg, float alpha, float rmsprop, float rmsprop_correction, float rmsprop_eps) {
+template <bool Correct>
+void RMSPropUpdate(ParamT *p, tensor agg, float alpha, float rmsprop, float rmsprop_correction, float rmsprop_eps) {
     Timestamp ts;
     vtensor &v = p->v, &g = p->g;
     EACH(v) {
@@ -40,7 +40,7 @@ void RMSPropUpdate(ParamT* p, tensor agg, float alpha, float rmsprop, float rmsp
     p->backward_ticks += ts.elapsed();
 }
 
-void RMSProp::Optimize(span<ParamT*> params) {
+void RMSProp::Optimize(span<ParamT *> params) {
     if (aggs.size() != params.size()) {
         aggs.resize(params.size());
         for (auto i : range(params.size())) aggs[i].reshape(params[i]->shape);
@@ -60,8 +60,9 @@ void RMSProp::Optimize(span<ParamT*> params) {
     }
 }
 
-template<bool Correct>
-void AdamUpdate(ParamT* p, tensor ag, tensor agg, float alpha_with_correction, float momentum, float rmsprop, float rmsprop_correction, float rmsprop_eps) {
+template <bool Correct>
+void AdamUpdate(ParamT *p, tensor ag, tensor agg, float alpha_with_correction, float momentum, float rmsprop,
+                float rmsprop_correction, float rmsprop_eps) {
     Timestamp ts;
     vtensor &v = p->v, &g = p->g;
     EACH(v) {
@@ -73,7 +74,7 @@ void AdamUpdate(ParamT* p, tensor ag, tensor agg, float alpha_with_correction, f
     p->backward_ticks += ts.elapsed();
 }
 
-void Adam::Optimize(span<ParamT*> params) {
+void Adam::Optimize(span<ParamT *> params) {
     if (ags.size() != params.size()) {
         ags.resize(params.size());
         aggs.resize(params.size());
@@ -89,12 +90,12 @@ void Adam::Optimize(span<ParamT*> params) {
 
     if (rmsprop_correction >= 0.999999f) {
         for (auto j : range(params.size())) {
-            AdamUpdate<true>(params[j], ags[j], aggs[j], alpha_with_correction, momentum, rmsprop, rmsprop_correction, rmsprop_eps);
+            AdamUpdate<true>(params[j], ags[j], aggs[j], alpha_with_correction, momentum, rmsprop, rmsprop_correction,
+                             rmsprop_eps);
         }
     } else {
         for (auto j : range(params.size())) {
             AdamUpdate<false>(params[j], ags[j], aggs[j], alpha_with_correction, momentum, rmsprop, 1, rmsprop_eps);
         }
     }
-
 }

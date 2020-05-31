@@ -4,9 +4,9 @@
 #include <core/string_util.h>
 #include <core/util.h>
 #include <immintrin.h>
-#include <range/v3/algorithm.hpp>
 
 #include <catch.hpp>
+#include <range/v3/algorithm.hpp>
 
 TEST_CASE("ranges basic", "[ranges]") {
     vector<int> v = {6, 2, 3, 4, 5, 6};

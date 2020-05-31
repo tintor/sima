@@ -28,9 +28,7 @@ class xpolygon {
         return {_vertices.data() + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
     }
 
-    span<Vec> operator[](uint idx) {
-        return {_vertices.data() + _offsets[idx], _offsets[idx + 1] - _offsets[idx]};
-    }
+    span<Vec> operator[](uint idx) { return {_vertices.data() + _offsets[idx], _offsets[idx + 1] - _offsets[idx]}; }
 
     uint size() const { return _offsets.size() - 1; }
 

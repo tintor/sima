@@ -29,7 +29,10 @@ void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<st
         for (int i = 0; i < 250; i++) {
             model.Forward();
             model.Backward();
-            if (b->v[0] <= 0.05) { count = i + 1; break; }
+            if (b->v[0] <= 0.05) {
+                count = i + 1;
+                break;
+            }
         }
         REQUIRE(b->v[0] <= 0.05);
         format_s(*row++, "%s|", count);
@@ -45,7 +48,10 @@ void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<st
         for (int i = 0; i < 250; i++) {
             model.Forward();
             model.Backward();
-            if (b->v[0] >= 0.95) { count = i + 1; break; }
+            if (b->v[0] >= 0.95) {
+                count = i + 1;
+                break;
+            }
         }
         REQUIRE(b->v[0] >= 0.95);
         format_s(*row++, "%s|", count);
@@ -121,66 +127,66 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     constexpr bool D3 = false;
     parallel(5, [&](size_t seed) {
-    const int Batch = 24;
-    auto x = Data({Batch, 1}) << "x";
-    auto y = Data({Batch, 1}) << "y";
-    auto z = Data({Batch, 1}) << "y";
-    auto ref = Data({Batch, 1}) << "ref";
+        const int Batch = 24;
+        auto x = Data({Batch, 1}) << "x";
+        auto y = Data({Batch, 1}) << "y";
+        auto z = Data({Batch, 1}) << "y";
+        auto ref = Data({Batch, 1}) << "ref";
 
-    std::mt19937_64 random(seed);
-    auto init = make_shared<NormalInit>(1 / sqrt(2), random);
-    auto a = Param({1}, init) << "a";
-    auto b = Param({1}, init) << "b";
-    auto c = Param({1}) << "d";
-    auto d = D3 ? Param({1}, init) << "c" : nullptr;
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(1 / sqrt(2), random);
+        auto a = Param({1}, init) << "a";
+        auto b = Param({1}, init) << "b";
+        auto c = Param({1}) << "d";
+        auto d = D3 ? Param({1}, init) << "c" : nullptr;
 
-    auto fc = x * a + y * b + c;
-    if (D3) fc = fc + z * d;
-    auto out = Logistic(fc, 15) << "out";
-    auto loss = BinaryCrossEntropy(ref, out) << "loss";
+        auto fc = x * a + y * b + c;
+        if (D3) fc = fc + z * d;
+        auto out = Logistic(fc, 15) << "out";
+        auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
-    Model model(loss, Accuracy(ref, out));
-    model.optimizer = make_shared<Adam>();
-    model.optimizer->alpha = 0.1;
+        Model model(loss, Accuracy(ref, out));
+        model.optimizer = make_shared<Adam>();
+        model.optimizer->alpha = 0.1;
 
-    // dataset
-    const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
-    UniformInit gen(-1, 1, random);
-    const int Classes = D3 ? 3: 2;
-    const int SamplesPerClass = 20000 - 8;
-    const int Samples = Classes * SamplesPerClass;
-    vtensor data_x({Samples, 1}, 0);
-    vtensor data_y({Samples, 1}, 0);
-    vtensor data_z({Samples, 1}, 0);
-    vtensor data_r({Samples, 1}, 0);
-    int count[2] = {0, 0};
-    int index = 0;
-    while (index < Samples) {
-        float dx = gen.get();
-        float dy = gen.get();
-        float dz = D3 ? gen.get() : 0;
-        float dr = (dx * A + dy * B + dz * C + D >= 0) ? 1 : 0;
-        int c = round(dr);
-        if (count[c] >= SamplesPerClass) continue;
-        count[c] += 1;
-        data_x[index] = dx;
-        data_y[index] = dy;
-        if (D3) data_z[index] = dz;
-        data_r[index] = dr;
-        index += 1;
-    }
-    vector<pair<PDiff, tensor>> dataset;
-    if (D3) dataset = {{x, data_x}, {y, data_y}, {z, data_z}, {ref, data_r}};
-    if (!D3) dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
-    NormalizeDataset(data_x);
-    NormalizeDataset(data_y);
-    if (D3) NormalizeDataset(data_z);
+        // dataset
+        const float A = 0.2, B = 0.4, C = -0.8, D = 0.1;
+        UniformInit gen(-1, 1, random);
+        const int Classes = D3 ? 3 : 2;
+        const int SamplesPerClass = 20000 - 8;
+        const int Samples = Classes * SamplesPerClass;
+        vtensor data_x({Samples, 1}, 0);
+        vtensor data_y({Samples, 1}, 0);
+        vtensor data_z({Samples, 1}, 0);
+        vtensor data_r({Samples, 1}, 0);
+        int count[2] = {0, 0};
+        int index = 0;
+        while (index < Samples) {
+            float dx = gen.get();
+            float dy = gen.get();
+            float dz = D3 ? gen.get() : 0;
+            float dr = (dx * A + dy * B + dz * C + D >= 0) ? 1 : 0;
+            int c = round(dr);
+            if (count[c] >= SamplesPerClass) continue;
+            count[c] += 1;
+            data_x[index] = dx;
+            data_y[index] = dy;
+            if (D3) data_z[index] = dz;
+            data_r[index] = dr;
+            index += 1;
+        }
+        vector<pair<PDiff, tensor>> dataset;
+        if (D3) dataset = {{x, data_x}, {y, data_y}, {z, data_z}, {ref, data_r}};
+        if (!D3) dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
+        NormalizeDataset(data_x);
+        NormalizeDataset(data_y);
+        if (D3) NormalizeDataset(data_z);
 
-    // train!
-    Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    REQUIRE(metrics.at("accuracy") >= 0.9994);
-    println("accuracy: %s", metrics.at("accuracy"));
+        // train!
+        Metrics metrics;
+        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        REQUIRE(metrics.at("accuracy") >= 0.9994);
+        println("accuracy: %s", metrics.at("accuracy"));
     });
 }
 
@@ -210,159 +216,159 @@ PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
 // B512 -> 6.9s 95.28%
 TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     parallel(5, [&](size_t seed) {
-    const int Batch = 24;
-    auto x = Data({Batch, 1}) << "x";
-    auto y = Data({Batch, 1}) << "y";
-    auto ref = Data({Batch, 1}) << "ref";
+        const int Batch = 24;
+        auto x = Data({Batch, 1}) << "x";
+        auto y = Data({Batch, 1}) << "y";
+        auto ref = Data({Batch, 1}) << "ref";
 
-    std::mt19937_64 random(seed);
-    auto init = make_shared<NormalInit>(1, random);
-    auto h1 = Neuron(x, y, init) << "h1";
-    auto h2 = Neuron(x, y, init) << "h2";
-    auto h3 = Neuron(x, y, init) << "h3";
-    auto init2 = make_shared<NormalInit>(1, random);
-    auto out = Neuron(h1, h2, h3, init2) << "out";
-    auto loss = MeanSquareError(ref, out) << "loss";
-    Model model(loss, Accuracy(ref, out));
-    model.optimizer->alpha = 0.1;
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(1, random);
+        auto h1 = Neuron(x, y, init) << "h1";
+        auto h2 = Neuron(x, y, init) << "h2";
+        auto h3 = Neuron(x, y, init) << "h3";
+        auto init2 = make_shared<NormalInit>(1, random);
+        auto out = Neuron(h1, h2, h3, init2) << "out";
+        auto loss = MeanSquareError(ref, out) << "loss";
+        Model model(loss, Accuracy(ref, out));
+        model.optimizer->alpha = 0.1;
 
-    // dataset
-    UniformInit gen(-1, 1, random);
-    const int Classes = 2;
-    const int SamplesPerClass = 20000 - 8;
-    const int Samples = Classes * SamplesPerClass;
-    vtensor data_x({Samples, 1}, 0);
-    vtensor data_y({Samples, 1}, 0);
-    vtensor data_r({Samples, 1}, 0);
-    int count[2] = {0, 0};
-    int index = 0;
-    while (index < Samples) {
-        float dx = gen.get();
-        float dy = gen.get();
-        float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
-        int c = round(dr);
-        if (count[c] >= SamplesPerClass) continue;
-        count[c] += 1;
-        data_x[index] = dx;
-        data_y[index] = dy;
-        data_r[index] = dr;
-        index += 1;
-    }
-    vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
+        // dataset
+        UniformInit gen(-1, 1, random);
+        const int Classes = 2;
+        const int SamplesPerClass = 20000 - 8;
+        const int Samples = Classes * SamplesPerClass;
+        vtensor data_x({Samples, 1}, 0);
+        vtensor data_y({Samples, 1}, 0);
+        vtensor data_r({Samples, 1}, 0);
+        int count[2] = {0, 0};
+        int index = 0;
+        while (index < Samples) {
+            float dx = gen.get();
+            float dy = gen.get();
+            float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
+            int c = round(dr);
+            if (count[c] >= SamplesPerClass) continue;
+            count[c] += 1;
+            data_x[index] = dx;
+            data_y[index] = dy;
+            data_r[index] = dr;
+            index += 1;
+        }
+        vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
 
-    // train!
-    Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    println("accuracy: %s", metrics.at("accuracy"));
-    REQUIRE(metrics.at("accuracy") >= 0.9922);
+        // train!
+        Metrics metrics;
+        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        println("accuracy: %s", metrics.at("accuracy"));
+        REQUIRE(metrics.at("accuracy") >= 0.9922);
     });
 }
 
 TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
     constexpr int N = 2;
     parallel(5, [&](size_t seed) {
-    const int Batch = 24;
-    auto in = Data({Batch, N}) << "in";
-    auto ref = Data({Batch, 1}) << "ref";
+        const int Batch = 24;
+        auto in = Data({Batch, N}) << "in";
+        auto ref = Data({Batch, 1}) << "ref";
 
-    std::mt19937_64 random(seed);
-    auto init = make_shared<NormalInit>(1, random);
-    auto fc = FullyConnected(in, 1, init);
-    auto out = Logistic(fc, 15) << "out";
-    auto loss = BinaryCrossEntropy(ref, out) << "loss";
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(1, random);
+        auto fc = FullyConnected(in, 1, init);
+        auto out = Logistic(fc, 15) << "out";
+        auto loss = BinaryCrossEntropy(ref, out) << "loss";
 
-    Model model(loss, Accuracy(ref, out));
-    model.optimizer = make_shared<Adam>();
-    model.optimizer->alpha = 0.1;
+        Model model(loss, Accuracy(ref, out));
+        model.optimizer = make_shared<Adam>();
+        model.optimizer->alpha = 0.1;
 
-    // dataset
-    UniformInit gen(-1, 1, random);
-    vector<float> W;
-    for (int i : range(N)) W.push_back(gen.get() / 2);
-    float B = gen.get() / 10;
+        // dataset
+        UniformInit gen(-1, 1, random);
+        vector<float> W;
+        for (int i : range(N)) W.push_back(gen.get() / 2);
+        float B = gen.get() / 10;
 
-    const int Classes = 2;
-    const int SamplesPerClass = 20000 - 8;
-    const int Samples = Classes * SamplesPerClass;
-    vtensor data_in({Samples, N}, 0);
-    vtensor data_ref({Samples, 1}, 0);
-    int count[2] = {0, 0};
-    int index = 0;
-    vector<float> d;
-    while (index < Samples) {
-        d.clear();
-        for (int i : range(N)) d.push_back(gen.get());
-        float s = B;
-        for (int i : range(N)) s += d[i] * W[i];
-        float dr = (s >= 0) ? 1 : 0;
-        int c = round(dr);
-        if (count[c] >= SamplesPerClass) continue;
-        count[c] += 1;
-        for (int i : range(N)) data_in(index, i) = d[i];
-        data_ref[index] = dr;
-        index += 1;
-    }
-    vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
-    NormalizeDataset(data_in);
+        const int Classes = 2;
+        const int SamplesPerClass = 20000 - 8;
+        const int Samples = Classes * SamplesPerClass;
+        vtensor data_in({Samples, N}, 0);
+        vtensor data_ref({Samples, 1}, 0);
+        int count[2] = {0, 0};
+        int index = 0;
+        vector<float> d;
+        while (index < Samples) {
+            d.clear();
+            for (int i : range(N)) d.push_back(gen.get());
+            float s = B;
+            for (int i : range(N)) s += d[i] * W[i];
+            float dr = (s >= 0) ? 1 : 0;
+            int c = round(dr);
+            if (count[c] >= SamplesPerClass) continue;
+            count[c] += 1;
+            for (int i : range(N)) data_in(index, i) = d[i];
+            data_ref[index] = dr;
+            index += 1;
+        }
+        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        NormalizeDataset(data_in);
 
-    // train!
-    Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    println("accuracy: %s", metrics.at("accuracy"));
-    REQUIRE(metrics.at("accuracy") >= 0.09994);
+        // train!
+        Metrics metrics;
+        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        println("accuracy: %s", metrics.at("accuracy"));
+        REQUIRE(metrics.at("accuracy") >= 0.09994);
     });
 }
 
 TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
     parallel(5, [&](size_t seed) {
-    const int Batch = 24;
-    auto in = Data({Batch, 2}) << "in";
-    auto ref = Data({Batch, 1}) << "ref";
+        const int Batch = 24;
+        auto in = Data({Batch, 2}) << "in";
+        auto ref = Data({Batch, 1}) << "ref";
 
-    std::mt19937_64 random(seed);
-    auto init = make_shared<NormalInit>(1, random);
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(1, random);
 
-    auto x = in;
-    x = FullyConnected(x, 3, init) << "fc";
-    x = Logistic(x, 15);
-    x = FullyConnected(x, 1, init);
-    x = Logistic(x, 15);
+        auto x = in;
+        x = FullyConnected(x, 3, init) << "fc";
+        x = Logistic(x, 15);
+        x = FullyConnected(x, 1, init);
+        x = Logistic(x, 15);
 
-    auto out = x << "out";
-    auto loss = MeanSquareError(ref, out) << "loss";
+        auto out = x << "out";
+        auto loss = MeanSquareError(ref, out) << "loss";
 
-    Model model(loss, Accuracy(ref, out));
-    model.optimizer->alpha = 0.1;
+        Model model(loss, Accuracy(ref, out));
+        model.optimizer->alpha = 0.1;
 
-    // dataset
-    UniformInit gen(-1, 1, random);
-    const int Classes = 2;
-    const int SamplesPerClass = 20000 - 8;
-    const int Samples = Classes * SamplesPerClass;
-    vtensor data_in({Samples, 2}, 0);
-    vtensor data_ref({Samples, 1}, 0);
-    int count[2] = {0, 0};
-    int index = 0;
-    while (index < Samples) {
-        float dx = gen.get();
-        float dy = gen.get();
-        float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
-        int c = round(dr);
-        if (count[c] >= SamplesPerClass) continue;
-        count[c] += 1;
-        data_in(index, 0) = dx;
-        data_in(index, 1) = dy;
-        data_ref[index] = dr;
-        index += 1;
-    }
-    vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
-    NormalizeDataset(data_in);
+        // dataset
+        UniformInit gen(-1, 1, random);
+        const int Classes = 2;
+        const int SamplesPerClass = 20000 - 8;
+        const int Samples = Classes * SamplesPerClass;
+        vtensor data_in({Samples, 2}, 0);
+        vtensor data_ref({Samples, 1}, 0);
+        int count[2] = {0, 0};
+        int index = 0;
+        while (index < Samples) {
+            float dx = gen.get();
+            float dy = gen.get();
+            float dr = (dx * dx + dy * dy >= 0.5) ? 1 : 0;
+            int c = round(dr);
+            if (count[c] >= SamplesPerClass) continue;
+            count[c] += 1;
+            data_in(index, 0) = dx;
+            data_in(index, 1) = dy;
+            data_ref[index] = dr;
+            index += 1;
+        }
+        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        NormalizeDataset(data_in);
 
-    // train!
-    Metrics metrics;
-    for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
-    println("accuracy: %s", metrics.at("accuracy"));
-    REQUIRE(metrics.at("accuracy") >= 0.9617);
+        // train!
+        Metrics metrics;
+        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        println("accuracy: %s", metrics.at("accuracy"));
+        REQUIRE(metrics.at("accuracy") >= 0.9617);
     });
 }
 
