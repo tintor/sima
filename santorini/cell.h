@@ -1,7 +1,7 @@
 #pragma once
 #include <core/std.h>
 
-enum class Figure : char { None, Dome, Player1, Player2 };
+enum class Figure : char { None = '.', Dome = 'D', Player1 = 'a', Player2 = 'b'};
 
 struct Cell {
     char level = 0;                // 2 bits

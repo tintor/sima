@@ -18,7 +18,7 @@ struct Coord {
     int x() const { return v % 5; }
     int y() const { return v / 5; }
 
-    static Coord Random(std::mt19937& random) {
+    static Coord Random(std::mt19937_64& random) {
         std::uniform_int_distribution<int> dis(0, 24);
         Coord c;
         c.v = dis(random);

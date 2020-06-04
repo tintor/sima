@@ -143,9 +143,9 @@ Figure Winner(const Board& board) {
 // ==================
 
 std::random_device rd;
-thread_local std::mt19937 g_random(rd());
+thread_local std::mt19937_64 g_random(rd());
 
-int RandomInt(int count, std::mt19937& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
+int RandomInt(int count, std::mt19937_64& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
 
 struct ReservoirSampler {
     std::uniform_real_distribution<double> dis;
@@ -159,7 +159,7 @@ struct ReservoirSampler {
     }
 };
 
-Coord MyRandomFigure(const Board& board, std::mt19937& random) {
+Coord MyRandomFigure(const Board& board, std::mt19937_64& random) {
     Coord out;
     ReservoirSampler sampler;
     for (Coord e : kAll)
@@ -168,7 +168,7 @@ Coord MyRandomFigure(const Board& board, std::mt19937& random) {
 }
 
 Action RandomAction(const Board& board) {
-    std::mt19937& random = g_random;
+    std::mt19937_64& random = g_random;
     if (board.setup) {
         int c = RandomInt(1 + 8, random);
         if (c == 0) return NextAction{};
@@ -318,7 +318,7 @@ struct MyModel {
 
         // TODO input normalization
         auto fc1 = FullyConnected(in, 128, w_init);
-        fc1 = BatchNorm(fc1, 1e-8);
+        //fc1 = BatchNorm(fc1, 1e-8);
         auto act1 = Relu(fc1);
         auto fc2 = FullyConnected(act1, 1, w_init);
         out = Logistic(fc2, 15);
@@ -795,6 +795,7 @@ Figure Battle(const Policy& policy_a, const Policy& policy_b) {
 }
 
 const std::unordered_map<string_view, Policy> g_policies = {
+    {"random", AutoRandom},
     {"greedy", AutoGreedy},
     {"climber", AutoClimber},
     {"mcts100", [](const auto& e) { return AutoMCTS(e, 100); }},
@@ -838,8 +839,117 @@ void AutoBattle(int count, string_view name_a, string_view name_b) {
     monitor.join();
 }
 
+void Learn() {
+    auto& random = g_random;
+
+    auto in = Data({100, BoardBits}) << "input";
+    auto ref = Data({100, 1}) << "reference";
+    auto w_init = make_shared<NormalInit>(1 / sqrt(128), random);
+    auto fc = FullyConnected(in, 1, w_init);
+    auto out = Logistic(fc, 15);
+    auto loss = BinaryCrossEntropy(ref, out);
+    Model train_model(loss, Accuracy(ref, out));
+    println("train model");
+    train_model.Print();
+
+    auto _in = Data({1, BoardBits}) << "input";
+    auto _fc = FullyConnected(_in, 1, w_init);
+    auto _out = Logistic(_fc, 15) << "out";
+    println("inference model");
+    Model inference_model(_out);
+
+    Values values;
+
+    auto play_by_memory = [&](const Board& board) {
+        Action best_action;
+        double best_value;
+        ReservoirSampler sampler;
+        AllValidActions(board, [&](const Board& new_board, const Action& action) {
+            auto value = values.Value(board);
+            if (sampler.count == 0 || value > best_value) {
+                sampler.count = 1;
+                best_action = action;
+                best_value = value;
+            } else if (value == best_value && sampler(random)) {
+                sampler.count += 1;
+                best_action = action;
+                best_value = value;
+            }
+            return true;
+        });
+        return best_action;
+    };
+
+    auto play_by_model = [&](const Board& board) {
+        Action best_action;
+        double best_value;
+        ReservoirSampler sampler;
+        AllValidActions(board, [&](const Board& new_board, const Action& action) {
+            Serialize(new_board, _in->v);
+            inference_model.Forward();
+            auto value = _out->v[0];
+            if (sampler.count == 0 || value > best_value) {
+                sampler.count = 1;
+                best_action = action;
+                best_value = value;
+            } else if (value == best_value && sampler(random)) {
+                sampler.count += 1;
+                best_action = action;
+                best_value = value;
+            }
+            return true;
+        });
+        return best_action;
+    };
+
+    //const Policy& policy_a = play_by_memory;
+    const Policy& policy_a = g_policies.at("random");
+    const Policy& policy_b = g_policies.at("random");
+
+    // self-play
+    double wins1 = 0;
+    for (auto game : range(1000000)) {
+        vector<Board> history;
+        Board board;
+        Figure w;
+        while (true) {
+            w = Winner(board);
+            if (w != Figure::None) break;
+            const Policy& policy = (board.player == Figure::Player1) ? policy_a : policy_b;
+            auto s = Execute(board, policy(board));
+            if (s != nullopt) Fail(format("faul %s", s));
+            history.push_back(board);
+        }
+        // Go back in game history and record values
+        uint w1 = (w == Figure::Player1) ? 1 : 0;
+        uint w2 = (w == Figure::Player2) ? 1 : 0;
+        std::reverse(history.begin(), history.end());
+        for (const Board& b : history) values.Add(b, w1, w2);
+        wins1 += w1;
+        println("Game %s (values %s, wins %.4f)", game + 1, values.Size(), wins1 / (game + 1));
+    }
+
+    // export Values into dataset
+    values.Export("self_play_outcomes.txt", 3);
+
+    // train model
+    vector<pair<PDiff, vtensor>> data;
+    for (auto i : range(1000)) {
+        //train_model.Epoch(dataset, random, true, i);
+    }
+
+    // TODO load weights from other model
+
+    // evaluate
+}
+
 int main(int argc, char** argv) {
     InitSegvHandler();
+
+    if (argc > 1 && argv[1] == "learn"s) {
+        Learn();
+        return 0;
+    }
 
     if (argc > 1) {
         AutoBattle(100, "climber", "minimax12");

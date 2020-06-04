@@ -21,6 +21,20 @@ struct Board {
     Cell& operator()(Coord c) { return cell[c.v]; }
 };
 
+void Print(const Board& board) {
+    for (int row = 0; row < 5; row++) {
+        for (int col = 0; col < 5; col++) {
+            const Cell c = board.cell[row * 5 + col];
+            cout << char(c.figure) << char(c.level ? '0' + c.level : '.') << ' ';
+        }
+        println();
+    }
+    char p[2] = {char(board.player), 0};
+    print("setup %s, player %s", board.setup, p);
+    if (board.moved) print(" moved %s%s", board.moved->x(), board.moved->y());
+    println(" built %s", board.built);
+}
+
 bool Less(const Cells& a, const Cells& b) {
     for (int i = 0; i < 25; i++) {
         if (a[i] != b[i]) return Less(a[i], b[i]);
@@ -96,7 +110,7 @@ using std::ostream;
 
 inline char Bit(bool a) { return a ? '1' : '0'; }
 
-ostream& operator<<(ostream& os, Cell cell) {
+inline ostream& operator<<(ostream& os, Cell cell) {
     os << Bit(cell.level == 0);
     os << Bit(cell.level == 1);
     os << Bit(cell.level == 2);
@@ -107,7 +121,7 @@ ostream& operator<<(ostream& os, Cell cell) {
     return os;
 }
 
-ostream& operator<<(ostream& os, const Board& board) {
+inline ostream& operator<<(ostream& os, const Board& board) {
     os << Bit(board.setup);
     for (Coord e : kAll) os << Bit(board.moved && *board.moved == e);
     os << Bit(board.built);
@@ -116,7 +130,7 @@ ostream& operator<<(ostream& os, const Board& board) {
     return os;
 }
 
-void Serialize(const Board& board, tensor out) {
+inline void Serialize(const Board& board, tensor out) {
     Check(out.rank == 1);
     Check(out.size == BoardBits);
     ostringstream os;
@@ -142,17 +156,18 @@ class Values {
         wins.player2 += wins2;
     }
 
-    optional<double> Value(const Board& board) const {
+    double Value(const Board& board) const {
         auto it = m_data.find(Normalize(board));
-        if (it == m_data.end()) return nullopt;
+        if (it == m_data.end()) return 0.5;
         const auto& wins = it->second;
-        return ((board.player == Figure::Player1) ? wins.player1 : wins.player2) / double(wins.player1 + wins.player2);
+        return wins.player1 / double(wins.player1 + wins.player2);
     }
 
-    void Export(string_view filename) {
-        std::ofstream os((string(filename)));
+    void Export(string_view filename, int wmin) {
+        // std::ofstream os((string(filename)));
         vector<Board> outs;
         for (const auto& [board, wins] : m_data) {
+            if (wins.player1 + wins.player2 < wmin) continue;
             outs.clear();
             double w = wins.player1 / double(wins.player1 + wins.player2);
             for (int transform = 0; transform < 8; transform++) {
@@ -162,7 +177,9 @@ class Values {
                 if (!contains(outs, out)) outs << out;
             }
             for (const auto& out : outs) {
-                os << out << ' ' << std::setprecision(10) << w << '\n';
+                Print(out);
+                println("wins: %s %s", wins.player1, wins.player2);
+                // os << out << ' ' << std::setprecision(10) << w << '\n';
             }
         }
     }
