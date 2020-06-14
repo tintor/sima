@@ -17,7 +17,7 @@ class Model {
    public:
     shared_ptr<Optimizer> optimizer = make_shared<Optimizer>();
 
-    Model(PDiff loss, PDiff accuracy = nullptr);
+    Model(PDiff out, PDiff loss, PDiff accuracy);
 
     void Forward();
     void Backward();
@@ -32,7 +32,11 @@ class Model {
 
     Metrics Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 
+    tensor::type Loss() const { return m_loss->v[0]; }
+    tensor::type Accuracy() const { return m_accuracy->v[0]; }
+
    private:
+    const PDiff m_out;
     const PDiff m_loss;
     const PDiff m_accuracy;
     vector<PDiff> m_nodes;
@@ -42,7 +46,7 @@ class Model {
 };
 
 inline void Minimize(PDiff loss, float alpha, size_t iterations) {
-    Model model(loss);
+    Model model(nullptr, loss, nullptr);
     model.optimizer->alpha = alpha;
     model.Iterate(iterations);
 }

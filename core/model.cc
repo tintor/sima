@@ -179,8 +179,9 @@ bool HasBackward(PDiff p) {
     return Diff::has_overload;
 }
 
-Model::Model(PDiff loss, PDiff accuracy) : m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({loss, accuracy})) {
-    Check(loss->size == 1);
+Model::Model(PDiff out, PDiff loss, PDiff accuracy) : m_out(out), m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({out, loss, accuracy})) {
+    Check(out == nullptr || out->size > 0);
+    Check(loss == nullptr || loss->size == 1);
     Check(accuracy == nullptr || accuracy->size == 1);
 
     // TODO optimize it here:
@@ -217,6 +218,7 @@ Model::Model(PDiff loss, PDiff accuracy) : m_loss(loss), m_accuracy(accuracy), m
 }
 
 Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
+    Check(m_loss != nullptr);
     Check(data.size() > 0);
     const auto B = data[0].first->shape(0);
     const auto N = data[0].second.shape()[0];

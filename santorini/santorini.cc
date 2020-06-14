@@ -147,6 +147,8 @@ thread_local std::mt19937_64 g_random(1);
 
 int RandomInt(int count, std::mt19937_64& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
 
+double RandomDouble(std::mt19937_64& random) { return std::uniform_real_distribution<double>(0, 1)(random); }
+
 struct ReservoirSampler {
     std::uniform_real_distribution<double> dis;
     size_t count = 0;
@@ -323,7 +325,7 @@ struct MyModel {
         auto fc2 = FullyConnected(act1, 1, w_init);
         out = Logistic(fc2, 15);
         auto loss = BinaryCrossEntropy(ref, out);
-        train_model = make_shared<Model>(loss, Accuracy(ref, out));
+        //train_model = make_shared<Model>(loss, Accuracy(ref, out));
 
         // TODO inference model:
         // - apply the same input normalization from training
@@ -856,8 +858,56 @@ struct MonteCarloAgent : public Agent {
     vector<Entry> history;
     std::ofstream lost_games;
     Figure my_player;
+    double eps_greedy;
 
-    MonteCarloAgent() : lost_games("lost_games.txt") { }
+    bool neural;
+    const uint batch;
+    PDiff in, ref;
+    shared_ptr<Model> train_model;
+
+    PDiff inf_in;
+    PDiff inf_out;
+    shared_ptr<Model> inf_model;
+
+    MonteCarloAgent(double eps_greedy, bool neural, uint batch) : eps_greedy(eps_greedy), neural(neural), batch(batch), lost_games("lost_games.txt") {
+        in = Data({batch, BoardBits}) << "input";
+        ref = Data({batch, 1}) << "reference";
+        auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), g_random);
+        PDiff w, b;
+        auto fc = FullyConnected(in, 1, w_init, &w, &b);
+        auto out = Logistic(fc, 15);
+        auto loss = MeanSquareError(ref, out);
+        train_model = std::make_shared<Model>(out, loss, Accuracy(ref, out));
+        train_model->Print();
+        train_model->optimizer->alpha = 0.01;
+
+        inf_in = Data({1, BoardBits}) << "input";
+        auto inf_fc = VecMatMul(inf_in, w) + b << "fc";
+        inf_out = Logistic(inf_fc, 15) << "out";
+        inf_model = std::make_shared<Model>(inf_out, nullptr, nullptr);
+        inf_model->Print();
+    }
+
+    float Predict(const Board& board) {
+        Serialize(board, inf_in->v);
+        inf_model->Forward();
+        return inf_out->v[0];
+    }
+
+    void Train() {
+        for(auto i : range(batch)) {
+            const auto& sample = values.Sample(g_random);
+            Serialize(sample.first, in->v.slice(i));
+            ref->v[0] = sample.second.Value();
+        }
+        train_model->Forward();
+        train_model->Backward();
+        // println("train loss:%.4f accuracy:%.4f", train_model->Loss(), train_model->Accuracy());
+        /*for(auto i : range(Batch)) {
+            const auto& sample = values.Sample(g_random);
+            println("actual: %.4f, prediction: %.4f", sample.second.Value(), Predict(sample.first));
+        }*/
+    }
 
     void BeginEpisode(Figure player) override {
         my_player = player;
@@ -870,6 +920,7 @@ struct MonteCarloAgent : public Agent {
         float best_value;
         Board best_board;
         ReservoirSampler sampler;
+        bool explore = RandomDouble(g_random) < eps_greedy;
 
         /*AllValidActionSequences(board, temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
             auto value = values.Value(board);
@@ -877,7 +928,11 @@ struct MonteCarloAgent : public Agent {
         });*/
 
         AllValidActions(board, [&](const Board& new_board, const Action& action) {
-            auto value = values.Value(new_board);
+            float value = -1;
+            if (!explore) {
+                auto w = values.Lookup(new_board);
+                value = w ? w->Value() : (neural ? Predict(new_board) : 0.5);
+            }
             if (sampler.count == 0 || value > best_value) {
                 sampler.count = 1;
                 best_action = action;
@@ -907,6 +962,7 @@ struct MonteCarloAgent : public Agent {
             lost_games << endl;
         }
         for (const Entry& e : history) values.Add(e.board, victory ? 1 : 0, victory ? 0 : 1);
+        if (neural) Train();
     }
 };
 
@@ -914,23 +970,11 @@ struct RandomAgent : public Agent {
     Action Play(const Board& board) override { return AutoRandom(board); }
 };
 
+struct GreedyAgent : public Agent {
+    Action Play(const Board& board) override { return AutoGreedy(board); }
+};
+
 void Learn() {
-    /*auto in = Data({100, BoardBits}) << "input";
-    auto ref = Data({100, 1}) << "reference";
-    auto w_init = make_shared<NormalInit>(1 / sqrt(128), random);
-    auto fc = FullyConnected(in, 1, w_init);
-    auto out = Logistic(fc, 15);
-    auto loss = BinaryCrossEntropy(ref, out);
-    Model train_model(loss, Accuracy(ref, out));
-    println("train model");*/
-    //train_model.Print();
-
-    /*auto _in = Data({1, BoardBits}) << "input";
-    auto _fc = FullyConnected(_in, 1, w_init);
-    auto _out = Logistic(_fc, 15) << "out";
-    println("inference model");
-    Model inference_model(_out);*/
-
     /*auto play_by_model = [&](const Board& board) {
         Action best_action;
         double best_value;
@@ -953,9 +997,10 @@ void Learn() {
         return best_action;
     };*/
 
-    MonteCarloAgent agent_a;
-    // RandomAgent agent_a;
+    MonteCarloAgent agent_a(0.01, true, 1000);
+    //MonteCarloAgent agent_b(0.01, false, 1000);
     RandomAgent agent_b;
+    //GreedyAgent agent_b;
 
     std::ofstream stats("stats.txt");
 
@@ -963,19 +1008,15 @@ void Learn() {
     double ratio = 0.5;
     for (auto game : range(1000000)) {
         Board board;
-        for (Coord a : kAll) board(a).level = 2;
-        board(Coord(1, 1)).figure = Figure::Player1;
-        board(Coord(3, 3)).figure = Figure::Player1;
-        board(Coord(3, 1)).figure = Figure::Player2;
-        board(Coord(1, 3)).figure = Figure::Player2;
-        board.setup = false;
 
         agent_a.BeginEpisode(Figure::Player1);
         agent_b.BeginEpisode(Figure::Player2);
         Figure w = Winner(board);
+        size_t actions = 0;
         while (w == Figure::None) {
             Agent& agent = (board.player == Figure::Player1) ? static_cast<Agent&>(agent_a) : static_cast<Agent&>(agent_b);
             auto action = agent.Play(board);
+            actions += 1;
             auto s = Execute(board, action);
             if (s != nullopt) Fail(format("faul %s", s));
             w = Winner(board);
@@ -985,7 +1026,7 @@ void Learn() {
 
         constexpr double q = 0.0025;
         ratio = ratio * (1 - q) + (w == Figure::Player1 ? 1 : 0) * q;
-        auto msg = format("Game %s (wins %.4f)", game + 1, ratio);
+        auto msg = format("Game %s (wins %.4f, actions %s)", game + 1, ratio, actions);
         cout << msg << endl;
         if ((game + 1) % 2000 == 0) stats << msg << endl;
     }

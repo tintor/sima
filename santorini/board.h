@@ -143,13 +143,25 @@ inline void Serialize(const Board& board, tensor out) {
 }
 
 class Values {
-   private:
+   public:
     struct Wins {
         uint32_t player1, player2;
+        float Value() const { return player1 / double(player1 + player2); }
     };
 
-   public:
     size_t Size() const { return m_data.size(); }
+
+    const auto& Sample(std::mt19937_64& random) const {
+        Check(m_data.size() > 0);
+        auto it = (m_data.bucket_count() != m_last_buckets) ? m_data.begin() : m_last_iterator;
+        std::uniform_int_distribution<int> dis(0, 9);
+        for (auto i : range(dis(random))) {
+            if (++it == m_data.end()) it = m_data.begin();
+        }
+        m_last_buckets = m_data.bucket_count();
+        m_last_iterator = it;
+        return *it;
+    }
 
     void Add(const Board& board, uint32_t wins1, uint32_t wins2) {
         auto result = m_data.emplace(Normalize(board), Wins{0, 0});
@@ -158,11 +170,16 @@ class Values {
         wins.player2 += wins2;
     }
 
+    const Wins* Lookup(const Board& board) const {
+        auto it = m_data.find(Normalize(board));
+        if (it == m_data.end()) return nullptr;
+        return &it->second;
+    }
+
     double Value(const Board& board) const {
         auto it = m_data.find(Normalize(board));
         if (it == m_data.end()) return 0.5;
-        const auto& wins = it->second;
-        return wins.player1 / double(wins.player1 + wins.player2);
+        return it->second.Value();
     }
 
     void Export(string_view filename, int wmin) {
@@ -187,5 +204,9 @@ class Values {
     }
 
    private:
-    absl::flat_hash_map<Board, Wins> m_data;
+    using Data = absl::flat_hash_map<Board, Wins>;
+    Data m_data;
+    mutable size_t m_last_buckets = 0;
+    mutable Data::const_iterator m_last_iterator;
+
 };

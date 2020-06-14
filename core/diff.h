@@ -933,8 +933,10 @@ inline PDiff FullyConnectedNB(PDiff a, uint size, shared_ptr<Init> w_init = make
     return VecMatMul(a, w) << "fc";
 }
 
-inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
+inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>(), PDiff* w_ptr = nullptr, PDiff* b_ptr = nullptr) {
     auto w = Param({size, a->shape->back()}, w_init) << "fc_w";
     auto b = Param({size}) << "fc_b";
+    if (w_ptr) *w_ptr = w;
+    if (b_ptr) *b_ptr = b;
     return VecMatMul(a, w) + b << "fc";
 }

@@ -63,7 +63,7 @@ class Tensor {
    public:
     using type = T;
 
-    Tensor() : m_data(nullptr) {}
+    Tensor() : m_data(nullptr), m_shape(0) {}
     Tensor(T* data, dim4 shape) : m_data(data), m_shape(shape) {
         Check(data || shape.elements() == 0);
         Check(shape.elements() != 0 || data == nullptr);
