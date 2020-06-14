@@ -143,7 +143,7 @@ Figure Winner(const Board& board) {
 // ==================
 
 std::random_device rd;
-thread_local std::mt19937_64 g_random(rd());
+thread_local std::mt19937_64 g_random(1);
 
 int RandomInt(int count, std::mt19937_64& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
 
@@ -839,48 +839,99 @@ void AutoBattle(int count, string_view name_a, string_view name_b) {
     monitor.join();
 }
 
-void Learn() {
-    auto& random = g_random;
+struct Agent {
+    virtual void BeginEpisode(Figure player) { }
+    virtual Action Play(const Board& board) = 0;
+    virtual void EndEpisode(bool victory) { }
+};
 
-    auto in = Data({100, BoardBits}) << "input";
+struct MonteCarloAgent : public Agent {
+    struct Entry {
+        Board board;
+        float value;
+        int sampler_count;
+    };
+
+    Values values;
+    vector<Entry> history;
+    std::ofstream lost_games;
+    Figure my_player;
+
+    MonteCarloAgent() : lost_games("lost_games.txt") { }
+
+    void BeginEpisode(Figure player) override {
+        my_player = player;
+        history.clear();
+    }
+
+    // vector<Action> temp;
+    Action Play(const Board& board) override {
+        Action best_action;
+        float best_value;
+        Board best_board;
+        ReservoirSampler sampler;
+
+        /*AllValidActionSequences(board, temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
+            auto value = values.Value(board);
+
+        });*/
+
+        AllValidActions(board, [&](const Board& new_board, const Action& action) {
+            auto value = values.Value(new_board);
+            if (sampler.count == 0 || value > best_value) {
+                sampler.count = 1;
+                best_action = action;
+                best_value = value;
+                best_board = new_board;
+            } else if (value == best_value && sampler(g_random)) {
+                sampler.count += 1;
+                best_action = action;
+                best_value = value;
+                best_board = new_board;
+            }
+            return true;
+        });
+
+        history << Entry{best_board, best_value, int(sampler.count)};
+        return best_action;
+    }
+
+    void EndEpisode(bool victory) override {
+        if (!victory) {
+            for (const auto& e : history) {
+                if (e.board.built) {
+                    lost_games << e.board << format("value %.4f, sampler_count %s\n", e.value, e.sampler_count);
+                    lost_games << endl;
+                }
+            }
+            lost_games << endl;
+        }
+        for (const Entry& e : history) values.Add(e.board, victory ? 1 : 0, victory ? 0 : 1);
+    }
+};
+
+struct RandomAgent : public Agent {
+    Action Play(const Board& board) override { return AutoRandom(board); }
+};
+
+void Learn() {
+    /*auto in = Data({100, BoardBits}) << "input";
     auto ref = Data({100, 1}) << "reference";
     auto w_init = make_shared<NormalInit>(1 / sqrt(128), random);
     auto fc = FullyConnected(in, 1, w_init);
     auto out = Logistic(fc, 15);
     auto loss = BinaryCrossEntropy(ref, out);
     Model train_model(loss, Accuracy(ref, out));
-    println("train model");
-    train_model.Print();
+    println("train model");*/
+    //train_model.Print();
 
-    auto _in = Data({1, BoardBits}) << "input";
+    /*auto _in = Data({1, BoardBits}) << "input";
     auto _fc = FullyConnected(_in, 1, w_init);
     auto _out = Logistic(_fc, 15) << "out";
     println("inference model");
-    Model inference_model(_out);
+    Model inference_model(_out);*/
 
-    Values values;
-
-    auto play_by_memory = [&](const Board& board) {
-        Action best_action;
-        double best_value;
-        ReservoirSampler sampler;
-        AllValidActions(board, [&](const Board& new_board, const Action& action) {
-            auto value = values.Value(board);
-            if (sampler.count == 0 || value > best_value) {
-                sampler.count = 1;
-                best_action = action;
-                best_value = value;
-            } else if (value == best_value && sampler(random)) {
-                sampler.count += 1;
-                best_action = action;
-                best_value = value;
-            }
-            return true;
-        });
-        return best_action;
-    };
-
-    auto play_by_model = [&](const Board& board) {
+    /*auto play_by_model = [&](const Board& board) {
         Action best_action;
         double best_value;
         ReservoirSampler sampler;
@@ -900,37 +951,47 @@ void Learn() {
             return true;
         });
         return best_action;
-    };
+    };*/
 
-    //const Policy& policy_a = play_by_memory;
-    const Policy& policy_a = g_policies.at("random");
-    const Policy& policy_b = g_policies.at("random");
+    MonteCarloAgent agent_a;
+    // RandomAgent agent_a;
+    RandomAgent agent_b;
+
+    std::ofstream stats("stats.txt");
 
     // self-play
-    double wins1 = 0;
+    double ratio = 0.5;
     for (auto game : range(1000000)) {
-        vector<Board> history;
         Board board;
-        Figure w;
-        while (true) {
-            w = Winner(board);
-            if (w != Figure::None) break;
-            const Policy& policy = (board.player == Figure::Player1) ? policy_a : policy_b;
-            auto s = Execute(board, policy(board));
+        for (Coord a : kAll) board(a).level = 2;
+        board(Coord(1, 1)).figure = Figure::Player1;
+        board(Coord(3, 3)).figure = Figure::Player1;
+        board(Coord(3, 1)).figure = Figure::Player2;
+        board(Coord(1, 3)).figure = Figure::Player2;
+        board.setup = false;
+
+        agent_a.BeginEpisode(Figure::Player1);
+        agent_b.BeginEpisode(Figure::Player2);
+        Figure w = Winner(board);
+        while (w == Figure::None) {
+            Agent& agent = (board.player == Figure::Player1) ? static_cast<Agent&>(agent_a) : static_cast<Agent&>(agent_b);
+            auto action = agent.Play(board);
+            auto s = Execute(board, action);
             if (s != nullopt) Fail(format("faul %s", s));
-            history.push_back(board);
+            w = Winner(board);
         }
-        // Go back in game history and record values
-        uint w1 = (w == Figure::Player1) ? 1 : 0;
-        uint w2 = (w == Figure::Player2) ? 1 : 0;
-        std::reverse(history.begin(), history.end());
-        for (const Board& b : history) values.Add(b, w1, w2);
-        wins1 += w1;
-        println("Game %s (values %s, wins %.4f)", game + 1, values.Size(), wins1 / (game + 1));
+        agent_a.EndEpisode(w == Figure::Player1);
+        agent_b.EndEpisode(w == Figure::Player2);
+
+        constexpr double q = 0.0025;
+        ratio = ratio * (1 - q) + (w == Figure::Player1 ? 1 : 0) * q;
+        auto msg = format("Game %s (wins %.4f)", game + 1, ratio);
+        cout << msg << endl;
+        if ((game + 1) % 2000 == 0) stats << msg << endl;
     }
 
     // export Values into dataset
-    values.Export("self_play_outcomes.txt", 3);
+    // values.Export("self_play_outcomes.txt", 3);
 
     // train model
     vector<pair<PDiff, vtensor>> data;
@@ -944,6 +1005,7 @@ void Learn() {
 }
 
 int main(int argc, char** argv) {
+    println("Main!");
     InitSegvHandler();
 
     if (argc > 1 && argv[1] == "learn"s) {

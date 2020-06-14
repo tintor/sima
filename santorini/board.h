@@ -21,19 +21,23 @@ struct Board {
     Cell& operator()(Coord c) { return cell[c.v]; }
 };
 
-void Print(const Board& board) {
+ostream& operator<<(ostream& os, const Board& board) {
     for (int row = 0; row < 5; row++) {
         for (int col = 0; col < 5; col++) {
             const Cell c = board.cell[row * 5 + col];
-            cout << char(c.figure) << char(c.level ? '0' + c.level : '.') << ' ';
+            os << char(c.figure) << char(c.level ? '0' + c.level : '.') << ' ';
         }
-        println();
+        os << endl;
     }
     char p[2] = {char(board.player), 0};
-    print("setup %s, player %s", board.setup, p);
-    if (board.moved) print(" moved %s%s", board.moved->x(), board.moved->y());
-    println(" built %s", board.built);
+    os << format("setup %s, player %s", board.setup, p);
+    if (board.moved) os << format(" moved %s%s", board.moved->x(), board.moved->y());
+    os << format(" built %s", board.built) << endl;
+    return os;
 }
+
+void Print(const Board& board) { cout << board; }
+
 
 bool Less(const Cells& a, const Cells& b) {
     for (int i = 0; i < 25; i++) {
@@ -110,7 +114,7 @@ using std::ostream;
 
 inline char Bit(bool a) { return a ? '1' : '0'; }
 
-inline ostream& operator<<(ostream& os, Cell cell) {
+void Serialize(ostream& os, Cell cell) {
     os << Bit(cell.level == 0);
     os << Bit(cell.level == 1);
     os << Bit(cell.level == 2);
@@ -118,16 +122,14 @@ inline ostream& operator<<(ostream& os, Cell cell) {
     os << Bit(cell.figure == Figure::Dome);
     os << Bit(cell.figure == Figure::Player1);
     os << Bit(cell.figure == Figure::Player2);
-    return os;
 }
 
-inline ostream& operator<<(ostream& os, const Board& board) {
+void Serialize(ostream& os, const Board& board) {
     os << Bit(board.setup);
     for (Coord e : kAll) os << Bit(board.moved && *board.moved == e);
     os << Bit(board.built);
     os << Bit(board.player == Figure::Player1);
-    for (Coord e : kAll) os << board(e);
-    return os;
+    for (Coord e : kAll) Serialize(os, board(e));
 }
 
 inline void Serialize(const Board& board, tensor out) {
@@ -135,7 +137,7 @@ inline void Serialize(const Board& board, tensor out) {
     Check(out.size == BoardBits);
     ostringstream os;
     os.str().reserve(BoardBits);
-    os << board;
+    Serialize(os, board);
     Check(os.str().size() == BoardBits);
     for (size_t i = 0; i < BoardBits; i++) out(i) = (os.str()[i] == '1') ? 1.f : 0.f;
 }

@@ -81,6 +81,7 @@ string Summary(const tensor v) {
     return format("(%s %s %s) %s", a.min, a.mean, a.max, sqrt(a.variance));
 }
 
+// TODO show number of gradients in g with very tiny absolute values
 void Model::Print() const {
     auto ids = ComputeIds(m_nodes);
 

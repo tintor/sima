@@ -853,6 +853,9 @@ inline pair<PDiff, PDiff> GradCmp(PDiff a) {
     return {p, q};
 }
 
+// TODO - BinaryCrossEntropy(Logistic()) can be merged into one node, with cheaper backward and more numericaly stable
+// TODO - same for CategoricalCrossEntropy(Softmax())
+
 struct BinaryCrossEntropyT : public Diff2 {
     constexpr static tensor::type eps = 1e-6, one = 1;
 
