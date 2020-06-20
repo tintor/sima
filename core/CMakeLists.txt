@@ -1,4 +1,5 @@
 add_library(core
+    std.cc
 	callstack.cc
 	diff.cc
 	file.cc
