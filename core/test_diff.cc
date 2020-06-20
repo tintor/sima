@@ -318,7 +318,7 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
         Metrics metrics;
         for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
-        REQUIRE(metrics.at("accuracy") >= 0.09994);
+        REQUIRE(metrics.at("accuracy") >= 0.9994);
     });
 }
 

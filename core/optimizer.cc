@@ -11,7 +11,7 @@ void Optimizer::Optimize(span<ParamT *> params) {
 void Momentum::Optimize(span<ParamT *> params) {
     if (ags.size() != params.size()) {
         ags.resize(params.size());
-        for (auto i : range(params.size())) ags[i].reshape(params[i]->shape);
+        for (auto i : range(params.size())) ags[i].reshape(params[i]->shape());
     }
 
     momentum_exp *= momentum;
@@ -43,7 +43,7 @@ void RMSPropUpdate(ParamT *p, tensor agg, float alpha, float rmsprop, float rmsp
 void RMSProp::Optimize(span<ParamT *> params) {
     if (aggs.size() != params.size()) {
         aggs.resize(params.size());
-        for (auto i : range(params.size())) aggs[i].reshape(params[i]->shape);
+        for (auto i : range(params.size())) aggs[i].reshape(params[i]->shape());
     }
 
     rmsprop_exp *= rmsprop;
@@ -78,8 +78,8 @@ void Adam::Optimize(span<ParamT *> params) {
     if (ags.size() != params.size()) {
         ags.resize(params.size());
         aggs.resize(params.size());
-        for (auto i : range(params.size())) ags[i].reshape(params[i]->shape);
-        for (auto i : range(params.size())) aggs[i].reshape(params[i]->shape);
+        for (auto i : range(params.size())) ags[i].reshape(params[i]->shape());
+        for (auto i : range(params.size())) aggs[i].reshape(params[i]->shape());
     }
 
     momentum_exp *= momentum;

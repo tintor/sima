@@ -59,7 +59,7 @@ bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
 auto ComputeIds(cspan<PDiff> nodes) {
     map<Diff*, string> ids;
     for (PDiff p : nodes) {
-        if (IsConst(p) && p->v.size == 1 && p->name.empty()) {
+        if (IsConst(p) && p->v.size() == 1 && p->name.empty()) {
             ids.emplace(p.get(), format("%s", p->v[0]));
             continue;
         }
@@ -77,7 +77,7 @@ auto ComputeIds(cspan<PDiff> nodes) {
 }
 
 string Summary(const tensor v) {
-    Aggregates<tensor::type> a(v.data(), v.data() + v.size);
+    Aggregates<tensor::type> a(v.data(), v.data() + v.size());
     return format("(%s %s %s) %s", a.min, a.mean, a.max, sqrt(a.variance));
 }
 
@@ -87,7 +87,7 @@ void Model::Print() const {
 
     ulong ftotal = 0, btotal = 0, ototal = 0, rtotal = 0;
     for (PDiff p : m_nodes)
-        if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
+        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
             ftotal += p->forward_ticks;
             btotal += p->backward_ticks;
         }
@@ -96,7 +96,7 @@ void Model::Print() const {
     vector<string> table = {"id|type|inputs|shape|forward|backward|ratio|values|gradients|"};
     string os;
     for (PDiff p : m_nodes)
-        if (!(IsConst(p) && p->v.size == 1 && p->name.empty())) {
+        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
             os.clear();
 
             // id
@@ -114,7 +114,7 @@ void Model::Print() const {
             os += '|';
 
             // shape
-            format_s(os, "%s|", string(p->shape));
+            format_s(os, "%s|", string(p->shape()));
 
             // forward
             format_s(os, "%s|", (p->forward_ticks + 500) / 1000);
@@ -128,10 +128,10 @@ void Model::Print() const {
 
             // values
             size_t summary = 6;
-            format_s(os, "%s|", (p->v.size >= summary) ? Summary(p->v) : string(p->v));
+            format_s(os, "%s|", (p->v.size() >= summary) ? Summary(p->v) : string(p->v));
 
             // gradients
-            format_s(os, "%s|", (p->g.size >= summary) ? Summary(p->g) : string(p->g));
+            format_s(os, "%s|", (p->g.size() >= summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }
@@ -215,14 +215,14 @@ Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
 
 Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
     Check(data.size() > 0);
-    const auto B = data[0].first->shape(0);
-    const auto N = data[0].second.shape()[0];
+    const auto B = data[0].first->dim(0);
+    const auto N = data[0].second.dim(0);
     Check(N % B == 0, format("N %% B must be 0. N:%s B:%s", N, B));
 
     for (const auto& [key, value] : data) {
-        Check(key->shape(0) == B);
-        Check(value.shape()[0] == N);
-        Check(value.shape().pop_front() == key->shape->pop_front());
+        Check(key->dim(0) == B);
+        Check(value.dim(0) == N);
+        Check(value.shape().pop_front() == key->shape().pop_front());
     }
 
     if (m_samples.size() != N) {
