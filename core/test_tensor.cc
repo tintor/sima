@@ -10,6 +10,8 @@ TEST_CASE("dim4", "[tensor]") {
     REQUIRE(dim4{1, 3, 1}.rank() == 1);
 
     REQUIRE(dim4{1}.elements() == 1);
+    REQUIRE(dim4{5, 3}.elements() == 15);
+    REQUIRE(dim4{2, 2, 2}.elements() == 8);
     REQUIRE(dim4{2, 3, 4, 5}.elements() == 2 * 3 * 4 * 5);
 
     REQUIRE(dim4{2} == dim4{2});
@@ -61,7 +63,7 @@ TEST_CASE("tensor", "[tensor]") {
 
     REQUIRE(tensor(m.data(), {2}));
     REQUIRE(!tensor());
-    REQUIRE(!tensor(nullptr, {}));
+    REQUIRE(!tensor(nullptr, dim4::empty()));
 
     REQUIRE(tensor().size == 0);
     REQUIRE(tensor() == tensor());

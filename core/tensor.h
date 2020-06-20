@@ -7,29 +7,32 @@
 using dim_t = uint;
 
 struct dim4 {
-    std::array<dim_t, 4> d;
-
-    dim4(dim_t a = 0, dim_t b = 0, dim_t c = 0, dim_t d = 0) : d{a, b, c, d} {
-        Check(a != 0 || b == 0);
-        Check(b != 0 || c == 0);
-        Check(c != 0 || d == 0);
+    dim4(dim_t a = 0, dim_t b = 0, dim_t c = 0, dim_t d = 0) : dim4{a, b, c, d, ' ', ' ', ' ', ' '} {
     }
 
-    int ndims() const {
-        if (d[3] != 0) return 4;
-        if (d[2] != 0) return 3;
-        if (d[1] != 0) return 2;
-        if (d[0] != 0) return 1;
-        return 0;
+    dim4(dim_t a, dim_t b, dim_t c, dim_t d, char an, char bn, char cn, char dn) : d{a, b, c, d}, n{an, bn, cn, dn} {
+        Check(a != 0 || (b == 0 && an == ' '));
+        Check(b != 0 || (c == 0 && bn == ' '));
+        Check(c != 0 || (d == 0 && cn == ' '));
+        Check(d != 0 || dn == ' ');
+
+        size = 0;
+        elem = 1;
+        for (int i = 0; i < 4; i++) if (this->d[i] > 0) {
+            elem *= this->d[i];
+            size += 1;
+        }
     }
 
-    dim_t elements() const {
-        if (d[3] != 0) return d[0] * d[1] * d[2] * d[3];
-        if (d[2] != 0) return d[0] * d[1] * d[2];
-        if (d[1] != 0) return d[0] * d[1];
-        if (d[0] != 0) return d[0];
-        return 0;
+    static dim4 empty() {
+        dim4 d;
+        d.elem = 0;
+        return d;
     }
+
+    int ndims() const { return size; }
+
+    dim_t elements() const { return elem; }
 
     dim_t operator[](int i) const { return d[i]; }
     dim_t& operator[](int i) { return d[i]; }
@@ -37,7 +40,9 @@ struct dim4 {
     bool operator!=(dim4 o) const { return d != o.d; }
 
     dim_t back() const { return d[ndims() - 1]; }
-    dim4 pop_front() const { return {d[1], d[2], d[3], 0}; }
+
+    dim4 pop_front() const { return {d[1], d[2], d[3], 0, n[1], n[2], n[3], ' '}; }
+
     dim4 pop_back() const {
         int r = rank();
         if (r <= 0) return *this;
@@ -45,7 +50,8 @@ struct dim4 {
         e[r - 1] = 0;
         return e;
     }
-    dim4 push_front(dim_t a) const { Check(d[3] == 0); return {a, d[0], d[1], d[2]}; }
+
+    dim4 push_front(dim_t a) const { Check(d[3] == 0); return {a, d[0], d[1], d[2], ' ', n[0], n[1], n[2]}; }
 
     // 0 scalar : all dimensions are 1
     // 1 vector : if one dimension is >1 and rest are 1
@@ -59,14 +65,24 @@ struct dim4 {
     }
 
     string str() const {
-        if (d[3] != 0) return format("[%s %s %s %s]", d[0], d[1], d[2], d[3]);
-        if (d[2] != 0) return format("[%s %s %s]", d[0], d[1], d[2]);
-        if (d[1] != 0) return format("[%s %s]", d[0], d[1]);
-        if (d[0] != 0) return format("[%s]", d[0]);
-        return "[]";
+        string s;
+        s += '[';
+        for (int i = 0; i < size; i++) {
+            if (i != 0) s += ' ';
+            if (n[i] != ' ') s += n[i];
+            format_s(s, "%s", d[i]);
+        }
+        s += ']';
+        return s;
     }
 
     operator string() const { return str(); }
+
+private:
+    std::array<dim_t, 4> d;
+    std::array<char, 4> n;
+    dim_t elem;
+    int size;
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)
@@ -75,7 +91,7 @@ class Tensor {
    public:
     using type = T;
 
-    Tensor() : m_data(nullptr), m_shape(0) {}
+    Tensor() : m_data(nullptr), m_shape(dim4::empty()) {}
     Tensor(T* data, dim4 shape) : m_data(data), m_shape(shape) {
         Check(data || shape.elements() == 0);
         Check(shape.elements() != 0 || data == nullptr);
@@ -171,7 +187,7 @@ class Tensor {
     }
 
     void copy_from(const Tensor& o) {
-        Check(shape() == o.shape());
+        if (shape() != o.shape()) Fail(format("%s vs %s", string(shape()), string(o.shape())));
         std::copy(o.begin(), o.end(), begin());
     }
 
