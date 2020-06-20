@@ -14,7 +14,7 @@ TEST_CASE("diff: minimize circle", "[diff]") {
     REQUIRE(abs(y->v[0]) < 1e-6);
 }
 
-void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<string>& table) {
+void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff b, vector<string>& table) {
     auto row = table.begin();
     if (name == "sgd") format_s(*row, "b|");
     format_s(*row++, "%s|", name);
@@ -28,7 +28,7 @@ void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<st
         int count = 250;
         for (int i = 0; i < 250; i++) {
             model.Forward();
-            model.Backward();
+            model.Backward(loss);
             if (b->v[0] <= 0.05) {
                 count = i + 1;
                 break;
@@ -47,7 +47,7 @@ void Test(string_view name, Model& model, PDiff x, PDiff ref, PDiff b, vector<st
         int count = 250;
         for (int i = 0; i < 250; i++) {
             model.Forward();
-            model.Backward();
+            model.Backward(loss);
             if (b->v[0] >= 0.95) {
                 count = i + 1;
                 break;
@@ -63,23 +63,23 @@ TEST_CASE("diff: minimize binary cross entropy", "[diff]") {
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
     auto loss = BinaryCrossEntropy<true>(ref, b);
-    Model model(loss);
+    Model model({loss});
 
     vector<string> table;
     table << format("x|r|");
     for (float e : range(-1.f, 1.01f, 0.1f)) table << format("%+.1f|0|", e);
     for (float e : range(-1.f, 1.01f, 0.1f)) table << format("%+.1f|1|", e);
 
-    Test("sgd", model, x, ref, b, table);
+    Test("sgd", model, loss, x, ref, b, table);
 
     model.optimizer = make_shared<Momentum>();
-    Test("momentum", model, x, ref, b, table);
+    Test("momentum", model, loss, x, ref, b, table);
 
     model.optimizer = make_shared<RMSProp>();
-    Test("rmsprop", model, x, ref, b, table);
+    Test("rmsprop", model, loss, x, ref, b, table);
 
     model.optimizer = make_shared<Adam>();
-    Test("adam", model, x, ref, b, table);
+    Test("adam", model, loss, x, ref, b, table);
 
     PrintTable(table, '|', " ", {3, 4, 5, 6});
 }
@@ -144,8 +144,9 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
         if (D3) fc = fc + z * d;
         auto out = Logistic(fc, 15) << "out";
         auto loss = BinaryCrossEntropy(ref, out) << "loss";
+        auto accuracy = BinaryAccuracy(ref, out);
 
-        Model model(loss, Accuracy(ref, out));
+        Model model({loss, accuracy});
         model.optimizer = make_shared<Adam>();
         model.optimizer->alpha = 0.1;
 
@@ -184,7 +185,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
 
         // train!
         Metrics metrics;
-        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         REQUIRE(metrics.at("accuracy") >= 0.9994);
         println("accuracy: %s", metrics.at("accuracy"));
     });
@@ -229,7 +230,8 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
         auto init2 = make_shared<NormalInit>(1, random);
         auto out = Neuron(h1, h2, h3, init2) << "out";
         auto loss = MeanSquareError(ref, out) << "loss";
-        Model model(loss, Accuracy(ref, out));
+        auto accuracy = BinaryAccuracy(ref, out);
+        Model model({loss, accuracy});
         model.optimizer->alpha = 0.1;
 
         // dataset
@@ -258,7 +260,7 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
 
         // train!
         Metrics metrics;
-        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
         REQUIRE(metrics.at("accuracy") >= 0.9922);
     });
@@ -276,8 +278,9 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
         auto fc = FullyConnected(in, 1, init);
         auto out = Logistic(fc, 15) << "out";
         auto loss = BinaryCrossEntropy(ref, out) << "loss";
+        auto accuracy = BinaryAccuracy(ref, out) << "accuracy";
 
-        Model model(loss, Accuracy(ref, out));
+        Model model({loss, accuracy});
         model.optimizer = make_shared<Adam>();
         model.optimizer->alpha = 0.1;
 
@@ -313,7 +316,7 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
 
         // train!
         Metrics metrics;
-        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
         REQUIRE(metrics.at("accuracy") >= 0.09994);
     });
@@ -336,8 +339,9 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
 
         auto out = x << "out";
         auto loss = MeanSquareError(ref, out) << "loss";
+        auto accuracy = BinaryAccuracy(ref, out) << "accuracy";
 
-        Model model(loss, Accuracy(ref, out));
+        Model model({loss, accuracy});
         model.optimizer->alpha = 0.1;
 
         // dataset
@@ -366,7 +370,7 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
 
         // train!
         Metrics metrics;
-        for (auto i : range(1000)) metrics = model.Epoch(dataset, random, false, i);
+        for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
         REQUIRE(metrics.at("accuracy") >= 0.9617);
     });
@@ -376,13 +380,6 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
 // learn hyper plane in Nd
 // learn hyper sphere in Nd
 // spiral in 2d
-
-// Regression:
-// - multiply two inputs: x * y
-// - sqr
-// - sqrt
-// - sine in 1d
-// - sine in 2d : sin(sqrt(x^2 + y^2)
 
 // Neuro-plasticity:
 // 1) train same model on datasets A and B separately, then take model trained of A and train it on B, should be able to

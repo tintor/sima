@@ -122,7 +122,7 @@ struct DiffA : public Diff1 {
 
 struct Diff_vv : public Diff2 {
     Diff_vv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape == b->shape);
+        Check(a->shape == b->shape || (a->rank == 1 && b->rank == 1 && a->size == b->size), format("a:%s b:%s", string(a->shape), string(b->shape)));
         Reshape(a->shape);
     }
 };
@@ -403,7 +403,7 @@ struct Add_vs : public Diff_vs {
 
 struct Add_mv : public Diff2 {
     Add_mv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape->pop_front() == b->shape);
+        Check(a->shape->pop_front() == b->shape, format("a:%s b:%s a.pop_front:%s", string(a->shape), string(b->shape), string(a->shape->pop_front())));
         Reshape(a->shape);
     }
     void Forward() override {
@@ -422,7 +422,7 @@ inline PDiff operator+(PDiff a, PDiff b) {
     if (a->size == 1 && b->size == 1) return make_shared<Add_vv>(a, b);
     if (a->size == 1) return make_shared<Add_vs>(b, a);
     if (b->size == 1) return make_shared<Add_vs>(a, b);
-    if (a->shape == b->shape) return make_shared<Add_vv>(a, b);
+    if (a->shape == b->shape || (a->rank == 1 && b->rank == 1 && a->size == b->size)) return make_shared<Add_vv>(a, b);
     if (a->size > b->size) return make_shared<Add_mv>(a, b);
     return make_shared<Add_mv>(b, a);
 }
@@ -701,10 +701,10 @@ struct VecMatMulT : public Diff2 {
     VecMatMulT(PDiff a, PDiff b) : Diff2(a, b) {
         dim4 as = a->shape, bs = b->shape;
         Check(as.ndims() > 0);
-        Check(bs.ndims() == 2);
+        Check(bs.ndims() == 2, format("a:%s b:%s", as, bs));
         Check(as.back() == bs.back());
         dim4 cs = as;
-        cs[cs.rank() - 1] = bs[0];
+        cs[cs.ndims() - 1] = bs[0];
         Reshape(cs);
     }
 
@@ -895,8 +895,8 @@ inline PDiff BinaryCrossEntropy(PDiff ref, PDiff out) {
     return make_shared<BinaryCrossEntropyT>(ref, out);
 }
 
-struct AccuracyT : public Diff2 {
-    AccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
+struct BinaryAccuracyT : public Diff2 {
+    BinaryAccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
         Check(a->shape == b->shape);
         Check(!ref->g);
         v.reshape({1});
@@ -908,7 +908,7 @@ struct AccuracyT : public Diff2 {
     }
 };
 
-Declare2(Accuracy, AccuracyT);
+Declare2(BinaryAccuracy, BinaryAccuracyT);
 
 inline PDiff Softmax(PDiff a) {
     PDiff e = Exp(a);

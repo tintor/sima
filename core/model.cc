@@ -23,7 +23,7 @@ void Model::Forward() {
     }
 }
 
-void Model::Backward() {
+void Model::Backward(PDiff loss) {
     for (auto p : m_params) {
         Timestamp ts;
         EACH(p->v) p->g[i] = 0;
@@ -35,7 +35,7 @@ void Model::Backward() {
         p->backward_ticks += ts.elapsed();
     }
 
-    m_loss->g[0] = 1;
+    loss->g[0] = 1;
 
     for (auto p : m_backward_nodes) {
         Timestamp ts;
@@ -179,11 +179,7 @@ bool HasBackward(PDiff p) {
     return Diff::has_overload;
 }
 
-Model::Model(PDiff out, PDiff loss, PDiff accuracy) : m_out(out), m_loss(loss), m_accuracy(accuracy), m_nodes(TopoSort({out, loss, accuracy})) {
-    Check(out == nullptr || out->size > 0);
-    Check(loss == nullptr || loss->size == 1);
-    Check(accuracy == nullptr || accuracy->size == 1);
-
+Model::Model(const cspan<PDiff> heads) : m_nodes(TopoSort(heads)) {
     // TODO optimize it here:
     // - remove redundant diffs
     // - replace more expensive diffs with cheaper diffs
@@ -217,8 +213,7 @@ Model::Model(PDiff out, PDiff loss, PDiff accuracy) : m_out(out), m_loss(loss), 
     }
 }
 
-Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
-    Check(m_loss != nullptr);
+Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
     Check(data.size() > 0);
     const auto B = data[0].first->shape(0);
     const auto N = data[0].second.shape()[0];
@@ -237,7 +232,8 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, b
     std::shuffle(m_samples.begin(), m_samples.end(), random);
 
     string msg;
-    Accumulator<float> a_loss, a_accuracy, a_f_ticks, a_b_ticks;
+    Accumulator<float> a_loss, a_accuracy;
+    Accumulator<float> a_f_ticks, a_b_ticks;
     ulong f_ticks = 0, b_ticks = 0;
     ulong message_ticks = 0;
     for (size_t i = 0; i < N; i += B) {
@@ -246,12 +242,12 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, b
         }
 
         f_ticks += Duration([&]() { Forward(); });
-        b_ticks += Duration([&]() { Backward(); });
+        b_ticks += Duration([&]() { Backward(loss); });
         a_f_ticks << f_ticks;
         a_b_ticks << b_ticks;
 
-        a_loss << m_loss->v[0];
-        if (m_accuracy) a_accuracy << m_accuracy->v[0];
+        a_loss << loss->v[0];
+        if (accuracy != nullptr) a_accuracy << accuracy->v[0];
 
         ulong ticks = f_ticks + b_ticks;
         if (ticks - message_ticks > long(1e10) && verbose) {
@@ -263,7 +259,7 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, b
 
             format_s(msg, "%s: %s/%s", epoch, i + B, N);
             format_s(msg, " loss:%.5f", a_loss.mean());
-            format_s(msg, " acc:%.5f", a_accuracy.mean());
+            if (accuracy != nullptr) format_s(msg, " accuracy:%.5f", a_accuracy.mean());
             msg += "   ";
             cout << msg;
             cout.flush();
@@ -279,14 +275,14 @@ Metrics Model::Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, b
 
         print("%s: %s/%s", epoch, N, N);
         print(" loss:%.5f", a_loss.mean());
-        if (m_accuracy) print(" accuracy:%.5f", a_accuracy.mean());
+        if (accuracy) print(" accuracy:%.5f", a_accuracy.mean());
         print(" f_ticks:%h", ulong(a_f_ticks.mean()));
         print(" b_ticks:%h", ulong(a_b_ticks.mean()));
         println();
     }
 
     Metrics metrics = {{"loss", a_loss.mean()}};
-    if (m_accuracy) metrics.emplace("accuracy", a_accuracy.mean());
+    if (accuracy) metrics.emplace("accuracy", a_accuracy.mean());
     return metrics;
 }
 

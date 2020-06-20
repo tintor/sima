@@ -10,13 +10,15 @@ struct dim4 {
     std::array<dim_t, 4> d;
 
     dim4(dim_t a = 1, dim_t b = 1, dim_t c = 1, dim_t d = 1) : d{a, b, c, d} {}
+
     int ndims() const {
-        if (elements() == 0) return 0;
         if (d[3] != 1) return 4;
         if (d[2] != 1) return 3;
         if (d[1] != 1) return 2;
-        return 1;
+        if (d[0] != 1) return 1;
+        return 0;
     }
+
     dim_t elements() const { return d[0] * d[1] * d[2] * d[3]; }
     dim_t operator[](int i) const { return d[i]; }
     dim_t& operator[](int i) { return d[i]; }
@@ -53,8 +55,10 @@ struct dim4 {
         if (d[3] != 1) return format("[%s %s %s %s]", d[0], d[1], d[2], d[3]);
         if (d[2] != 1) return format("[%s %s %s]", d[0], d[1], d[2]);
         if (d[1] != 1) return format("[%s %s]", d[0], d[1]);
-        return (d[0] != 1) ? format("[%s]", d[0]) : "[]";
+        return (d[0] != 1) ? format("[%s]", d[0]) : "scalar";
     }
+
+    operator string() const { return str(); }
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)

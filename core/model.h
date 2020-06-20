@@ -17,28 +17,22 @@ class Model {
    public:
     shared_ptr<Optimizer> optimizer = make_shared<Optimizer>();
 
-    Model(PDiff out, PDiff loss, PDiff accuracy);
+    Model(cspan<PDiff> heads);
 
     void Forward();
-    void Backward();
+    void Backward(PDiff loss);
     void Print() const;
 
-    void Iterate(size_t iterations) {
+    void Iterate(size_t iterations, PDiff loss) {
         for (size_t i : range(iterations)) {
             Forward();
-            Backward();
+            Backward(loss);
         }
     }
 
-    Metrics Epoch(cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
-
-    tensor::type Loss() const { return m_loss->v[0]; }
-    tensor::type Accuracy() const { return m_accuracy->v[0]; }
+    Metrics Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 
    private:
-    const PDiff m_out;
-    const PDiff m_loss;
-    const PDiff m_accuracy;
     vector<PDiff> m_nodes;
     vector<Diff*> m_forward_nodes, m_backward_nodes, m_end_epoch_nodes;
     vector<ParamT*> m_params;
@@ -46,9 +40,9 @@ class Model {
 };
 
 inline void Minimize(PDiff loss, float alpha, size_t iterations) {
-    Model model(nullptr, loss, nullptr);
+    Model model({loss});
     model.optimizer->alpha = alpha;
-    model.Iterate(iterations);
+    model.Iterate(iterations, loss);
 }
 
 // subtract mean and divide by stdev
