@@ -8,14 +8,13 @@ TEST_CASE("dim4", "[tensor]") {
     REQUIRE(dim4{1}.rank() == 0);
     REQUIRE(dim4{3}.rank() == 1);
     REQUIRE(dim4{1, 3, 1}.rank() == 1);
-    REQUIRE(dim4{0, 3, 1}.rank() == -1);
 
     REQUIRE(dim4{1}.elements() == 1);
     REQUIRE(dim4{2, 3, 4, 5}.elements() == 2 * 3 * 4 * 5);
 
     REQUIRE(dim4{2} == dim4{2});
     REQUIRE(dim4{2, 2} == dim4{2, 2});
-    REQUIRE(dim4{2, 1} == dim4{2});
+    REQUIRE(dim4{2, 1} != dim4{2});
 
     REQUIRE(dim4{2, 1}.pop_front() == dim4{1});
     REQUIRE(dim4{2}.pop_front() == dim4{});
@@ -35,8 +34,8 @@ TEST_CASE("dim4", "[tensor]") {
 
     REQUIRE(dim4{2, 4, 5}.str() == "[2 4 5]");
     REQUIRE(dim4{2}.str() == "[2]");
-    REQUIRE(dim4{1}.str() == "scalar");
-    REQUIRE(dim4{}.str() == "scalar");
+    REQUIRE(dim4{1}.str() == "[1]");
+    REQUIRE(dim4{}.str() == "[]");
 }
 
 TEST_CASE("tensor", "[tensor]") {
@@ -55,14 +54,14 @@ TEST_CASE("tensor", "[tensor]") {
     REQUIRE(tensor(m.data(), {3}) == tensor(n.data(), {3}));
     REQUIRE(tensor(m.data() + 1, {3}) != tensor(n.data(), {3}));
     REQUIRE(tensor(m.data(), {3}) != tensor(n.data(), {2}));
-    REQUIRE(tensor(m.data(), {3}) == tensor(n.data(), {3, 1}));
+    REQUIRE(tensor(m.data(), {3}) != tensor(n.data(), {3, 1}));
 
     REQUIRE(tensor(m.data(), {2, 3}).slice(0) == tensor(m.data(), {3}));
     REQUIRE(tensor(m.data(), {2, 3}).slice(1) == tensor(m.data() + 3, {3}));
 
     REQUIRE(tensor(m.data(), {2}));
     REQUIRE(!tensor());
-    REQUIRE(!tensor(nullptr, {0}));
+    REQUIRE(!tensor(nullptr, {}));
 
     REQUIRE(tensor().size == 0);
     REQUIRE(tensor() == tensor());

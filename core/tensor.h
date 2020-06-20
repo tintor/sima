@@ -9,34 +9,44 @@ using dim_t = uint;
 struct dim4 {
     std::array<dim_t, 4> d;
 
-    dim4(dim_t a = 1, dim_t b = 1, dim_t c = 1, dim_t d = 1) : d{a, b, c, d} {}
+    dim4(dim_t a = 0, dim_t b = 0, dim_t c = 0, dim_t d = 0) : d{a, b, c, d} {
+        Check(a != 0 || b == 0);
+        Check(b != 0 || c == 0);
+        Check(c != 0 || d == 0);
+    }
 
     int ndims() const {
-        if (d[3] != 1) return 4;
-        if (d[2] != 1) return 3;
-        if (d[1] != 1) return 2;
-        if (d[0] != 1) return 1;
+        if (d[3] != 0) return 4;
+        if (d[2] != 0) return 3;
+        if (d[1] != 0) return 2;
+        if (d[0] != 0) return 1;
         return 0;
     }
 
-    dim_t elements() const { return d[0] * d[1] * d[2] * d[3]; }
+    dim_t elements() const {
+        if (d[3] != 0) return d[0] * d[1] * d[2] * d[3];
+        if (d[2] != 0) return d[0] * d[1] * d[2];
+        if (d[1] != 0) return d[0] * d[1];
+        if (d[0] != 0) return d[0];
+        return 0;
+    }
+
     dim_t operator[](int i) const { return d[i]; }
     dim_t& operator[](int i) { return d[i]; }
     bool operator==(dim4 o) const { return d == o.d; }
     bool operator!=(dim4 o) const { return d != o.d; }
 
     dim_t back() const { return d[ndims() - 1]; }
-    dim4 pop_front() const { return {d[1], d[2], d[3], 1}; }
+    dim4 pop_front() const { return {d[1], d[2], d[3], 0}; }
     dim4 pop_back() const {
         int r = rank();
         if (r <= 0) return *this;
         dim4 e = *this;
-        e[r - 1] = 1;
+        e[r - 1] = 0;
         return e;
     }
-    dim4 push_front(dim_t a) const { return {a, d[0], d[1], d[2]}; }
+    dim4 push_front(dim_t a) const { Check(d[3] == 0); return {a, d[0], d[1], d[2]}; }
 
-    // -1 empty : if any dimension is 0
     // 0 scalar : all dimensions are 1
     // 1 vector : if one dimension is >1 and rest are 1
     // 2 matrix
@@ -44,18 +54,16 @@ struct dim4 {
     // 4 hyper-cuboid
     int rank() const {
         int r = 0;
-        for (int i = 0; i < 4; i++) {
-            if (d[i] == 0) return -1;
-            if (d[i] > 1) r += 1;
-        }
+        for (int i = 0; i < 4; i++) if (d[i] > 1) r += 1;
         return r;
     }
 
     string str() const {
-        if (d[3] != 1) return format("[%s %s %s %s]", d[0], d[1], d[2], d[3]);
-        if (d[2] != 1) return format("[%s %s %s]", d[0], d[1], d[2]);
-        if (d[1] != 1) return format("[%s %s]", d[0], d[1]);
-        return (d[0] != 1) ? format("[%s]", d[0]) : "scalar";
+        if (d[3] != 0) return format("[%s %s %s %s]", d[0], d[1], d[2], d[3]);
+        if (d[2] != 0) return format("[%s %s %s]", d[0], d[1], d[2]);
+        if (d[1] != 0) return format("[%s %s]", d[0], d[1]);
+        if (d[0] != 0) return format("[%s]", d[0]);
+        return "[]";
     }
 
     operator string() const { return str(); }
