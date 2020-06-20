@@ -310,56 +310,6 @@ Action AutoClimber(const Board& board) {
     return choice;
 }
 
-struct MyModel {
-    MyModel() {
-        in = Data({100, BoardBits}) << "input";
-        ref = Data({100, 1}) << "reference";
-
-        std::mt19937_64 random(1);
-        auto w_init = make_shared<NormalInit>(1 / sqrt(128), random);
-
-        // TODO input normalization
-        auto fc1 = FullyConnected(in, 128, w_init);
-        //fc1 = BatchNorm(fc1, 1e-8);
-        auto act1 = Relu(fc1);
-        auto fc2 = FullyConnected(act1, 1, w_init);
-        out = Logistic(fc2, 15);
-        auto loss = BinaryCrossEntropy(ref, out);
-        //train_model = make_shared<Model>(loss, Accuracy(ref, out));
-
-        // TODO inference model:
-        // - apply the same input normalization from training
-        // - use the same parameters
-        // - no loss / no acc
-        // - EpochMean in BatchNorm?
-        // - Is it possible to use training model directly? (reshape vectors to batch 1, temporarily?)
-    }
-
-    void Train(const Values& values) {
-        // reinitialize all weights?
-        // hyper params?
-    }
-
-    float Predict(const tensor input) { return 0; }
-
-    PDiff in;
-    PDiff ref;
-    PDiff out;
-    PDiff loss;
-    shared_ptr<Model> train_model;
-    shared_ptr<Model> inf_model;
-};
-
-MyModel g_value_fn;
-
-// 1 - current player wins always
-// 0 - current player looses alwaya
-double WinValue(const Board& board) {
-    vtensor input(BoardBits);
-    Serialize(board, input);
-    return g_value_fn.Predict(input);
-}
-
 size_t Rollout(Figure player, Board board) {
     auto& random = g_random;
     while (true) {
@@ -772,13 +722,8 @@ void Render(const Board& board, View& view) {
     glDisable(GL_BLEND);
 }
 
-// u - undo
-// place worker - left click
-// select worker - left click
-// move worker - left click
-// build tower - right click
-// build dome - shift + right click
-// Space - next player
+// Benchmarks and training
+// -----------------------
 
 using Policy = std::function<Action(const Board&)>;
 
@@ -859,54 +804,75 @@ struct MonteCarloAgent : public Agent {
     std::ofstream lost_games;
     Figure my_player;
     double eps_greedy;
+    uint episodes = 0;
 
     bool neural;
     const uint batch;
-    PDiff in, ref;
-    shared_ptr<Model> train_model;
+    PDiff in, ref, loss;
+    Model train_model;
 
     PDiff inf_in;
     PDiff inf_out;
-    shared_ptr<Model> inf_model;
+    Model inf_model;
 
     MonteCarloAgent(double eps_greedy, bool neural, uint batch) : eps_greedy(eps_greedy), neural(neural), batch(batch), lost_games("lost_games.txt") {
         in = Data({batch, BoardBits}) << "input";
         ref = Data({batch, 1}) << "reference";
         auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), g_random);
-        PDiff w, b;
-        auto fc = FullyConnected(in, 1, w_init, &w, &b);
-        auto out = Logistic(fc, 15);
-        auto loss = MeanSquareError(ref, out);
-        train_model = std::make_shared<Model>(out, loss, Accuracy(ref, out));
-        train_model->Print();
-        train_model->optimizer->alpha = 0.01;
+        PDiff w1, b1;
+        auto fc1 = FullyConnected(in, 10, w_init, &w1, &b1) << "fc1";
+        auto act1 = Tanh(fc1);
+        PDiff w2, b2;
+        auto fc2 = FullyConnected(act1, 1, w_init, &w2, &b2) << "fc2";
+        auto out = Logistic(fc2, 15);
+        loss = MeanSquareError(ref, out);
+        train_model = Model({loss});
+        train_model.Print();
+        auto opt = train_model.optimizer = std::make_shared<Optimizer>();
+        opt->alpha = 0.01;
 
         inf_in = Data({1, BoardBits}) << "input";
-        auto inf_fc = VecMatMul(inf_in, w) + b << "fc";
-        inf_out = Logistic(inf_fc, 15) << "out";
-        inf_model = std::make_shared<Model>(inf_out, nullptr, nullptr);
-        inf_model->Print();
+        println("w1.shape %s, b1.shape %s", string(w1->shape), string(b1->shape));
+        println("mul.shape %s", string(VecMatMul(inf_in, w1)->shape));
+        auto inf_fc1 = VecMatMul(inf_in, w1) + b1 << "fc1";
+        auto inf_act1 = Tanh(inf_fc1);
+        println("w2.shape %s, b2.shape %s", string(w2->shape), string(b2->shape));
+        auto inf_fc2 = VecMatMul(inf_act1, w2) + b2 << "fc2";
+        inf_out = Logistic(inf_fc2, 15) << "out";
+        inf_model = Model({inf_out});
+        inf_model.Print();
     }
 
     float Predict(const Board& board) {
         Serialize(board, inf_in->v);
-        inf_model->Forward();
+        inf_model.Forward();
         return inf_out->v[0];
     }
 
     void Train() {
-        for(auto i : range(batch)) {
-            const auto& sample = values.Sample(g_random);
-            Serialize(sample.first, in->v.slice(i));
-            ref->v[0] = sample.second.Value();
+        vector<uint> samples;
+        samples.resize(values.Size());
+        for (auto i : range(values.Size())) samples[i] = i;
+        std::shuffle(samples.begin(), samples.end(), g_random);
+
+        for (auto i : range(10)) {
+            // Epoch
+            for(auto i : range(batch)) {
+                const auto& sample = values.Sample(g_random);
+                Serialize(sample.first, in->v.slice(i));
+                ref->v[0] = sample.second.Value();
+            }
+            train_model.Forward();
+            train_model.Backward(loss);
         }
-        train_model->Forward();
-        train_model->Backward();
-        // println("train loss:%.4f accuracy:%.4f", train_model->Loss(), train_model->Accuracy());
-        /*for(auto i : range(Batch)) {
-            const auto& sample = values.Sample(g_random);
-            println("actual: %.4f, prediction: %.4f", sample.second.Value(), Predict(sample.first));
-        }*/
+        if (episodes % 100 == 0) {
+            train_model.Print();
+            double s = 0;
+            for(const auto& e : values)
+                s += std::pow(double(e.second.Value()) - double(Predict(e.first)), 2);
+            s /= values.Size();
+            println("dataset loss:%.4f accuracy:%.04f", s, std::sqrt(s));
+        }
     }
 
     void BeginEpisode(Figure player) override {
@@ -931,7 +897,7 @@ struct MonteCarloAgent : public Agent {
             float value = -1;
             if (!explore) {
                 auto w = values.Lookup(new_board);
-                value = w ? w->Value() : (neural ? Predict(new_board) : 0.5);
+                value = w ? w->Value() : ((neural) ? Predict(new_board) : 0.5);
             }
             if (sampler.count == 0 || value > best_value) {
                 sampler.count = 1;
@@ -952,6 +918,7 @@ struct MonteCarloAgent : public Agent {
     }
 
     void EndEpisode(bool victory) override {
+        episodes += 1;
         if (!victory) {
             for (const auto& e : history) {
                 if (e.board.built) {
@@ -962,7 +929,7 @@ struct MonteCarloAgent : public Agent {
             lost_games << endl;
         }
         for (const Entry& e : history) values.Add(e.board, victory ? 1 : 0, victory ? 0 : 1);
-        if (neural) Train();
+        if (neural && episodes % 100 == 0) Train();
     }
 };
 
@@ -975,29 +942,7 @@ struct GreedyAgent : public Agent {
 };
 
 void Learn() {
-    /*auto play_by_model = [&](const Board& board) {
-        Action best_action;
-        double best_value;
-        ReservoirSampler sampler;
-        AllValidActions(board, [&](const Board& new_board, const Action& action) {
-            Serialize(new_board, _in->v);
-            inference_model.Forward();
-            auto value = _out->v[0];
-            if (sampler.count == 0 || value > best_value) {
-                sampler.count = 1;
-                best_action = action;
-                best_value = value;
-            } else if (value == best_value && sampler(random)) {
-                sampler.count += 1;
-                best_action = action;
-                best_value = value;
-            }
-            return true;
-        });
-        return best_action;
-    };*/
-
-    MonteCarloAgent agent_a(0.01, true, 1000);
+    MonteCarloAgent agent_a(0.01, true, 100);
     //MonteCarloAgent agent_b(0.01, false, 1000);
     RandomAgent agent_b;
     //GreedyAgent agent_b;
@@ -1027,22 +972,9 @@ void Learn() {
         constexpr double q = 0.0025;
         ratio = ratio * (1 - q) + (w == Figure::Player1 ? 1 : 0) * q;
         auto msg = format("Game %s (wins %.4f, actions %s)", game + 1, ratio, actions);
-        cout << msg << endl;
+        if ((game + 1) % 100 == 0) cout << msg << endl;
         if ((game + 1) % 2000 == 0) stats << msg << endl;
     }
-
-    // export Values into dataset
-    // values.Export("self_play_outcomes.txt", 3);
-
-    // train model
-    vector<pair<PDiff, vtensor>> data;
-    for (auto i : range(1000)) {
-        //train_model.Epoch(dataset, random, true, i);
-    }
-
-    // TODO load weights from other model
-
-    // evaluate
 }
 
 int main(int argc, char** argv) {

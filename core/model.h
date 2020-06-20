@@ -17,7 +17,8 @@ class Model {
    public:
     shared_ptr<Optimizer> optimizer = make_shared<Optimizer>();
 
-    Model(cspan<PDiff> heads);
+    Model() {}
+    explicit Model(std::initializer_list<PDiff> heads);
 
     void Forward();
     void Backward(PDiff loss);

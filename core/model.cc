@@ -179,7 +179,7 @@ bool HasBackward(PDiff p) {
     return Diff::has_overload;
 }
 
-Model::Model(const cspan<PDiff> heads) : m_nodes(TopoSort(heads)) {
+Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
     // TODO optimize it here:
     // - remove redundant diffs
     // - replace more expensive diffs with cheaper diffs

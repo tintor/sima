@@ -112,34 +112,32 @@ constexpr int BoardBits = 3 + 25 * (1 + CellBits);
 
 using std::ostream;
 
-inline char Bit(bool a) { return a ? '1' : '0'; }
+inline float Bit(bool a) { return a ? 1 : 0; }
 
-void Serialize(ostream& os, Cell cell) {
-    os << Bit(cell.level == 0);
-    os << Bit(cell.level == 1);
-    os << Bit(cell.level == 2);
-    os << Bit(cell.level == 3);
-    os << Bit(cell.figure == Figure::Dome);
-    os << Bit(cell.figure == Figure::Player1);
-    os << Bit(cell.figure == Figure::Player2);
+inline float* Serialize(float* v, Cell cell) {
+    *v++ = Bit(cell.level == 0);
+    *v++ = Bit(cell.level == 1);
+    *v++ = Bit(cell.level == 2);
+    *v++ = Bit(cell.level == 3);
+    *v++ = Bit(cell.figure == Figure::Dome);
+    *v++ = Bit(cell.figure == Figure::Player1);
+    *v++ = Bit(cell.figure == Figure::Player2);
+    return v;
 }
 
-void Serialize(ostream& os, const Board& board) {
-    os << Bit(board.setup);
-    for (Coord e : kAll) os << Bit(board.moved && *board.moved == e);
-    os << Bit(board.built);
-    os << Bit(board.player == Figure::Player1);
-    for (Coord e : kAll) Serialize(os, board(e));
+inline float* Serialize(float* v, const Board& board) {
+    *v++ = Bit(board.setup);
+    for (Coord e : kAll) *v++ = Bit(board.moved && *board.moved == e);
+    *v++ = Bit(board.built);
+    *v++ = Bit(board.player == Figure::Player1);
+    for (Coord e : kAll) v = Serialize(v, board(e));
+    return v;
 }
 
-inline void Serialize(const Board& board, tensor out) {
+void Serialize(const Board& board, tensor out) {
     Check(out.rank == 1);
     Check(out.size == BoardBits);
-    ostringstream os;
-    os.str().reserve(BoardBits);
-    Serialize(os, board);
-    Check(os.str().size() == BoardBits);
-    for (size_t i = 0; i < BoardBits; i++) out(i) = (os.str()[i] == '1') ? 1.f : 0.f;
+    Check(Serialize(out.data(), board) == out.data() + out.size);
 }
 
 class Values {
@@ -150,6 +148,9 @@ class Values {
     };
 
     size_t Size() const { return m_data.size(); }
+
+    auto begin() const { return m_data.begin(); }
+    auto end() const { return m_data.end(); }
 
     const auto& Sample(std::mt19937_64& random) const {
         Check(m_data.size() > 0);
