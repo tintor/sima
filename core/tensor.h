@@ -7,10 +7,11 @@
 using dim_t = uint;
 
 struct dim4 {
-    dim4(dim_t a = 0, dim_t b = 0, dim_t c = 0, dim_t d = 0) : dim4{a, b, c, d, ' ', ' ', ' ', ' '} {
-    }
+    dim4(dim_t a = 0, dim_t b = 0, dim_t c = 0, dim_t d = 0)
+            : dim4{a, b, c, d, ' ', ' ', ' ', ' '} { }
 
-    dim4(dim_t a, dim_t b, dim_t c, dim_t d, char an, char bn, char cn, char dn) : d{a, b, c, d}, n{an, bn, cn, dn} {
+    dim4(dim_t a, dim_t b, dim_t c, dim_t d, char an, char bn, char cn, char dn)
+            : d{a, b, c, d}, n{an, bn, cn, dn} {
         Check(a != 0 || (b == 0 && an == ' '));
         Check(b != 0 || (c == 0 && bn == ' '));
         Check(c != 0 || (d == 0 && cn == ' '));
@@ -34,12 +35,12 @@ struct dim4 {
 
     dim_t elements() const { return elem; }
 
-    dim_t operator[](int i) const { return d[i]; }
-    dim_t& operator[](int i) { return d[i]; }
+    dim_t operator[](uint i) const { Check(i < size); return d[i]; }
+    dim_t& operator[](uint i) { Check(i < size); return d[i]; }
     bool operator==(dim4 o) const { return d == o.d; }
     bool operator!=(dim4 o) const { return d != o.d; }
 
-    dim_t back() const { return d[ndims() - 1]; }
+    dim_t back() const { Check(size > 0); return d[size - 1]; }
 
     dim4 pop_front() const { return {d[1], d[2], d[3], 0, n[1], n[2], n[3], ' '}; }
 
@@ -82,7 +83,7 @@ private:
     std::array<dim_t, 4> d;
     std::array<char, 4> n;
     dim_t elem;
-    int size;
+    uint size;
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)
