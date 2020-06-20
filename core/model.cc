@@ -15,10 +15,10 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
     return out;
 }
 
-void Model::Forward() {
+void Model::Forward(bool training) {
     for (auto p : m_forward_nodes) {
         Timestamp ts;
-        p->Forward();
+        p->Forward(training);
         p->forward_ticks += ts.elapsed();
     }
 }
@@ -193,7 +193,7 @@ Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
 
     for (PDiff p : m_nodes) {
         Diff::has_overload = true;
-        p->Forward();
+        p->Forward(false);
         if (Diff::has_overload) m_forward_nodes.push_back(p.get());
     }
 
@@ -242,7 +242,7 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
             for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(m_samples[i + j]));
         }
 
-        f_ticks += Duration([&]() { Forward(); });
+        f_ticks += Duration([&]() { Forward(true); });
         b_ticks += Duration([&]() { Backward(loss); });
         a_f_ticks << f_ticks;
         a_b_ticks << b_ticks;

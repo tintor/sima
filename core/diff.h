@@ -8,7 +8,7 @@
 // Stages of Diff graph:
 // - construction - final size of tensors is known
 // - optimization
-// - Forward() - v tensors populated
+// - Forward(bool) - v tensors populated
 // - ResetGradients() - g tensors cleared
 // - Backward() - g tensors accumulated
 // - Optimize() - v tensors adjusted using g tensors
@@ -23,7 +23,7 @@ struct Diff {
     virtual vector<PDiff> Inputs() { return {}; }
 
     static thread_local bool has_overload;
-    virtual void Forward() { has_overload = false; }
+    virtual void Forward(bool training) { has_overload = false; }
     virtual void Backward() { has_overload = false; }
     virtual void EndEpoch() { has_overload = false; }
 
@@ -208,7 +208,7 @@ struct GaussianT : public Diff {
     GaussianT(dim4 shape, tensor::type mean, tensor::type stdev, size_t seed) : normal(mean, stdev), random(seed) {
         v.reshape(shape);
     }
-    void Forward() override { EACH(v) v[i] = normal(random); }
+    void Forward(bool) override { EACH(v) v[i] = normal(random); }
     std::normal_distribution<tensor::type> normal;
     std::mt19937_64 random;
 };
@@ -219,7 +219,7 @@ inline PDiff Gaussian(dim4 shape, tensor::type mean, tensor::type stdev, size_t 
 
 struct ReluT : public DiffA {
     ReluT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : 0; }
+    void Forward(bool) override { EACH(v) v[i] = (va[i] > 0) ? va[i] : 0; }
     void Backward() override { EACH(ga) ga[i] += (va[i] > 0) * g[i]; }
 };
 Declare1(Relu);
@@ -230,21 +230,21 @@ inline PDiff NoisyRelu(PDiff a, size_t seed) { return Relu(a + Gaussian(a->shape
 // SmoothRelu
 struct SoftplusT : public DiffA {
     SoftplusT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = log(1 + std::exp(va[i])); }
+    void Forward(bool) override { EACH(v) v[i] = log(1 + std::exp(va[i])); }
     void Backward() override { EACH(ga) ga[i] += g[i] / (1 + exp(-va[i])); }
 };
 Declare1(Softplus);
 
 struct LeakyReluT : public DiffA {
     LeakyReluT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] / 100); }
+    void Forward(bool) override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] / 100); }
     void Backward() override { EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] / 100); }
 };
 Declare1(LeakyRelu);
 
 struct ParametricReluT : public Diff_vv {
     ParametricReluT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] * vb[i]); }
+    void Forward(bool) override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (va[i] * vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] > 0) ? g[i] : (g[i] * vb[i]);
         EACH(gb) gb[i] += (va[i] > 0) ? 0 : (g[i] * va[i]);
@@ -254,7 +254,7 @@ Declare2(ParametricRelu, ParametricReluT);
 
 struct ELUT : public DiffA {
     ELUT(PDiff a, double k) : DiffA(a), k(k) {}
-    void Forward() override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (k * (std::exp(va[i] - 1))); }
+    void Forward(bool) override { EACH(v) v[i] = (va[i] > 0) ? va[i] : (k * (std::exp(va[i] - 1))); }
     void Backward() override { Check(false, "not implemented"); }
     double k;
 };
@@ -262,14 +262,14 @@ inline PDiff ELU(PDiff a, double k) { return make_shared<ELUT>(a, k); }
 
 struct LogisticT : public DiffA {
     LogisticT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = 1 / (1 + std::exp(-va[i])); }
+    void Forward(bool) override { EACH(v) v[i] = 1 / (1 + std::exp(-va[i])); }
     void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
 };
 Declare1(Logistic);
 
 struct ClampLogisticT : public DiffA {
     ClampLogisticT(PDiff a, tensor::type limit) : DiffA(a), limit(limit) {}
-    void Forward() override { EACH(v) v[i] = 1 / (1 + std::exp(std::clamp(-va[i], -limit, limit))); }
+    void Forward(bool) override { EACH(v) v[i] = 1 / (1 + std::exp(std::clamp(-va[i], -limit, limit))); }
     void Backward() override { EACH(ga) ga[i] += g[i] * v[i] * (1 - v[i]); }
     tensor::type limit;
 };
@@ -278,14 +278,14 @@ inline PDiff Logistic(PDiff a, float limit) { return make_shared<ClampLogisticT>
 
 struct TanhT : public DiffA {
     TanhT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::tanh(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::tanh(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] * (1 - sqr(v[i])); }
 };
 Declare1(Tanh);
 
 struct ErfT : public DiffA {
     ErfT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::erf(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::erf(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] * tensor::type(2 / sqrt(PI)) * std::exp(-sqr(va[i])); }
 };
 Declare1(Erf);
@@ -293,7 +293,7 @@ Declare1(Erf);
 // TODO variation: atan(pi*x/2)*2/pi
 struct AtanT : public DiffA {
     AtanT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::atan(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::atan(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] / (1 + sqr(va[i])); }
 };
 Declare1(Atan);
@@ -301,7 +301,7 @@ Declare1(Atan);
 // x / (1 + abs(x))
 struct SaxT : public DiffA {
     SaxT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = va[i] / (1 + std::abs(va[i])); }
+    void Forward(bool) override { EACH(v) v[i] = va[i] / (1 + std::abs(va[i])); }
     void Backward() override { EACH(ga) ga[i] += g[i] / sqr(1 + std::abs(va[i])); }
 };
 Declare1(Sax);
@@ -309,56 +309,56 @@ Declare1(Sax);
 // 1/sqrt(1+x^2)
 struct SoxT : public DiffA {
     SoxT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = 1 / std::sqrt(1 + sqr(va[i])); }
+    void Forward(bool) override { EACH(v) v[i] = 1 / std::sqrt(1 + sqr(va[i])); }
     void Backward() override { EACH(ga) ga[i] -= g[i] * va[i] * cube(v[i]); }
 };
 Declare1(Sox);
 
 struct SqrT : public DiffA {
     SqrT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = va[i] * va[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] * va[i]; }
     void Backward() override { EACH(ga) ga[i] += g[i] * 2 * va[i]; }
 };
 Declare1(Sqr);
 
 struct SqrtT : public DiffA {
     SqrtT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::sqrt(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::sqrt(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] / 2 / v[i]; }
 };
 Declare1(Sqrt);
 
 struct ExpT : public DiffA {
     ExpT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::exp(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::exp(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] * v[i]; }
 };
 Declare1(Exp);
 
 struct LogT : public DiffA {
     LogT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::log(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::log(va[i]); }
     void Backward() override { EACH(ga) ga[i] += g[i] / va[i]; }
 };
 Declare1(Log);
 
 struct AbsT : public DiffA {
     AbsT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::abs(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::abs(va[i]); }
     void Backward() override { EACH(ga) ga[i] += std::copysign(g[i], va[i]); }
 };
 Declare1(Abs);
 
 struct CosT : public DiffA {
     CosT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::cos(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::cos(va[i]); }
     void Backward() override { EACH(ga) ga[i] -= std::sin(va[i]); }
 };
 Declare1(Cos);
 
 struct SinT : public DiffA {
     SinT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = std::sin(va[i]); }
+    void Forward(bool) override { EACH(v) v[i] = std::sin(va[i]); }
     void Backward() override { EACH(ga) ga[i] += std::cos(va[i]); }
 };
 Declare1(Sin);
@@ -376,7 +376,7 @@ inline tensor::type Dot(const tensor a, const tensor b, tensor::type s = 0) {
 
 struct Add_vv : public Diff_vv {
     Add_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] + vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] + vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
         EACH(gb) gb[i] += g[i];
@@ -385,7 +385,7 @@ struct Add_vv : public Diff_vv {
 
 struct Add_vs : public Diff_vs {
     Add_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] + vb[0]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] + vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
         if (gb) gb[0] += Sum(g, gb[0]);
@@ -398,7 +398,7 @@ struct Add_mv : public Diff2 {
             format("a:%s b:%s a.pop_front:%s", string(a->shape()), string(b->shape()), string(a->shape().pop_front())));
         Reshape(a->shape());
     }
-    void Forward() override {
+    void Forward(bool) override {
         for (auto i : range<size_t>(0, va.elements(), vb.elements())) {
             for (auto j : range<size_t>(vb.elements())) v[i + j] = va[i + j] + vb[j];
         }
@@ -426,7 +426,7 @@ inline auto operator+(PDiff a, tensor::type b) { return b + a; }
 
 struct Sub_vv : public Diff_vv {
     Sub_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] - vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] - vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
         EACH(gb) gb[i] -= g[i];
@@ -435,7 +435,7 @@ struct Sub_vv : public Diff_vv {
 
 struct Sub_vs : public Diff_vs {
     Sub_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] - vb[0]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] - vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
         if (gb) gb[0] -= Sum(g, gb[0]);
@@ -444,7 +444,7 @@ struct Sub_vs : public Diff_vs {
 
 struct Sub_sv : public Diff_sv {
     Sub_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[0] - vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[0] - vb[i]; }
     void Backward() override {
         if (ga) ga[0] += Sum(g, ga[0]);
         EACH(gb) gb[i] -= g[i];
@@ -453,7 +453,7 @@ struct Sub_sv : public Diff_sv {
 
 struct Neg : public DiffA {
     Neg(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = -va[i]; }
+    void Forward(bool) override { EACH(v) v[i] = -va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i]; }
 };
 
@@ -472,7 +472,7 @@ struct Mul_vs : public Diff_vs {
         Check(b->elements() == 1 && !b->batched());
         Reshape(a->shape());
     }
-    void Forward() override { EACH(v) v[i] = va[i] * vb[0]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] * vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] * vb[0];
         if (gb) gb[0] += Dot(g, va);
@@ -481,7 +481,7 @@ struct Mul_vs : public Diff_vs {
 
 struct Mul_vv : public Diff_vv {
     Mul_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] * vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] * vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] * vb[i];
         EACH(gb) gb[i] += g[i] * va[i];
@@ -508,7 +508,7 @@ inline PDiff operator*(PDiff a, tensor::type b) {
 
 struct Div_vv : public Diff_vv {
     Div_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] / vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] / vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[i];
         EACH(gb) gb[i] -= g[i] * v[i] / vb[i];
@@ -517,7 +517,7 @@ struct Div_vv : public Diff_vv {
 
 struct Div_vs : public Diff_vs {
     Div_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[i] / vb[0]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i] / vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[0];
         if (gb) EACH(g) gb[0] -= g[i] * v[i] / vb[0];
@@ -526,7 +526,7 @@ struct Div_vs : public Diff_vs {
 
 struct Div_sv : public Diff_sv {
     Div_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
-    void Forward() override { EACH(v) v[i] = va[0] / vb[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[0] / vb[i]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i] / vb[i];
         EACH(gb) gb[i] -= g[i] * v[0] / sqr(vb[i]);
@@ -535,7 +535,7 @@ struct Div_sv : public Diff_sv {
 
 struct InvT : public DiffA {
     InvT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = 1 / va[i]; }
+    void Forward(bool) override { EACH(v) v[i] = 1 / va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i] * sqr(v[i]); }
 };
 
@@ -563,7 +563,7 @@ inline PDiff& operator/=(PDiff& a, tensor::type b) { return a = a / b; }
 #define RELATION(NAME, OP)                                                                            \
     struct NAME : public Diff_vv {                                                                    \
         NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                                                     \
-        void Forward() override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; }                          \
+        void Forward(bool) override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; }                          \
     };                                                                                                \
     Declare2(operator OP, NAME);                                                                      \
     inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape()) OP b; } \
@@ -578,7 +578,7 @@ RELATION(LessOrEqual, <=);
 
 struct MinT : public Diff_vv {
     MinT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = min(va[i], vb[i]); }
+    void Forward(bool) override { EACH(v) v[i] = min(va[i], vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] < vb[i]) * g[i];
         EACH(gb) gb[i] += (vb[i] < va[i]) * g[i];
@@ -590,7 +590,7 @@ inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->
 
 struct MaxT : public Diff_vv {
     MaxT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override { EACH(v) v[i] = max(va[i], vb[i]); }
+    void Forward(bool) override { EACH(v) v[i] = max(va[i], vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] > vb[i]) * g[i];
         EACH(gb) gb[i] += (vb[i] > va[i]) * g[i];
@@ -610,7 +610,7 @@ struct Concat : public Diff2 {
         Reshape({uint(a->elements() + b->elements())});
     }
 
-    void Forward() override {
+    void Forward(bool) override {
         EACH(v) v[i] = va[i];
         EACH(v) v[i + va.elements()] = vb[i];
     }
@@ -631,7 +631,7 @@ struct Conv1D : public Diff2 {
         Reshape(a->shape());
     }
 
-    void Forward() override {
+    void Forward(bool) override {
         EACH(v) {
             tensor::type sum = 0;
             // TODO check
@@ -659,7 +659,7 @@ struct MaxPool1D : public Diff1 {
         Reshape({m});
     }
 
-    void Forward() override {
+    void Forward(bool) override {
         const size_t m = a->dim(0) / 2;
         for (size_t i = 0; i < m; i++) v[i] = max(va[i * 2], va[i * 2 + 1]);
         if (a->dim(0) % 2 == 1) v[m] = va[m * 2];
@@ -675,7 +675,7 @@ struct MaxPool1D : public Diff1 {
 
 struct MaxPool2D : public Diff1 {
     MaxPool2D(PDiff a);
-    void Forward() override;
+    void Forward(bool) override;
     void Backward() override;
 };
 
@@ -687,7 +687,7 @@ struct ReshapeT : public Diff1 {
         if (a->g) g.reshape(shape);
     }
 
-    void Forward() override { EACH(v) v[i] = va[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i]; }
     void Backward() override { EACH(ga) ga[i] = g[i]; }
 };
 
@@ -705,7 +705,7 @@ struct VecMatMulT : public Diff2 {
         Reshape(as.pop_back().push_back(bs[0], bs.name(0)));
     }
 
-    void Forward() override {
+    void Forward(bool) override {
         const size_t m = va.elements() / va.shape().back();
         const size_t q = vb.dim(0);
         const size_t p = vb.dim(1);
@@ -747,7 +747,7 @@ Declare2(VecMatMul, VecMatMulT);
 
 struct SumT : public Diff1 {
     SumT(PDiff a) : Diff1(a) { Reshape({}); }
-    void Forward() override { v[0] = Sum(va); }
+    void Forward(bool) override { v[0] = Sum(va); }
     void Backward() override { EACH(ga) ga[i] += g[0]; }
 };
 
@@ -755,7 +755,7 @@ Declare1(Sum);
 
 struct MeanT : public Diff1 {
     MeanT(PDiff a) : Diff1(a) { Reshape({}); }
-    void Forward() override { v[0] = Sum(va) / a->elements(); }
+    void Forward(bool) override { v[0] = Sum(va) / a->elements(); }
     void Backward() override {
         const tensor::type d = g[0] / a->elements();
         EACH(ga) ga[i] += d;
@@ -768,7 +768,7 @@ Declare1(Mean);
 
 struct RunningAverageT : public Diff1 {
     RunningAverageT(PDiff a, float k) : Diff1(a), k(k) { v.reshape(a->shape()); }
-    void Forward() override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
+    void Forward(bool) override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
     tensor::type k;
 };
 
@@ -777,7 +777,7 @@ inline PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverag
 // Returns mean of all input values from prev epoch OR 0 if first epoch.
 struct EpochMeanT : public Diff1 {
     EpochMeanT(PDiff a) : Diff1(a) { v.reshape({}); }
-    void Forward() override {
+    void Forward(bool) override {
         EACH(va) sum += va[i];
         count += va.elements();
     }
@@ -802,7 +802,7 @@ struct MeanSquareErrorT : public Diff2 {
         Check(a->shape() == b->shape());
         Reshape({});
     }
-    void Forward() override {
+    void Forward(bool) override {
         double s = 0;
         EACH(va) s += sqr(va[i] - vb[i]);
         v[0] = s / a->elements();
@@ -838,7 +838,7 @@ inline void CheckEqualFP(T a, T b) {
 
 struct ValueCmpT : public Diff_vv {
     ValueCmpT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward() override {
+    void Forward(bool) override {
         EACH(v) {
             v[i] = va[i];
             CheckEqualFP(va[i], vb[i]);
@@ -854,7 +854,7 @@ Declare2(ValueCmp, ValueCmpT);
 
 struct GradCmpT : public DiffA {
     GradCmpT(PDiff a) : DiffA(a) {}
-    void Forward() override { EACH(v) v[i] = va[i]; }
+    void Forward(bool) override { EACH(v) v[i] = va[i]; }
     void Backward() override {
         if (++counter != other->counter) return;
         EACH(ga) ga[i] = g[i];
@@ -889,7 +889,7 @@ struct BinaryCrossEntropyT : public Diff2 {
         Check(!ref->g);
         Reshape({});
     }
-    void Forward() override {
+    void Forward(bool) override {
         double s = 0;
         EACH(va) {
             s -= va[i] * std::log(max(eps, vb[i]));
@@ -926,7 +926,7 @@ struct BinaryAccuracyT : public Diff2 {
         Check(!ref->g);
         v.reshape({});
     }
-    void Forward() override {
+    void Forward(bool) override {
         double s = 0;
         EACH(va) s += std::abs(va[i] - vb[i]) < 0.5f;
         v[0] = s / a->elements();

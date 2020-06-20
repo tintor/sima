@@ -20,13 +20,13 @@ class Model {
     Model() {}
     explicit Model(std::initializer_list<PDiff> heads);
 
-    void Forward();
+    void Forward(bool training);
     void Backward(PDiff loss);
     void Print() const;
 
     void Iterate(size_t iterations, PDiff loss) {
         for (size_t i : range(iterations)) {
-            Forward();
+            Forward(true);
             Backward(loss);
         }
     }

@@ -6,7 +6,7 @@ bool IsBroadcastable(dim4 a, dim4 b) { return a.ndims() != 0 && (a.elements() ==
 
 struct BroadcastS : public Diff1 {
     BroadcastS(PDiff a, dim4 b) : Diff1(a) { Reshape(b); }
-    void Forward() override { EACH(v) v[i] = va[0]; }
+    void Forward(bool) override { EACH(v) v[i] = va[0]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i];
     }
@@ -35,7 +35,7 @@ MaxPool2D::MaxPool2D(PDiff a) : Diff1(a) {
     Reshape({m, n});
 }
 
-void MaxPool2D::Forward() {
+void MaxPool2D::Forward(bool) {
     // TODO edge condition on last row / column
     Check(a->dim(0) % 2 == 0);
     Check(a->dim(1) % 2 == 0);

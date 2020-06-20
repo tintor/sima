@@ -23,11 +23,11 @@ void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff 
         x->v[0] = e;
         ref->v[0] = 0;
         model.optimizer->Reset();
-        model.Forward();
+        model.Forward(true);
         if (name == "sgd") format_s(*row, "%s|", b->v[0]);
         int count = 250;
         for (int i = 0; i < 250; i++) {
-            model.Forward();
+            model.Forward(true);
             model.Backward(loss);
             if (b->v[0] <= 0.05) {
                 count = i + 1;
@@ -42,11 +42,11 @@ void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff 
         x->v[0] = e;
         ref->v[0] = 1;
         model.optimizer->Reset();
-        model.Forward();
+        model.Forward(true);
         if (name == "sgd") format_s(*row, "%s|", b->v[0]);
         int count = 250;
         for (int i = 0; i < 250; i++) {
-            model.Forward();
+            model.Forward(true);
             model.Backward(loss);
             if (b->v[0] >= 0.95) {
                 count = i + 1;
