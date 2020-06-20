@@ -38,6 +38,14 @@ struct dim4 {
 
     dim_t back() const { Check(d[0] != 0); return d[ndims() - 1]; }
 
+    dim4 set(uint i, dim_t a, char an = ' ') const {
+        Check(i < 4 && d[i] != 0);
+        dim4 e = *this;
+        e.d[i] = a;
+        e.n[i] = an;
+        return e;
+    }
+
     dim4 pop_front() const { return {d[1], d[2], d[3], 0, n[1], n[2], n[3], ' '}; }
 
     dim4 pop_back() const {
@@ -64,13 +72,20 @@ struct dim4 {
         return e;
     }
 
+    dim4 normalized() const {
+        dim4 e;
+        int w = 0;
+        for (int i = 0; i < 4; i++) if (d[i] > 1) e.d[w++] = d[i];
+        return e;
+    }
+
     string str() const {
         string s;
         s += '[';
         for (int i = 0; i < 4 && d[i] != 0; i++) {
             if (i != 0) s += ' ';
-            if (n[i] != ' ') s += n[i];
             format_s(s, "%s", d[i]);
+            if (n[i] != ' ') s += n[i];
         }
         s += ']';
         return s;
@@ -102,22 +117,22 @@ class Tensor {
     T const* data() const { return m_data; }
 
     T* begin() { return data(); }
-    T* end() { return data() + size(); }
+    T* end() { return data() + elements(); }
     const T* begin() const { return data(); }
-    const T* end() const { return data() + size(); }
+    const T* end() const { return data() + elements(); }
 
     auto ndims() const { return m_shape.ndims(); }
-    auto size() const { return m_data ? m_shape.elements() : 0; }
+    auto elements() const { return m_data ? m_shape.elements() : 0; }
 
     dim_t dim(uint i) const { return m_shape[i]; }
     const auto& shape() const { return m_shape; }
 
     T& operator[](size_t index) {
-        DCheck(index < size(), format("%s < %s", index, size()));
+        DCheck(index < elements(), format("%s < %s", index, elements()));
         return m_data[index];
     }
     const T& operator[](size_t index) const {
-        DCheck(index < size(), format("%s < %s", index, size()));
+        DCheck(index < elements(), format("%s < %s", index, elements()));
         return m_data[index];
     }
 
@@ -134,45 +149,45 @@ class Tensor {
     const T& operator()(size_t a, size_t b, size_t c, size_t d) const { return m_data[offset(a, b, c, d)]; }
 
     size_t offset(size_t a) const {
-        DCheck(m_shape.size() == 1, "");
-        DCheck(a < m_shape[0], "");
+        DCheck(ndims() == 1, "");
+        DCheck(a < dim(0), "");
         return a;
     }
     size_t offset(size_t a, size_t b) const {
-        DCheck(m_shape.size() == 2, "");
-        DCheck(a < m_shape[0], "");
-        DCheck(b < m_shape[1], "");
-        return a * m_shape[1] + b;
+        DCheck(ndims() == 2, "");
+        DCheck(a < dim(0), "");
+        DCheck(b < dim(1), "");
+        return a * dim(1) + b;
     }
     size_t offset(size_t a, size_t b, size_t c) const {
-        DCheck(m_shape.size() == 3, "");
-        DCheck(a < m_shape[0], "");
-        DCheck(b < m_shape[1], "");
-        DCheck(c < m_shape[2], "");
-        return (a * m_shape[1] + b) * m_shape[2] + c;
+        DCheck(ndims() == 3, "");
+        DCheck(a < dim(0), "");
+        DCheck(b < dim(1), "");
+        DCheck(c < dim(2), "");
+        return (a * dim(1) + b) * dim(2) + c;
     }
     size_t offset(size_t a, size_t b, size_t c, size_t d) const {
-        DCheck(m_shape.size() == 4, "");
-        DCheck(a < m_shape[0], "");
-        DCheck(b < m_shape[1], "");
-        DCheck(c < m_shape[2], "");
-        DCheck(d < m_shape[3], "");
-        return ((a * m_shape[1] + b) * m_shape[2] + c) * m_shape[3] + d;
+        DCheck(ndims() == 4, "");
+        DCheck(a < dim(0), "");
+        DCheck(b < dim(1), "");
+        DCheck(c < dim(2), "");
+        DCheck(d < dim(3), "");
+        return ((a * dim(1) + b) * dim(2) + c) * dim(3) + d;
     }
 
     const T& operator()(dim4 index) const { return operator[](offset(index)); }
 
     // sub-tensor for the fixed value of the first dimension
     Tensor slice(size_t a) {
-        DCheck(m_shape.size() > 0, "");
-        DCheck(a < m_shape[0], "");
+        DCheck(ndims() > 0, "");
+        DCheck(a < dim(0), "");
         size_t v = m_shape.pop_front().elements();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
 
     const Tensor slice(size_t a) const {
-        DCheck(m_shape.size() > 0, "");
-        DCheck(a < m_shape[0], "");
+        DCheck(ndims() > 0, "");
+        DCheck(a < dim(0), "");
         size_t v = m_shape.pop_front().elements();
         return Tensor(m_data + a * v, m_shape.pop_front());
     }
@@ -183,7 +198,7 @@ class Tensor {
     }
 
     bool operator==(const Tensor& o) const {
-        return m_shape == o.m_shape && std::equal(m_data, m_data + size(), o.m_data);
+        return m_shape == o.m_shape && std::equal(m_data, m_data + elements(), o.m_data);
     }
     bool operator!=(const Tensor& o) const { return !operator==(o); }
 
@@ -196,7 +211,7 @@ class Tensor {
     operator string() const {
         string s;
         s += '[';
-        for (size_t i = 0; i < size(); i++) {
+        for (size_t i = 0; i < elements(); i++) {
             if (i > 0) s += ' ';
             format_s(s, "%s", m_data[i]);
         }
@@ -236,14 +251,14 @@ class VTensor : public Tensor<T> {
     VTensor& operator=(const Tensor<T> o) {
         if (this == &o) return *this;
         Tensor<T>::m_shape = o.shape();
-        m_vector.resize(o.size());
+        m_vector.resize(o.elements());
         Tensor<T>::m_data = m_vector.data();
         // TODO not safe if strides are added to Tensor
-        std::copy(o.data(), o.data() + o.size(), m_vector.data());
+        std::copy(o.data(), o.data() + o.elements(), m_vector.data());
         return *this;
     }
 
-    auto size() const { return m_vector.size(); }
+    auto elements() const { return m_vector.size(); }
 
     void reshape(dim4 new_shape, T init = T()) {
         Tensor<T>::m_shape = new_shape;

@@ -33,6 +33,10 @@ class Model {
 
     Metrics Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 
+    void SetBatchSize(uint batch) {
+        for (auto p : m_nodes) p->SetBatchSize(batch);
+    }
+
    private:
     vector<PDiff> m_nodes;
     vector<Diff*> m_forward_nodes, m_backward_nodes, m_end_epoch_nodes;

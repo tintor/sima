@@ -4,8 +4,8 @@
 #include <catch.hpp>
 
 TEST_CASE("diff: minimize circle", "[diff]") {
-    auto x = Param({1}) << "x";
-    auto y = Param({1}) << "y";
+    auto x = Param({}) << "x";
+    auto y = Param({}) << "y";
     x->v[0] = 3.14f;
     y->v[0] = 2.16f;
     Minimize(Sqr(x) + Sqr(y), 0.1, 70);
@@ -59,7 +59,7 @@ void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff 
 }
 
 TEST_CASE("diff: minimize binary cross entropy", "[diff]") {
-    auto x = Param({1}) << "x";
+    auto x = Param({}) << "x";
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
     auto loss = BinaryCrossEntropy<true>(ref, b);
@@ -87,8 +87,8 @@ TEST_CASE("diff: minimize binary cross entropy", "[diff]") {
 TEST_CASE("diff: minimize booth", "[diff]") {
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto x = Param({1}, init) << "x";
-    auto y = Param({1}, init) << "y";
+    auto x = Param({}, init) << "x";
+    auto y = Param({}, init) << "y";
     Minimize(Sqr(x + 2 * y - 7) + Sqr(2 * x + y - 5), 0.01, 1000);
 
     REQUIRE(abs(x->v[0] - 1) <= 2e-5);
@@ -98,8 +98,8 @@ TEST_CASE("diff: minimize booth", "[diff]") {
 TEST_CASE("diff: minimize rastrigin", "[diff]") {
     std::mt19937_64 random(1);
     auto init = make_shared<NormalInit>(1, random);
-    auto x = Param({1}, init) << "x";
-    auto y = Param({1}, init) << "y";
+    auto x = Param({}, init) << "x";
+    auto y = Param({}, init) << "y";
     Minimize(20 + (x * x - 10 * Cos(2 * PI * x)) + (y * y - 10 * Cos(2 * PI * y)), 0.01, 2000);
 
     // REQUIRE(abs(x->v[0]) < 1e-5);
@@ -127,18 +127,17 @@ TEST_CASE("diff: minimize rastrigin", "[diff]") {
 TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     constexpr bool D3 = false;
     parallel(5, [&](size_t seed) {
-        const int Batch = 24;
-        auto x = Data({Batch, 1}) << "x";
-        auto y = Data({Batch, 1}) << "y";
-        auto z = Data({Batch, 1}) << "y";
-        auto ref = Data({Batch, 1}) << "ref";
+        auto x = Data({}) << "x";
+        auto y = Data({}) << "y";
+        auto z = Data({}) << "y";
+        auto ref = Data({}) << "ref";
 
         std::mt19937_64 random(seed);
         auto init = make_shared<NormalInit>(1 / sqrt(2), random);
-        auto a = Param({1}, init) << "a";
-        auto b = Param({1}, init) << "b";
-        auto c = Param({1}) << "d";
-        auto d = D3 ? Param({1}, init) << "c" : nullptr;
+        auto a = Param({}, init) << "a";
+        auto b = Param({}, init) << "b";
+        auto c = Param({}) << "d";
+        auto d = D3 ? Param({}, init) << "c" : nullptr;
 
         auto fc = x * a + y * b + c;
         if (D3) fc = fc + z * d;
@@ -147,6 +146,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
         auto accuracy = BinaryAccuracy(ref, out);
 
         Model model({loss, accuracy});
+        model.SetBatchSize(24);
         model.optimizer = make_shared<Adam>();
         model.optimizer->alpha = 0.1;
 
@@ -156,10 +156,10 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
         const int Classes = D3 ? 3 : 2;
         const int SamplesPerClass = 20000 - 8;
         const int Samples = Classes * SamplesPerClass;
-        vtensor data_x({Samples, 1}, 0);
-        vtensor data_y({Samples, 1}, 0);
-        vtensor data_z({Samples, 1}, 0);
-        vtensor data_r({Samples, 1}, 0);
+        vtensor data_x({Samples}, 0);
+        vtensor data_y({Samples}, 0);
+        vtensor data_z({Samples}, 0);
+        vtensor data_r({Samples}, 0);
         int count[2] = {0, 0};
         int index = 0;
         while (index < Samples) {
@@ -192,17 +192,17 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
 }
 
 PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
-    auto a = Param({1}, init) << "a";
-    auto b = Param({1}, init) << "b";
-    auto c = Param({1}) << "c";
+    auto a = Param({}, init) << "a";
+    auto b = Param({}, init) << "b";
+    auto c = Param({}) << "c";
     return Logistic(x * a + y * b + c, 15);
 }
 
 PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
-    auto a = Param({1}, init) << "a";
-    auto b = Param({1}, init) << "b";
-    auto c = Param({1}, init) << "c";
-    auto d = Param({1}) << "d";
+    auto a = Param({}, init) << "a";
+    auto b = Param({}, init) << "b";
+    auto c = Param({}, init) << "c";
+    auto d = Param({}) << "d";
     return Logistic(x * a + y * b + z * c + d, 15);
 }
 
@@ -217,10 +217,9 @@ PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
 // B512 -> 6.9s 95.28%
 TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
     parallel(5, [&](size_t seed) {
-        const int Batch = 24;
-        auto x = Data({Batch, 1}) << "x";
-        auto y = Data({Batch, 1}) << "y";
-        auto ref = Data({Batch, 1}) << "ref";
+        auto x = Data({}) << "x";
+        auto y = Data({}) << "y";
+        auto ref = Data({}) << "ref";
 
         std::mt19937_64 random(seed);
         auto init = make_shared<NormalInit>(1, random);
@@ -232,6 +231,7 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
         auto loss = MeanSquareError(ref, out) << "loss";
         auto accuracy = BinaryAccuracy(ref, out);
         Model model({loss, accuracy});
+        model.SetBatchSize(24);
         model.optimizer->alpha = 0.1;
 
         // dataset
@@ -239,9 +239,9 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
         const int Classes = 2;
         const int SamplesPerClass = 20000 - 8;
         const int Samples = Classes * SamplesPerClass;
-        vtensor data_x({Samples, 1}, 0);
-        vtensor data_y({Samples, 1}, 0);
-        vtensor data_r({Samples, 1}, 0);
+        vtensor data_x({Samples}, 0);
+        vtensor data_y({Samples}, 0);
+        vtensor data_r({Samples}, 0);
         int count[2] = {0, 0};
         int index = 0;
         while (index < Samples) {
@@ -269,9 +269,8 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
 TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
     constexpr int N = 2;
     parallel(5, [&](size_t seed) {
-        const int Batch = 24;
-        auto in = Data({Batch, N}) << "in";
-        auto ref = Data({Batch, 1}) << "ref";
+        auto in = Data({N}) << "in";
+        auto ref = Data({}) << "ref";
 
         std::mt19937_64 random(seed);
         auto init = make_shared<NormalInit>(1, random);
@@ -281,6 +280,7 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
         auto accuracy = BinaryAccuracy(ref, out) << "accuracy";
 
         Model model({loss, accuracy});
+        model.SetBatchSize(24);
         model.optimizer = make_shared<Adam>();
         model.optimizer->alpha = 0.1;
 
@@ -294,7 +294,7 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
         const int SamplesPerClass = 20000 - 8;
         const int Samples = Classes * SamplesPerClass;
         vtensor data_in({Samples, N}, 0);
-        vtensor data_ref({Samples, 1}, 0);
+        vtensor data_ref({Samples}, 0);
         int count[2] = {0, 0};
         int index = 0;
         vector<float> d;
@@ -324,9 +324,8 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
 
 TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
     parallel(5, [&](size_t seed) {
-        const int Batch = 24;
-        auto in = Data({Batch, 2}) << "in";
-        auto ref = Data({Batch, 1}) << "ref";
+        auto in = Data({2}) << "in";
+        auto ref = Data({}) << "ref";
 
         std::mt19937_64 random(seed);
         auto init = make_shared<NormalInit>(1, random);
@@ -337,11 +336,12 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
         x = FullyConnected(x, 1, init);
         x = Logistic(x, 15);
 
-        auto out = x << "out";
+        auto out = Reshape(x, {}) << "out";
         auto loss = MeanSquareError(ref, out) << "loss";
         auto accuracy = BinaryAccuracy(ref, out) << "accuracy";
 
         Model model({loss, accuracy});
+        model.SetBatchSize(24);
         model.optimizer->alpha = 0.1;
 
         // dataset
@@ -350,7 +350,7 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
         const int SamplesPerClass = 20000 - 8;
         const int Samples = Classes * SamplesPerClass;
         vtensor data_in({Samples, 2}, 0);
-        vtensor data_ref({Samples, 1}, 0);
+        vtensor data_ref({Samples}, 0);
         int count[2] = {0, 0};
         int index = 0;
         while (index < Samples) {

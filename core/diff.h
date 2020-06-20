@@ -27,6 +27,14 @@ struct Diff {
     virtual void Backward() { has_overload = false; }
     virtual void EndEpoch() { has_overload = false; }
 
+    void SetBatchSize(uint batch) {
+        if (batched()) {
+            const dim4 s = v.shape().set(0, batch, 'b');
+            v.reshape(s);
+            if (g) g.reshape(s);
+        }
+    }
+
     void Reshape(dim4 s) {
         v.reshape(s);
         g.reshape(s);
@@ -37,7 +45,8 @@ struct Diff {
     dim_t dim(uint i) const { return v.shape()[i]; }
     auto shape() const { return v.shape(); }
     auto ndims() const { return v.ndims(); }
-    auto size() const { return v.size(); }
+    auto elements() const { return v.elements(); }
+    bool batched() const { return ndims() > 0 && shape().name(0) == 'b'; }
 
     string name;
     vtensor v, g;
@@ -51,7 +60,7 @@ inline PDiff operator<<(PDiff a, string_view name) {
     return a;
 }
 
-#define EACH(V) for (auto i : range(V.size()))
+#define EACH(V) for (auto i : range(V.elements()))
 
 #define Declare1(Func) \
     inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
@@ -64,7 +73,9 @@ inline PDiff operator<<(PDiff a, string_view name) {
         tensor::type& operator[](size_t i) { return parent->TENSOR[i]; }                   \
         tensor::type operator()(size_t i, size_t j) const { return parent->TENSOR(i, j); } \
         tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); }      \
-        auto size() const { return parent->TENSOR.size(); }                                \
+        auto elements() const { return parent->TENSOR.elements(); }                        \
+        auto dim(uint i) const { return parent->TENSOR.dim(i); }                           \
+        auto ndims() const { return parent->TENSOR.ndims(); }                              \
         const auto& shape() const { return parent->TENSOR.shape(); }                       \
         operator bool() const { return parent->TENSOR; }                                   \
         operator tensor() { return parent->TENSOR; }                                       \
@@ -104,22 +115,21 @@ struct DiffA : public Diff1 {
 
 struct Diff_vv : public Diff2 {
     Diff_vv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape() == b->shape() || (a->ndims() == 1 && b->ndims() == 1 && a->size() == b->size()),
-            format("a:%s b:%s", string(a->shape()), string(b->shape())));
+        Check(a->shape() == b->shape(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Reshape(a->shape());
     }
 };
 
 struct Diff_sv : public Diff2 {
     Diff_sv(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->size() == 1);
+        Check(a->elements() == 1, string(a->shape()));
         Reshape(b->shape());
     }
 };
 
 struct Diff_vs : public Diff2 {
     Diff_vs(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(b->size() == 1);
+        Check(b->elements() == 1, string(b->shape()));
         Reshape(a->shape());
     }
 };
@@ -130,7 +140,7 @@ PDiff Broadcast(PDiff a, dim4 b);
 // Ignores gradients and batches.
 inline PDiff Const(tensor::type c) {
     auto p = make_shared<Diff>();
-    p->v.reshape({1});
+    p->v.reshape({});
     p->v[0] = c;
     return p;
 }
@@ -174,7 +184,6 @@ struct ParamT : public Diff {};
 // Accepts gradients, ignores batches. Learnable parameter, can be saved.
 inline PDiff Param(dim4 shape, shared_ptr<Init> init = nullptr) {
     auto p = make_shared<ParamT>();
-    Check(shape.elements() > 0, "Parameter shape.elements() must be non-zero");
     p->Reshape(shape);
     if (init) EACH(p->v) p->v[i] = init->get();
     return p;
@@ -182,7 +191,6 @@ inline PDiff Param(dim4 shape, shared_ptr<Init> init = nullptr) {
 
 inline PDiff Param(dim4 shape, tensor::type init) {
     auto p = make_shared<ParamT>();
-    Check(shape.elements() > 0, "Parameter shape.elements() must be non-zero");
     p->v.reshape(shape, init);
     p->g.reshape(shape);
     return p;
@@ -192,7 +200,7 @@ inline PDiff Param(dim4 shape, tensor::type init) {
 // Ignores gradients, requires batches.
 inline PDiff Data(dim4 shape) {
     auto p = make_shared<Diff>();
-    p->v.reshape(shape);
+    p->v.reshape(shape.push_front(1, 'b'));
     return p;
 }
 
@@ -391,8 +399,8 @@ struct Add_mv : public Diff2 {
         Reshape(a->shape());
     }
     void Forward() override {
-        for (auto i : range<size_t>(0, va.size(), vb.size())) {
-            for (auto j : range<size_t>(vb.size())) v[i + j] = va[i + j] + vb[j];
+        for (auto i : range<size_t>(0, va.elements(), vb.elements())) {
+            for (auto j : range<size_t>(vb.elements())) v[i + j] = va[i + j] + vb[j];
         }
     }
     void Backward() override {
@@ -403,12 +411,14 @@ struct Add_mv : public Diff2 {
 };
 
 inline PDiff operator+(PDiff a, PDiff b) {
-    if (a->size() == 1 && b->size() == 1) return make_shared<Add_vv>(a, b);
-    if (a->size() == 1) return make_shared<Add_vs>(b, a);
-    if (b->size() == 1) return make_shared<Add_vs>(a, b);
-    if (a->shape() == b->shape() || (a->ndims() == 1 && b->ndims() == 1 && a->size() == b->size())) return make_shared<Add_vv>(a, b);
-    if (a->size() > b->size()) return make_shared<Add_mv>(a, b);
-    return make_shared<Add_mv>(b, a);
+    dim4 as = a->shape(), bs = b->shape();
+    if (a->elements() == 1 && !a->batched()) return make_shared<Add_vs>(b, a);
+    if (b->elements() == 1 && !b->batched()) return make_shared<Add_vs>(a, b);
+    if (a->shape() == b->shape()) return make_shared<Add_vv>(a, b);
+    if (a->ndims() > b->ndims()) return make_shared<Add_mv>(a, b);
+    if (b->ndims() > a->ndims()) return make_shared<Add_mv>(b, a);
+    Fail(format("Incompatible shapes: %s vs %s", string(a->shape()), string(b->shape())));
+    return nullptr;
 }
 
 inline auto operator+(tensor::type a, PDiff b) { return (a == 0) ? b : (b + Const(a)); }
@@ -448,9 +458,8 @@ struct Neg : public DiffA {
 };
 
 inline PDiff operator-(PDiff a, PDiff b) {
-    if (a->size() == 1 && b->size() == 1) return make_shared<Sub_vv>(a, b);
-    if (a->size() == 1) return make_shared<Sub_sv>(a, b);
-    if (b->size() == 1) return make_shared<Sub_vs>(a, b);
+    if (a->elements() == 1 && !a->batched()) return make_shared<Sub_sv>(a, b);
+    if (b->elements() == 1 && !b->batched()) return make_shared<Sub_vs>(a, b);
     return make_shared<Sub_vv>(a, b);
 }
 
@@ -460,7 +469,7 @@ inline PDiff operator-(PDiff a) { return make_shared<Neg>(a); }
 
 struct Mul_vs : public Diff_vs {
     Mul_vs(PDiff a, PDiff b) : Diff_vs(a, b) {
-        Check(b->size() == 1);
+        Check(b->elements() == 1 && !b->batched());
         Reshape(a->shape());
     }
     void Forward() override { EACH(v) v[i] = va[i] * vb[0]; }
@@ -480,9 +489,8 @@ struct Mul_vv : public Diff_vv {
 };
 
 inline PDiff operator*(PDiff a, PDiff b) {
-    if (a->size() == 1 && b->size() == 1) return make_shared<Mul_vv>(a, b);
-    if (a->size() == 1) return make_shared<Mul_vs>(b, a);
-    if (b->size() == 1) return make_shared<Mul_vs>(a, b);
+    if (a->elements() == 1 && !a->batched()) return make_shared<Mul_vs>(b, a);
+    if (b->elements() == 1 && !b->batched()) return make_shared<Mul_vs>(a, b);
     return make_shared<Mul_vv>(a, b);
 }
 
@@ -534,9 +542,8 @@ struct InvT : public DiffA {
 Declare1(Inv);
 
 inline PDiff operator/(PDiff a, PDiff b) {
-    if (a->size() == 1 && b->size() == 1) return make_shared<Div_vv>(a, b);
-    if (a->size() == 1) return make_shared<Div_sv>(a, b);
-    if (b->size() == 1) return make_shared<Mul_vs>(a, Inv(b));
+    if (a->elements() == 1 && !a->batched()) return make_shared<Div_sv>(a, b);
+    if (b->elements() == 1 && !b->batched()) return make_shared<Mul_vs>(a, Inv(b));
     return make_shared<Div_vv>(a, b);
 }
 
@@ -593,22 +600,24 @@ Declare2(Max, MaxT);
 inline auto Max(tensor::type a, PDiff b) { return Max(Broadcast(Const(a), b->shape()), b); }
 inline auto Max(PDiff a, tensor::type b) { return Max(a, Broadcast(Const(b), a->shape())); }
 
+// TODO Concat more than two inputs
+// TODO Concat along given dimension (ie. channel dim)
 struct Concat : public Diff2 {
     Concat(PDiff a, PDiff b) : Diff2(a, b) {
         // TODO generalize for more dimensions
         Check(a->ndims() == 1);
         Check(b->ndims() == 1);
-        Reshape({uint(a->size() + b->size())});
+        Reshape({uint(a->elements() + b->elements())});
     }
 
     void Forward() override {
         EACH(v) v[i] = va[i];
-        EACH(v) v[i + va.size()] = vb[i];
+        EACH(v) v[i + va.elements()] = vb[i];
     }
 
     void Backward() override {
         EACH(ga) ga[i] += g[i];
-        EACH(gb) gb[i] += g[i + va.size()];
+        EACH(gb) gb[i] += g[i + va.elements()];
     }
 };
 
@@ -618,6 +627,7 @@ struct Conv1D : public Diff2 {
     Conv1D(PDiff a, PDiff b, int offset) : Diff2(a, b), offset(offset) {
         Check(a->ndims() == 1);
         Check(b->ndims() == 1);
+        Check(!b->batched());
         Reshape(a->shape());
     }
 
@@ -626,7 +636,7 @@ struct Conv1D : public Diff2 {
             tensor::type sum = 0;
             // TODO check
             size_t begin = (offset > i) ? offset - i : 0;
-            size_t end = min<size_t>(vb.size(), offset - i + va.size());
+            size_t end = min<size_t>(vb.elements(), offset - i + va.elements());
             for (size_t j = begin; j < end; j++) sum += va[i + j - offset] * vb[j];
             v[i] = sum;
         }
@@ -644,6 +654,7 @@ struct Deconv1D : public Diff2 {
 struct MaxPool1D : public Diff1 {
     MaxPool1D(PDiff a) : Diff1(a) {
         Check(a->ndims() == 1);
+        Check(!a->batched());
         const uint m = (a->dim(0) + 1) / 2;
         Reshape({m});
     }
@@ -668,15 +679,19 @@ struct MaxPool2D : public Diff1 {
     void Backward() override;
 };
 
-struct Reshape : public Diff1 {
-    Reshape(PDiff a, dim4 shape) : Diff1(a) {
+struct ReshapeT : public Diff1 {
+    ReshapeT(PDiff a, dim4 shape) : Diff1(a) {
+        if (a->batched()) shape = shape.push_front(a->dim(0), a->shape().name(0));
+        Check(a->elements() == shape.elements());
         v.reshape(shape);
-        Check(a->size() == v.size());
+        if (a->g) g.reshape(shape);
     }
 
     void Forward() override { EACH(v) v[i] = va[i]; }
     void Backward() override { EACH(ga) ga[i] = g[i]; }
 };
+
+inline PDiff Reshape(PDiff a, dim4 shape) { return std::make_shared<ReshapeT>(a, shape); }
 
 // m can be zero, one or more dimensions
 // p and q are exactly one dimension
@@ -691,9 +706,9 @@ struct VecMatMulT : public Diff2 {
     }
 
     void Forward() override {
-        const size_t m = va.shape().elements() / va.shape().back();
-        const size_t q = vb.shape()[0];
-        const size_t p = vb.shape()[1];
+        const size_t m = va.elements() / va.shape().back();
+        const size_t q = vb.dim(0);
+        const size_t p = vb.dim(1);
 
         for (auto im : range(m)) {
             for (auto iq : range(q)) {
@@ -705,9 +720,9 @@ struct VecMatMulT : public Diff2 {
     }
 
     void Backward() override {
-        const size_t m = va.shape().elements() / va.shape().back();
-        const size_t q = vb.shape()[0];
-        const size_t p = vb.shape()[1];
+        const size_t m = va.elements() / va.shape().back();
+        const size_t q = vb.dim(0);
+        const size_t p = vb.dim(1);
 
         if (ga) {
             for (auto im : range(m))
@@ -731,12 +746,23 @@ struct VecMatMulT : public Diff2 {
 Declare2(VecMatMul, VecMatMulT);
 
 struct SumT : public Diff1 {
-    SumT(PDiff a) : Diff1(a) { Reshape({1}); }
+    SumT(PDiff a) : Diff1(a) { Reshape({}); }
     void Forward() override { v[0] = Sum(va); }
     void Backward() override { EACH(ga) ga[i] += g[0]; }
 };
 
 Declare1(Sum);
+
+struct MeanT : public Diff1 {
+    MeanT(PDiff a) : Diff1(a) { Reshape({}); }
+    void Forward() override { v[0] = Sum(va) / a->elements(); }
+    void Backward() override {
+        const tensor::type d = g[0] / a->elements();
+        EACH(ga) ga[i] += d;
+    }
+};
+
+Declare1(Mean);
 
 // TODO Unary horizontal Min and Max!
 
@@ -750,10 +776,10 @@ inline PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverag
 
 // Returns mean of all input values from prev epoch OR 0 if first epoch.
 struct EpochMeanT : public Diff1 {
-    EpochMeanT(PDiff a) : Diff1(a) { v.reshape({1}); }
+    EpochMeanT(PDiff a) : Diff1(a) { v.reshape({}); }
     void Forward() override {
         EACH(va) sum += va[i];
-        count += va.size();
+        count += va.elements();
     }
     void EndEpoch() override {
         v[0] = sum / count;
@@ -771,9 +797,24 @@ inline PDiff EpochMean(PDiff a, float init) {
     return p;
 }
 
-inline PDiff Mean(PDiff a) { return Sum(a) / a->size(); }
+struct MeanSquareErrorT : public Diff2 {
+    MeanSquareErrorT(PDiff a, PDiff b) : Diff2(a, b) {
+        Check(a->shape() == b->shape());
+        Reshape({});
+    }
+    void Forward() override {
+        double s = 0;
+        EACH(va) s += sqr(va[i] - vb[i]);
+        v[0] = s / a->elements();
+    }
+    void Backward() override {
+        const tensor::type d = (2.0 * g[0]) / a->elements();
+        EACH(ga) ga[i] += (va[i] - vb[i]) * d;
+        EACH(gb) gb[i] += (vb[i] - va[i]) * d;
+    }
+};
 
-inline PDiff MeanSquareError(PDiff a, PDiff b) { return Mean(Sqr(a - b)); }
+Declare2(MeanSquareError, MeanSquareErrorT);
 
 template <typename T>
 inline T RelativeError(T a, T b) {
@@ -842,10 +883,11 @@ struct BinaryCrossEntropyT : public Diff2 {
     constexpr static tensor::type eps = 1e-6, one = 1;
 
     BinaryCrossEntropyT(PDiff ref, PDiff out) : Diff2(ref, out) {
-        Check(a->shape() == b->shape());
+        Check(a->batched() == b->batched());
+        Check(a->shape().normalized() == b->shape().normalized(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Check(out->g);
         Check(!ref->g);
-        Reshape({1});
+        Reshape({});
     }
     void Forward() override {
         double s = 0;
@@ -853,7 +895,7 @@ struct BinaryCrossEntropyT : public Diff2 {
             s -= va[i] * std::log(max(eps, vb[i]));
             s -= (one - va[i]) * std::log(max(eps, one - vb[i]));
         }
-        v[0] = s / a->size();
+        v[0] = s / a->elements();
     }
     void Backward() override {
         Check(g[0] == 1);
@@ -861,7 +903,7 @@ struct BinaryCrossEntropyT : public Diff2 {
             // TODO try removing the max
             auto p = va[i] / max(eps, vb[i]) * (eps < vb[i]);
             auto q = (one - va[i]) / max(eps, one - vb[i]) * (eps < one - vb[i]);
-            gb[i] -= (p - q) / a->size();  // not multiplying with g[0] == 1
+            gb[i] -= (p - q) / a->elements();  // not multiplying with g[0] == 1
         }
     }
 };
@@ -879,14 +921,15 @@ inline PDiff BinaryCrossEntropy(PDiff ref, PDiff out) {
 
 struct BinaryAccuracyT : public Diff2 {
     BinaryAccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
-        Check(a->shape() == b->shape());
+        Check(a->batched() == b->batched());
+        Check(a->shape().normalized() == b->shape().normalized(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Check(!ref->g);
-        v.reshape({1});
+        v.reshape({});
     }
     void Forward() override {
         double s = 0;
         EACH(va) s += std::abs(va[i] - vb[i]) < 0.5f;
-        v[0] = s / a->size();
+        v[0] = s / a->elements();
     }
 };
 
@@ -915,10 +958,8 @@ inline PDiff FullyConnectedNB(PDiff a, uint size, shared_ptr<Init> w_init = make
     return VecMatMul(a, w) << "fc";
 }
 
-inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>(), PDiff* w_ptr = nullptr, PDiff* b_ptr = nullptr) {
+inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
     auto w = Param({size, a->shape().back()}, w_init) << "fc_w";
     auto b = Param({size}) << "fc_b";
-    if (w_ptr) *w_ptr = w;
-    if (b_ptr) *b_ptr = b;
     return VecMatMul(a, w) + b << "fc";
 }

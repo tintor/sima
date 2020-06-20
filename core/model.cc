@@ -59,7 +59,7 @@ bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
 auto ComputeIds(cspan<PDiff> nodes) {
     map<Diff*, string> ids;
     for (PDiff p : nodes) {
-        if (IsConst(p) && p->v.size() == 1 && p->name.empty()) {
+        if (IsConst(p) && p->v.elements() == 1 && p->name.empty()) {
             ids.emplace(p.get(), format("%s", p->v[0]));
             continue;
         }
@@ -77,7 +77,7 @@ auto ComputeIds(cspan<PDiff> nodes) {
 }
 
 string Summary(const tensor v) {
-    Aggregates<tensor::type> a(v.data(), v.data() + v.size());
+    Aggregates<tensor::type> a(v.data(), v.data() + v.elements());
     return format("(%s %s %s) %s", a.min, a.mean, a.max, sqrt(a.variance));
 }
 
@@ -87,7 +87,7 @@ void Model::Print() const {
 
     ulong ftotal = 0, btotal = 0, ototal = 0, rtotal = 0;
     for (PDiff p : m_nodes)
-        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
+        if (!(IsConst(p) && p->v.elements() == 1 && p->name.empty())) {
             ftotal += p->forward_ticks;
             btotal += p->backward_ticks;
         }
@@ -96,7 +96,7 @@ void Model::Print() const {
     vector<string> table = {"id|type|inputs|shape|forward|backward|ratio|values|gradients|"};
     string os;
     for (PDiff p : m_nodes)
-        if (!(IsConst(p) && p->v.size() == 1 && p->name.empty())) {
+        if (!(IsConst(p) && p->v.elements() == 1 && p->name.empty())) {
             os.clear();
 
             // id
@@ -128,10 +128,10 @@ void Model::Print() const {
 
             // values
             size_t summary = 6;
-            format_s(os, "%s|", (p->v.size() >= summary) ? Summary(p->v) : string(p->v));
+            format_s(os, "%s|", (p->v.elements() >= summary) ? Summary(p->v) : string(p->v));
 
             // gradients
-            format_s(os, "%s|", (p->g.size() >= summary) ? Summary(p->g) : string(p->g));
+            format_s(os, "%s|", (p->g.elements() >= summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }
@@ -167,6 +167,7 @@ void Model::Print() const {
 
     table << os;
 
+    std::unique_lock lock(g_cout_mutex);
     PrintTable(table, '|', " ", {4, 5, 6});
 }
 
@@ -222,7 +223,7 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
     for (const auto& [key, value] : data) {
         Check(key->dim(0) == B);
         Check(value.dim(0) == N);
-        Check(value.shape().pop_front() == key->shape().pop_front());
+        Check(value.shape().pop_front() == key->shape().pop_front(), format("%s vs %s", string(value.shape()), string(key->shape())));
     }
 
     if (m_samples.size() != N) {

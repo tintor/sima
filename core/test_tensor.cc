@@ -48,7 +48,7 @@ TEST_CASE("dim4 str", "[tensor]") {
     REQUIRE(dim4{2}.str() == "[2]");
     REQUIRE(dim4{1}.str() == "[1]");
     REQUIRE(dim4{}.str() == "[]");
-    REQUIRE(dim4{2, 4, 5, 0, 'B', ' ', 'H'}.str() == "[B2 4 H5]");
+    REQUIRE(dim4{2, 4, 5, 0, 'b', ' ', 'h'}.str() == "[2b 4 5h]");
 }
 
 TEST_CASE("dim4 push_front", "[tensor]") {
@@ -90,7 +90,7 @@ TEST_CASE("tensor", "[tensor]") {
     REQUIRE(!tensor());
     REQUIRE(!tensor(nullptr, dim4()));
 
-    REQUIRE(tensor().size() == 0);
+    REQUIRE(tensor().elements() == 0);
     REQUIRE(tensor() == tensor());
     REQUIRE(tensor(m.data(), {1}) != tensor());
 }
