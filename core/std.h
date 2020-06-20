@@ -101,6 +101,8 @@ overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 constexpr double PI = M_PI;
 constexpr double INF = numeric_limits<double>::infinity();
 
+extern std::mutex g_cout_mutex;
+
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),
                   unsigned line = __builtin_LINE(), const char* function = __builtin_FUNCTION());
 

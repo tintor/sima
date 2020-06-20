@@ -2,7 +2,7 @@
 #include <core/callstack.h>
 #include <mutex>
 
-static std::mutex g_cout_mutex;
+std::mutex g_cout_mutex;
 
 void Check(bool value, string_view message, const char* file, unsigned line, const char* function) {
     if (value) return;
