@@ -3,6 +3,17 @@
 
 #include <algorithm>
 
+inline double env(const char* name, double def) {
+    const char* v = std::getenv(name);
+    return v ? std::atof(v) : def;
+}
+
+template<typename T>
+T RoundUp(T a, T b) {
+    auto m = a % b;
+    return m ? a + b - m : a;
+}
+
 #define LAMBDA(EXPR) \
     (const auto& e) { return EXPR; }
 
