@@ -78,11 +78,16 @@ void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff 
     }
 }
 
-TEST_CASE("diff: minimize binary cross entropy", "[diff]") {
+TEST_CASE("diff: minimize binary cross entropy (grad check)", "[diff]") {
     auto x = Param({}) << "x";
     auto ref = Const(0);
     auto b = Logistic(x) << "b";
-    auto loss = BinaryCrossEntropy<true>(ref, b);
+
+    // grad check BinaryCrossEntropy
+    auto [b0, b1] = GradCmp(b);
+    auto one = Mean(-(ref * Log(Max(1e-6, b0)) + (1 - ref) * Log(Max(1e-6, 1 - b0))));
+    auto two = BinaryCrossEntropy(ref, b1);
+    auto loss = ValueCmp(one, two);
     Model model({loss});
 
     vector<string> table;

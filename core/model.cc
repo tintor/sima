@@ -198,9 +198,6 @@ void Model::Iterate(size_t iterations, PDiff loss) {
 }
 
 bool HasBackward(PDiff p) {
-    // BinaryCrossEntropyT has Check() which fails for empty gradients
-    if (dynamic_cast<BinaryCrossEntropyT*>(p.get())) return true;
-
     Diff::has_overload = true;
     p->Backward();
     return Diff::has_overload;
