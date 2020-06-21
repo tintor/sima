@@ -34,7 +34,7 @@ TEST_CASE("diff: minimize circle", "[diff]") {
     REQUIRE(abs(y->v[0]) < 1e-6);
 }
 
-void Test(string_view name, Model& model, PDiff loss, PDiff x, PDiff ref, PDiff b, vector<string>& table) {
+void Test(string_view name, Model& model, Diff loss, Diff x, Diff ref, Diff b, vector<string>& table) {
     auto row = table.begin();
     if (name == "sgd") format_s(*row, "b|");
     format_s(*row++, "%s|", name);
@@ -201,7 +201,7 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
             data_r[index] = dr;
             index += 1;
         }
-        vector<pair<PDiff, tensor>> dataset;
+        vector<pair<Diff, tensor>> dataset;
         if (D3) dataset = {{x, data_x}, {y, data_y}, {z, data_z}, {ref, data_r}};
         if (!D3) dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
         NormalizeDataset(data_x);
@@ -216,14 +216,14 @@ TEST_CASE("diff: learn perceptron, plane in 2d", "[diff]") {
     });
 }
 
-PDiff Neuron(PDiff x, PDiff y, shared_ptr<Init> init) {
+Diff Neuron(Diff x, Diff y, shared_ptr<Init> init) {
     auto a = Param({}, init) << "a";
     auto b = Param({}, init) << "b";
     auto c = Param({}) << "c";
     return Logistic(x * a + y * b + c, 15);
 }
 
-PDiff Neuron(PDiff x, PDiff y, PDiff z, shared_ptr<Init> init) {
+Diff Neuron(Diff x, Diff y, Diff z, shared_ptr<Init> init) {
     auto a = Param({}, init) << "a";
     auto b = Param({}, init) << "b";
     auto c = Param({}, init) << "c";
@@ -282,7 +282,7 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
             data_r[index] = dr;
             index += 1;
         }
-        vector<pair<PDiff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
+        vector<pair<Diff, tensor>> dataset = {{x, data_x}, {y, data_y}, {ref, data_r}};
 
         // train!
         Metrics metrics;
@@ -337,7 +337,7 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
             data_ref[index] = dr;
             index += 1;
         }
-        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        vector<pair<Diff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
         NormalizeDataset(data_in);
 
         // train!
@@ -396,7 +396,7 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
             data_ref[index] = dr;
             index += 1;
         }
-        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        vector<pair<Diff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
         NormalizeDataset(data_in);
 
         // train!
@@ -466,7 +466,7 @@ TEST_CASE("diff: Polynomial, learn sin(x)", "[diff_x]") {
 
             index += 1;
         }
-        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        vector<pair<Diff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
         NormalizeDataset(data_in);
 
         // train!

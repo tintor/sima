@@ -1,17 +1,17 @@
 #include <core/model.h>
 
-static void DFS(PDiff a, unordered_set<Diff*>& visited, vector<PDiff>& out) {
+static void DFS(Diff a, unordered_set<DiffT*>& visited, vector<Diff>& out) {
     if (a == nullptr || visited.count(a.get())) return;
     visited.insert(a.get());
-    for (PDiff b : a->Inputs())
+    for (Diff b : a->Inputs())
         if (b) DFS(b, visited, out);
     out.push_back(a);
 }
 
-vector<PDiff> TopoSort(const cspan<PDiff> heads) {
-    vector<PDiff> out;
-    unordered_set<Diff*> visited;
-    for (PDiff a : heads) DFS(a, visited, out);
+vector<Diff> TopoSort(const cspan<Diff> heads) {
+    vector<Diff> out;
+    unordered_set<DiffT*> visited;
+    for (Diff a : heads) DFS(a, visited, out);
     return out;
 }
 
@@ -36,7 +36,7 @@ void Model::Forward(bool training) {
     }
 }
 
-void Model::Backward(PDiff loss) {
+void Model::Backward(Diff loss) {
     for (auto p : m_params) {
         Timestamp ts;
         EACH(p->v) p->g[i] = 0;
@@ -63,8 +63,8 @@ void Model::EndEpoch(bool training) {
     for (auto p : m_end_epoch_nodes) p->EndEpoch(training);
 }
 
-bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
-    for (PDiff p : nodes) {
+bool Bounded(cspan<Diff> nodes, const tensor::type limit) {
+    for (Diff p : nodes) {
         for (auto e : p->v)
             if (!std::isfinite(e) || abs(e) > limit) return false;
         for (auto e : p->g)
@@ -73,9 +73,9 @@ bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
     return true;
 }
 
-auto ComputeIds(cspan<PDiff> nodes) {
-    map<Diff*, string> ids;
-    for (PDiff p : nodes) {
+auto ComputeIds(cspan<Diff> nodes) {
+    map<DiffT*, string> ids;
+    for (Diff p : nodes) {
         if (IsConst(p) && p->v.elements() == 1 && p->name.empty()) {
             ids.emplace(p.get(), format("%s", p->v[0]));
             continue;
@@ -103,7 +103,7 @@ void Model::Print() const {
     auto ids = ComputeIds(m_nodes);
 
     ulong ftotal = 0, btotal = 0, ototal = 0, rtotal = 0;
-    for (PDiff p : m_nodes)
+    for (Diff p : m_nodes)
         if (!(IsConst(p) && p->v.elements() == 1 && p->name.empty())) {
             ftotal += p->forward_ticks;
             btotal += p->backward_ticks;
@@ -112,7 +112,7 @@ void Model::Print() const {
 
     vector<string> table = {"id|type|inputs|shape|forward|backward|ratio|values|gradients|"};
     string os;
-    for (PDiff p : m_nodes)
+    for (Diff p : m_nodes)
         if (!(IsConst(p) && p->v.elements() == 1 && p->name.empty())) {
             os.clear();
 
@@ -126,7 +126,7 @@ void Model::Print() const {
             format_s(os, "%s|", type);
 
             // inputs
-            for (PDiff e : p->Inputs())
+            for (Diff e : p->Inputs())
                 if (e) format_s(os, "%s ", ids.at(e.get()));
             os += '|';
 
@@ -188,7 +188,7 @@ void Model::Print() const {
     PrintTable(table, '|', " ", {4, 5, 6});
 }
 
-void Model::Iterate(size_t iterations, PDiff loss) {
+void Model::Iterate(size_t iterations, Diff loss) {
     for (size_t i : range(iterations)) {
         BeginEpoch(true);
         Forward(true);
@@ -197,13 +197,13 @@ void Model::Iterate(size_t iterations, PDiff loss) {
     }
 }
 
-bool HasBackward(PDiff p) {
-    Diff::has_overload = true;
+bool HasBackward(Diff p) {
+    DiffT::has_overload = true;
     p->Backward();
-    return Diff::has_overload;
+    return DiffT::has_overload;
 }
 
-Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
+Model::Model(std::initializer_list<Diff> heads) : m_nodes(TopoSort(heads)) {
     // TODO optimize it here:
     // - remove redundant diffs
     // - replace more expensive diffs with cheaper diffs
@@ -214,39 +214,39 @@ Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
     // - gpu vectorized kernels
     // - cpu multi-core kernels
 
-    for (PDiff p : m_nodes) {
-        Diff::has_overload = true;
+    for (Diff p : m_nodes) {
+        DiffT::has_overload = true;
         p->Forward(false);
-        if (Diff::has_overload) m_forward_nodes.push_back(p.get());
+        if (DiffT::has_overload) m_forward_nodes.push_back(p.get());
     }
 
-    for (PDiff p : m_nodes) {
+    for (Diff p : m_nodes) {
         if (HasBackward(p)) m_backward_nodes.push_back(p.get());
     }
     std::reverse(m_backward_nodes.begin(), m_backward_nodes.end());
 
-    for (PDiff p : m_nodes) {
-        Diff::has_overload = true;
+    for (Diff p : m_nodes) {
+        DiffT::has_overload = true;
         p->BeginEpoch(false);
-        if (Diff::has_overload) m_begin_epoch_nodes.push_back(p.get());
+        if (DiffT::has_overload) m_begin_epoch_nodes.push_back(p.get());
     }
 
-    for (PDiff p : m_nodes) {
-        Diff::has_overload = true;
+    for (Diff p : m_nodes) {
+        DiffT::has_overload = true;
         p->EndEpoch(false);
-        if (Diff::has_overload) m_end_epoch_nodes.push_back(p.get());
+        if (DiffT::has_overload) m_end_epoch_nodes.push_back(p.get());
     }
 
-    for (PDiff p : m_nodes) {
+    for (Diff p : m_nodes) {
         auto param = dynamic_cast<ParamT*>(p.get());
         if (param) m_params.push_back(param);
     }
 }
 
-Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
+Metrics Model::Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
     Check(data.size() > 0);
-    const auto B = data[0].first->dim(0);
-    const auto N = data[0].second.dim(0);
+    const dim_t B = data[0].first->dim(0);
+    const dim_t N = data[0].second.dim(0);
     Check(N % B == 0, format("N %% B must be 0. N:%s B:%s", N, B));
 
     for (const auto& [key, value] : data) {
@@ -267,7 +267,7 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
     ulong f_ticks = 0, b_ticks = 0;
     ulong message_ticks = 0;
 
-    for (Diff* p : m_begin_epoch_nodes) p->BeginEpoch(true);
+    for (DiffT* p : m_begin_epoch_nodes) p->BeginEpoch(true);
 
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
@@ -299,7 +299,7 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
         }
     }
 
-    for (Diff* p : m_end_epoch_nodes) p->EndEpoch(true);
+    for (DiffT* p : m_end_epoch_nodes) p->EndEpoch(true);
 
     if (verbose) {
         for (char& c : msg) c = '\r';

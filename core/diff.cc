@@ -1,11 +1,11 @@
 #include <core/diff.h>
 
-thread_local bool Diff::has_overload;
+thread_local bool DiffT::has_overload;
 
 bool IsBroadcastable(dim4 a, dim4 b) { return a.ndims() != 0 && (a.elements() == 1 /*|| a == b.last(a.size)*/); }
 
 struct BroadcastS : public Diff1 {
-    BroadcastS(PDiff a, dim4 b) : Diff1(a) { Reshape(b); }
+    BroadcastS(Diff a, dim4 b) : Diff1(a) { Reshape(b); }
     void Forward(bool) override { EACH(v) v[i] = va[0]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i];
@@ -13,14 +13,14 @@ struct BroadcastS : public Diff1 {
 };
 
 /*struct BroadcastT : public Diff1 {
-    BroadcastT(PDiff a, dim4 b) : Diff1(a) { Reshape(b); }
+    BroadcastT(Diff a, dim4 b) : Diff1(a) { Reshape(b); }
     void Forward() override { EACH(v) v[i] = va[i % va.size]; }
     void Backward() override {
         if (ga) EACH(g) ga[i % ga.size] += g[i];
     }
 };*/
 
-PDiff Broadcast(PDiff a, dim4 b) {
+Diff Broadcast(Diff a, dim4 b) {
     if (a->shape() == b) return a;
     if (a->elements() == 1) return make_shared<BroadcastS>(a, b);
     // if (a->shape == b.last(a->rank)) return make_shared<BroadcastT>(a, b);
@@ -31,7 +31,7 @@ PDiff Broadcast(PDiff a, dim4 b) {
 // ----------------------
 
 struct Add_vv : public Diff_vv {
-    Add_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    Add_vv(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] + vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -40,7 +40,7 @@ struct Add_vv : public Diff_vv {
 };
 
 struct Add_vs : public Diff_vs {
-    Add_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
+    Add_vs(Diff a, Diff b) : Diff_vs(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] + vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -49,7 +49,7 @@ struct Add_vs : public Diff_vs {
 };
 
 struct Add_mv : public Diff2 {
-    Add_mv(PDiff a, PDiff b) : Diff2(a, b) {
+    Add_mv(Diff a, Diff b) : Diff2(a, b) {
         Check(a->shape().pop_front() == b->shape(),
             format("a:%s b:%s a.pop_front:%s", string(a->shape()), string(b->shape()), string(a->shape().pop_front())));
         Reshape(a->shape());
@@ -66,7 +66,7 @@ struct Add_mv : public Diff2 {
     }
 };
 
-PDiff operator+(PDiff a, PDiff b) {
+Diff operator+(Diff a, Diff b) {
     dim4 as = a->shape(), bs = b->shape();
     if (a->elements() == 1 && !a->batched()) return make_shared<Add_vs>(b, a);
     if (b->elements() == 1 && !b->batched()) return make_shared<Add_vs>(a, b);
@@ -77,13 +77,13 @@ PDiff operator+(PDiff a, PDiff b) {
     return nullptr;
 }
 
-PDiff operator+(tensor::type a, PDiff b) { return (a == 0) ? b : (b + Const(a)); }
-PDiff operator+(PDiff a, tensor::type b) { return b + a; }
+Diff operator+(tensor::type a, Diff b) { return (a == 0) ? b : (b + Const(a)); }
+Diff operator+(Diff a, tensor::type b) { return b + a; }
 
 // ----------------------
 
 struct Sub_vv : public Diff_vv {
-    Sub_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    Sub_vv(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] - vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -92,7 +92,7 @@ struct Sub_vv : public Diff_vv {
 };
 
 struct Sub_vs : public Diff_vs {
-    Sub_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
+    Sub_vs(Diff a, Diff b) : Diff_vs(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] - vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i];
@@ -101,7 +101,7 @@ struct Sub_vs : public Diff_vs {
 };
 
 struct Sub_sv : public Diff_sv {
-    Sub_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
+    Sub_sv(Diff a, Diff b) : Diff_sv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[0] - vb[i]; }
     void Backward() override {
         if (ga) ga[0] += Sum(g, ga[0]);
@@ -110,25 +110,25 @@ struct Sub_sv : public Diff_sv {
 };
 
 struct Neg : public DiffA {
-    Neg(PDiff a) : DiffA(a) {}
+    Neg(Diff a) : DiffA(a) {}
     void Forward(bool) override { EACH(v) v[i] = -va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i]; }
 };
 
-PDiff operator-(PDiff a, PDiff b) {
+Diff operator-(Diff a, Diff b) {
     if (a->elements() == 1 && !a->batched()) return make_shared<Sub_sv>(a, b);
     if (b->elements() == 1 && !b->batched()) return make_shared<Sub_vs>(a, b);
     return make_shared<Sub_vv>(a, b);
 }
 
-PDiff operator-(PDiff a) { return make_shared<Neg>(a); }
-PDiff operator-(tensor::type a, PDiff b) { return (a == 0) ? -b : (Const(a) - b); }
-PDiff operator-(PDiff a, tensor::type b) { return (b == 0) ? a : (a - Const(b)); }
+Diff operator-(Diff a) { return make_shared<Neg>(a); }
+Diff operator-(tensor::type a, Diff b) { return (a == 0) ? -b : (Const(a) - b); }
+Diff operator-(Diff a, tensor::type b) { return (b == 0) ? a : (a - Const(b)); }
 
 // ----------------------
 
 struct Mul_vs : public Diff_vs {
-    Mul_vs(PDiff a, PDiff b) : Diff_vs(a, b) {
+    Mul_vs(Diff a, Diff b) : Diff_vs(a, b) {
         Check(b->elements() == 1 && !b->batched());
         Reshape(a->shape());
     }
@@ -140,7 +140,7 @@ struct Mul_vs : public Diff_vs {
 };
 
 struct Mul_vv : public Diff_vv {
-    Mul_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    Mul_vv(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] * vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] * vb[i];
@@ -149,7 +149,7 @@ struct Mul_vv : public Diff_vv {
 };
 
 struct Mul_mv : public Diff2 {
-    Mul_mv(PDiff a, PDiff b) : Diff2(a, b) {
+    Mul_mv(Diff a, Diff b) : Diff2(a, b) {
         Check(a->shape().pop_front() == b->shape(),
             format("a:%s b:%s a.pop_front:%s", string(a->shape()), string(b->shape()), string(a->shape().pop_front())));
         Reshape(a->shape());
@@ -179,7 +179,7 @@ struct Mul_mv : public Diff2 {
     }
 };
 
-PDiff operator*(PDiff a, PDiff b) {
+Diff operator*(Diff a, Diff b) {
     if (a->elements() == 1 && !a->batched()) return make_shared<Mul_vs>(b, a);
     if (b->elements() == 1 && !b->batched()) return make_shared<Mul_vs>(a, b);
     if (a->shape() == b->shape()) return make_shared<Mul_vv>(a, b);
@@ -189,13 +189,13 @@ PDiff operator*(PDiff a, PDiff b) {
     return nullptr;
 }
 
-PDiff operator*(tensor::type a, PDiff b) {
+Diff operator*(tensor::type a, Diff b) {
     if (a == 1) return b;
     if (a == 0) return Const(b->shape(), 0);
     return b * Const(a);
 }
 
-PDiff operator*(PDiff a, tensor::type b) {
+Diff operator*(Diff a, tensor::type b) {
     if (b == 1) return a;
     if (b == 0) return Const(a->shape(), 0);
     return a * Const(b);
@@ -204,7 +204,7 @@ PDiff operator*(PDiff a, tensor::type b) {
 // ----------------------
 
 struct Div_vv : public Diff_vv {
-    Div_vv(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    Div_vv(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] / vb[i]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[i];
@@ -213,7 +213,7 @@ struct Div_vv : public Diff_vv {
 };
 
 struct Div_vs : public Diff_vs {
-    Div_vs(PDiff a, PDiff b) : Diff_vs(a, b) {}
+    Div_vs(Diff a, Diff b) : Diff_vs(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[i] / vb[0]; }
     void Backward() override {
         EACH(ga) ga[i] += g[i] / vb[0];
@@ -222,7 +222,7 @@ struct Div_vs : public Diff_vs {
 };
 
 struct Div_sv : public Diff_sv {
-    Div_sv(PDiff a, PDiff b) : Diff_sv(a, b) {}
+    Div_sv(Diff a, Diff b) : Diff_sv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = va[0] / vb[i]; }
     void Backward() override {
         if (ga) EACH(g) ga[0] += g[i] / vb[i];
@@ -231,26 +231,26 @@ struct Div_sv : public Diff_sv {
 };
 
 struct InvT : public DiffA {
-    InvT(PDiff a) : DiffA(a) {}
+    InvT(Diff a) : DiffA(a) {}
     void Forward(bool) override { EACH(v) v[i] = 1 / va[i]; }
     void Backward() override { EACH(ga) ga[i] -= g[i] * sqr(v[i]); }
 };
 
-PDiff Inv(PDiff a) { return make_shared<InvT>(a); }
+Diff Inv(Diff a) { return make_shared<InvT>(a); }
 
-PDiff operator/(PDiff a, PDiff b) {
+Diff operator/(Diff a, Diff b) {
     if (a->elements() == 1 && !a->batched()) return make_shared<Div_sv>(a, b);
     if (b->elements() == 1 && !b->batched()) return make_shared<Mul_vs>(a, Inv(b));
     return make_shared<Div_vv>(a, b);
 }
 
-PDiff operator/(tensor::type a, PDiff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
-PDiff operator/(PDiff a, tensor::type b) { return a * Const(1 / b); }
+Diff operator/(tensor::type a, Diff b) { return (a == 1) ? Inv(b) : (Const(a) / b); }
+Diff operator/(Diff a, tensor::type b) { return a * Const(1 / b); }
 
 // ----------------------
 
 struct PowT : public Diff2 {
-    PowT(PDiff a, PDiff b) : Diff2(a, b) {
+    PowT(Diff a, Diff b) : Diff2(a, b) {
         Check(a->shape() == b->shape() || (a->elements() == 1 && !a->batched()) || (b->elements() == 1 && !b->batched()));
         Reshape((a->elements() > b->elements()) ? a->shape() : b->shape());
     }
@@ -290,12 +290,12 @@ struct PowT : public Diff2 {
     }
 };
 
-PDiff Pow(PDiff a, PDiff b) { return make_shared<PowT>(a, b); }
+Diff Pow(Diff a, Diff b) { return make_shared<PowT>(a, b); }
 
 // ----------------------
 
 struct MinT : public Diff_vv {
-    MinT(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    MinT(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = min(va[i], vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] < vb[i]) * g[i];
@@ -303,10 +303,10 @@ struct MinT : public Diff_vv {
     }
 };
 
-PDiff Min(PDiff a, PDiff b) { return make_shared<MinT>(a, b); }
+Diff Min(Diff a, Diff b) { return make_shared<MinT>(a, b); }
 
 struct MaxT : public Diff_vv {
-    MaxT(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    MaxT(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override { EACH(v) v[i] = max(va[i], vb[i]); }
     void Backward() override {
         EACH(ga) ga[i] += (va[i] > vb[i]) * g[i];
@@ -314,14 +314,14 @@ struct MaxT : public Diff_vv {
     }
 };
 
-PDiff Max(PDiff a, PDiff b) { return make_shared<MaxT>(a, b); }
+Diff Max(Diff a, Diff b) { return make_shared<MaxT>(a, b); }
 
 // ----------------------
 
 // TODO Concat more than two inputs
 // TODO Concat along given dimension (ie. channel dim)
 struct ConcatT : public Diff2 {
-    ConcatT(PDiff a, PDiff b) : Diff2(a, b) {
+    ConcatT(Diff a, Diff b) : Diff2(a, b) {
         // TODO generalize for more dimensions
         Check(a->ndims() == 1);
         Check(b->ndims() == 1);
@@ -339,12 +339,12 @@ struct ConcatT : public Diff2 {
     }
 };
 
-PDiff Concat(PDiff a, PDiff b) { return make_shared<ConcatT>(a, b); }
+Diff Concat(Diff a, Diff b) { return make_shared<ConcatT>(a, b); }
 
 // ----------------------
 
 struct ReshapeT : public Diff1 {
-    ReshapeT(PDiff a, dim4 shape) : Diff1(a) {
+    ReshapeT(Diff a, dim4 shape) : Diff1(a) {
         if (a->batched()) shape = shape.push_front(a->dim(0), a->shape().name(0));
         Check(a->elements() == shape.elements());
         v.reshape(shape);
@@ -355,7 +355,7 @@ struct ReshapeT : public Diff1 {
     void Backward() override { EACH(ga) ga[i] = g[i]; }
 };
 
-PDiff Reshape(PDiff a, dim4 shape) { return make_shared<ReshapeT>(a, shape); }
+Diff Reshape(Diff a, dim4 shape) { return make_shared<ReshapeT>(a, shape); }
 
 // ----------------------
 
@@ -363,7 +363,7 @@ PDiff Reshape(PDiff a, dim4 shape) { return make_shared<ReshapeT>(a, shape); }
 // p and q are exactly one dimension
 // v{m,p} x m{q,p} -> {m,q}
 struct VecMatMulT : public Diff2 {
-    VecMatMulT(PDiff a, PDiff b) : Diff2(a, b) {
+    VecMatMulT(Diff a, Diff b) : Diff2(a, b) {
         dim4 as = a->shape(), bs = b->shape();
         Check(as.ndims() > 0);
         Check(bs.ndims() == 2, format("a:%s b:%s", as, bs));
@@ -409,20 +409,20 @@ struct VecMatMulT : public Diff2 {
     }
 };
 
-PDiff VecMatMul(PDiff a, PDiff b) { return make_shared<VecMatMulT>(a, b); }
+Diff VecMatMul(Diff a, Diff b) { return make_shared<VecMatMulT>(a, b); }
 
 // ----------------------
 
 struct SumT : public Diff1 {
-    SumT(PDiff a) : Diff1(a) { Reshape({}); }
+    SumT(Diff a) : Diff1(a) { Reshape({}); }
     void Forward(bool) override { v[0] = Sum(va); }
     void Backward() override { EACH(ga) ga[i] += g[0]; }
 };
 
-PDiff Sum(PDiff a) { return make_shared<SumT>(a); }
+Diff Sum(Diff a) { return make_shared<SumT>(a); }
 
 struct MeanT : public Diff1 {
-    MeanT(PDiff a) : Diff1(a) { Reshape({}); }
+    MeanT(Diff a) : Diff1(a) { Reshape({}); }
     void Forward(bool) override { v[0] = Sum(va) / a->elements(); }
     void Backward() override {
         const tensor::type d = g[0] / a->elements();
@@ -430,10 +430,10 @@ struct MeanT : public Diff1 {
     }
 };
 
-PDiff Mean(PDiff a) { return make_shared<MeanT>(a); }
+Diff Mean(Diff a) { return make_shared<MeanT>(a); }
 
 struct StdevT : public Diff2 {
-    StdevT(PDiff a, PDiff b, tensor::type k) : Diff2(a, b), k(k) {
+    StdevT(Diff a, Diff b, tensor::type k) : Diff2(a, b), k(k) {
         Check(b->elements() == 1 && !b->batched());
         Reshape({});
     }
@@ -449,12 +449,12 @@ struct StdevT : public Diff2 {
     tensor::type k;
 };
 
-PDiff Stdev(PDiff a, PDiff mean_a, tensor::type k) { return make_shared<StdevT>(a, mean_a, k); }
+Diff Stdev(Diff a, Diff mean_a, tensor::type k) { return make_shared<StdevT>(a, mean_a, k); }
 
 // ----------------------
 
 struct Conv1D : public Diff2 {
-    Conv1D(PDiff a, PDiff b, int offset) : Diff2(a, b), offset(offset) {
+    Conv1D(Diff a, Diff b, int offset) : Diff2(a, b), offset(offset) {
         Check(a->ndims() == 1);
         Check(b->ndims() == 1);
         Check(!b->batched());
@@ -478,13 +478,13 @@ struct Conv1D : public Diff2 {
 };
 
 struct Deconv1D : public Diff2 {
-    Deconv1D(PDiff a, PDiff b) : Diff2(a, b) {}
+    Deconv1D(Diff a, Diff b) : Diff2(a, b) {}
 };
 
 // ------------------------
 
 struct MaxPool1D : public Diff1 {
-    MaxPool1D(PDiff a) : Diff1(a) {
+    MaxPool1D(Diff a) : Diff1(a) {
         Check(a->ndims() == 1);
         Check(!a->batched());
         const uint m = (a->dim(0) + 1) / 2;
@@ -506,12 +506,12 @@ struct MaxPool1D : public Diff1 {
 };
 
 struct MaxPool2D : public Diff1 {
-    MaxPool2D(PDiff a);
+    MaxPool2D(Diff a);
     void Forward(bool) override;
     void Backward() override;
 };
 
-MaxPool2D::MaxPool2D(PDiff a) : Diff1(a) {
+MaxPool2D::MaxPool2D(Diff a) : Diff1(a) {
     Check(a->ndims() == 2);
     const uint m = (a->dim(0) + 1) / 2;
     const uint n = (a->dim(1) + 1) / 2;
@@ -549,16 +549,16 @@ void MaxPool2D::Backward() {
 // ------------------------
 
 struct RunningAverageT : public Diff1 {
-    RunningAverageT(PDiff a, float k) : Diff1(a), k(k) { v.reshape(a->shape()); }
+    RunningAverageT(Diff a, float k) : Diff1(a), k(k) { v.reshape(a->shape()); }
     void Forward(bool) override { EACH(v) v[i] = v[i] * (1 - k) + va[i] * k; }
     tensor::type k;
 };
 
-PDiff RunningAverage(PDiff a, float k) { return make_shared<RunningAverageT>(a, k); }
+Diff RunningAverage(Diff a, float k) { return make_shared<RunningAverageT>(a, k); }
 
 // Returns mean of all input values from prev epoch OR 0 if first epoch.
 struct EpochMeanT : public Diff1 {
-    EpochMeanT(PDiff a) : Diff1(a) { v.reshape({}); }
+    EpochMeanT(Diff a) : Diff1(a) { v.reshape({}); }
     void Forward(bool) override {
         EACH(va) sum += va[i];
         count += va.elements();
@@ -573,14 +573,14 @@ struct EpochMeanT : public Diff1 {
     uint count = 0;
 };
 
-PDiff EpochMean(PDiff a, float init) {
+Diff EpochMean(Diff a, float init) {
     auto p = make_shared<EpochMeanT>(a);
     p->v[0] = init;
     return p;
 }
 
 struct MeanSquareErrorT : public Diff2 {
-    MeanSquareErrorT(PDiff a, PDiff b) : Diff2(a, b) {
+    MeanSquareErrorT(Diff a, Diff b) : Diff2(a, b) {
         Check(a->shape() == b->shape(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Reshape({});
     }
@@ -596,7 +596,7 @@ struct MeanSquareErrorT : public Diff2 {
     }
 };
 
-PDiff MeanSquareError(PDiff a, PDiff b) { return make_shared<MeanSquareErrorT>(a, b); }
+Diff MeanSquareError(Diff a, Diff b) { return make_shared<MeanSquareErrorT>(a, b); }
 
 // ------------------------
 
@@ -622,7 +622,7 @@ inline void CheckEqualFP(T a, T b) {
 }
 
 struct ValueCmpT : public Diff_vv {
-    ValueCmpT(PDiff a, PDiff b) : Diff_vv(a, b) {}
+    ValueCmpT(Diff a, Diff b) : Diff_vv(a, b) {}
     void Forward(bool) override {
         EACH(v) {
             v[i] = va[i];
@@ -635,10 +635,10 @@ struct ValueCmpT : public Diff_vv {
     }
 };
 
-PDiff ValueCmp(PDiff a, PDiff b) { return make_shared<ValueCmpT>(a, b); }
+Diff ValueCmp(Diff a, Diff b) { return make_shared<ValueCmpT>(a, b); }
 
 struct GradCmpT : public DiffA {
-    GradCmpT(PDiff a) : DiffA(a) {}
+    GradCmpT(Diff a) : DiffA(a) {}
     void Forward(bool) override { EACH(v) v[i] = va[i]; }
     void Backward() override {
         if (++counter != other->counter) return;
@@ -653,7 +653,7 @@ struct GradCmpT : public DiffA {
     GradCmpT* other;  // can't use shared_ptr because cyclic references
 };
 
-pair<PDiff, PDiff> GradCmp(PDiff a) {
+pair<Diff, Diff> GradCmp(Diff a) {
     auto p = make_shared<GradCmpT>(a);
     auto q = make_shared<GradCmpT>(a);
     p->other = q.get();
@@ -669,7 +669,7 @@ pair<PDiff, PDiff> GradCmp(PDiff a) {
 struct BinaryCrossEntropyT : public Diff2 {
     constexpr static tensor::type eps = 1e-6, one = 1;
 
-    BinaryCrossEntropyT(PDiff ref, PDiff out) : Diff2(ref, out) {
+    BinaryCrossEntropyT(Diff ref, Diff out) : Diff2(ref, out) {
         Check(a->batched() == b->batched());
         Check(a->shape().normalized() == b->shape().normalized(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Check(out->g);
@@ -695,10 +695,10 @@ struct BinaryCrossEntropyT : public Diff2 {
     }
 };
 
-PDiff BinaryCrossEntropy(PDiff ref, PDiff out) { return make_shared<BinaryCrossEntropyT>(ref, out); }
+Diff BinaryCrossEntropy(Diff ref, Diff out) { return make_shared<BinaryCrossEntropyT>(ref, out); }
 
 struct BinaryAccuracyT : public Diff2 {
-    BinaryAccuracyT(PDiff ref, PDiff out) : Diff2(ref, out) {
+    BinaryAccuracyT(Diff ref, Diff out) : Diff2(ref, out) {
         Check(a->batched() == b->batched());
         Check(a->shape().normalized() == b->shape().normalized(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Check(!ref->g);
@@ -711,12 +711,12 @@ struct BinaryAccuracyT : public Diff2 {
     }
 };
 
-PDiff BinaryAccuracy(PDiff ref, PDiff out) { return make_shared<BinaryAccuracyT>(ref, out); }
+Diff BinaryAccuracy(Diff ref, Diff out) { return make_shared<BinaryAccuracyT>(ref, out); }
 
 // ---------------------------
 
 struct TrainEpochAverageT : public DiffA {
-    TrainEpochAverageT(PDiff a) : DiffA(a) { s.reshape(a->shape()); }
+    TrainEpochAverageT(Diff a) : DiffA(a) { s.reshape(a->shape()); }
     void BeginEpoch(bool training) override {
         if (training) {
             EACH(s) s[i] = 0;
@@ -748,7 +748,7 @@ struct TrainEpochAverageT : public DiffA {
 
 Declare1(TrainEpochAverage);
 
-PDiff BatchNorm(PDiff a, tensor::type k) {
+Diff BatchNorm(Diff a, tensor::type k) {
     auto mean = Mean(a) << "bn_mean";
     auto stdev = Stdev(a, mean, k) << "bn_stdev";
 
@@ -767,7 +767,7 @@ PDiff BatchNorm(PDiff a, tensor::type k) {
 }
 
 struct KroneckerT : public Diff1 {
-    KroneckerT(PDiff a) : Diff1(a) {
+    KroneckerT(Diff a) : Diff1(a) {
         Check(a->ndims() == 2 && a->batched(), string(a->shape()));
         Reshape(a->shape().push_back(a->shape().back()));
     }
@@ -786,7 +786,7 @@ struct KroneckerT : public Diff1 {
     }
 };
 
-PDiff Kronecker(PDiff a) { return make_shared<KroneckerT>(a); }
+Diff Kronecker(Diff a) { return make_shared<KroneckerT>(a); }
 
 float ComputePolynomial(float x, cspan<float> poly) {
     if (poly.size() == 0) return 0;
@@ -811,7 +811,7 @@ float ComputePolynomialDeriv(float x, cspan<float> poly) {
 }
 
 struct PolynomialT : public Diff2 {
-    PolynomialT(PDiff a, uint degree, uint channels, shared_ptr<Init> init) : Diff2(a, Param({channels, degree + 1}, init)) {
+    PolynomialT(Diff a, uint degree, uint channels, shared_ptr<Init> init) : Diff2(a, Param({channels, degree + 1}, init)) {
         Check(a->ndims() == 2 && a->batched(), string(a->shape()));
         Check(degree >= 1);
         Reshape(a->shape().push_back(channels, 'c'));
@@ -847,4 +847,4 @@ struct PolynomialT : public Diff2 {
     }
 };
 
-PDiff Polynomial(PDiff a, uint degree, uint channels, shared_ptr<Init> init) { return make_shared<PolynomialT>(a, degree, channels, init); }
+Diff Polynomial(Diff a, uint degree, uint channels, shared_ptr<Init> init) { return make_shared<PolynomialT>(a, degree, channels, init); }
