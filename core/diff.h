@@ -344,6 +344,48 @@ struct LogT : public DiffA {
 };
 Declare1(Log);
 
+struct PowT : public Diff2 {
+    PowT(PDiff a, PDiff b) : Diff2(a, b) {
+        Check(a->shape() == b->shape() || (a->elements() == 1 && !a->batched()) || (b->elements() == 1 && !b->batched()));
+        Reshape((a->elements() > b->elements()) ? a->shape() : b->shape());
+    }
+    void Forward(bool) override {
+        if (a->elements() == 1) {
+            if (b->elements() == 1) {
+                EACH(v) v[i] = std::pow(va[0], vb[0]);
+            } else {
+                EACH(v) v[i] = std::pow(va[0], vb[i]);
+            }
+        } else {
+            if (b->elements() == 1) {
+                EACH(v) v[i] = std::pow(va[i], vb[0]);
+            } else {
+                EACH(v) v[i] = std::pow(va[i], vb[i]);
+            }
+        }
+    }
+    void Backward() override {
+        if (a->elements() == 1) {
+            if (b->elements() == 1) {
+                if (ga) ga[0] += g[0] * vb[0] * v[0] / va[0];
+                if (gb) gb[0] += g[0] * v[0] * std::log(va[0]);
+            } else {
+                if (ga) EACH(g) ga[0] += g[i] * vb[i] * v[i] / va[0];
+                if (gb) EACH(g) gb[i] += g[i] * v[i] * std::log(va[0]);
+            }
+        } else {
+            if (b->elements() == 1) {
+                if (ga) EACH(g) ga[i] += g[i] * vb[0] * v[i] / va[i];
+                if (gb) EACH(g) gb[0] += g[i] * v[i] * std::log(va[i]);
+            } else {
+                if (ga) EACH(g) ga[i] += g[i] * vb[i] * v[i] / va[i];
+                if (gb) EACH(g) gb[i] += g[i] * v[i] * std::log(va[i]);
+            }
+        }
+    }
+};
+Declare2(Pow, PowT);
+
 struct AbsT : public DiffA {
     AbsT(PDiff a) : DiffA(a) {}
     void Forward(bool) override { EACH(v) v[i] = std::abs(va[i]); }

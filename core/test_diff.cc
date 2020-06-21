@@ -3,6 +3,28 @@
 
 #include <catch.hpp>
 
+#define FOR(i, I) for (auto i : range(I))
+
+TEST_CASE("diff: grad check Pow()", "[diff]") {
+    FOR(c, 4) {
+        auto a = Param((c & 1) ? dim4{3} : dim4{});
+        auto b = Param((c & 2) ? dim4{3} : dim4{});
+        auto [a0, a1] = GradCmp(a);
+        auto [b0, b1] = GradCmp(b);
+        auto p = ValueCmp(Exp(b0 * Log(a0)), Pow(a1, b1));
+        Model model({p});
+
+        std::mt19937_64 random(1);
+        FOR(i, 100000) {
+            std::uniform_real_distribution<double> dis(0.1, 3);
+            EACH(a->v) a->v[i] = dis(random);
+            EACH(b->v) b->v[i] = dis(random);
+            model.Forward(true);
+            model.Backward(p);
+        }
+    }
+}
+
 TEST_CASE("diff: minimize circle", "[diff]") {
     auto x = Param({}) << "x";
     auto y = Param({}) << "y";
