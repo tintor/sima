@@ -1,7 +1,5 @@
 #pragma once
 #include <core/format.h>
-#include <core/property.h>
-#include <core/std.h>
 #include <core/util.h>
 
 using dim_t = uint;
@@ -94,8 +92,8 @@ struct dim4 {
     operator string() const { return str(); }
 
 private:
-    std::array<dim_t, 4> d;
-    std::array<char, 4> n;
+    array<dim_t, 4> d;
+    array<char, 4> n;
 };
 
 // Tensor is a pointer to multi-dimensional array (doesn't own memory)

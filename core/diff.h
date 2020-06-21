@@ -1,6 +1,5 @@
 #pragma once
 #include <core/auto.h>
-#include <core/property.h>
 #include <core/range.h>
 #include <core/std.h>
 #include <core/tensor.h>
@@ -65,49 +64,29 @@ inline PDiff operator<<(PDiff a, string_view name) {
 
 #define Declare1(Func) \
     inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
-#define Declare2(Func, Type) \
-    inline PDiff Func(PDiff a, PDiff b) { return make_shared<Type>(a, b); }
-
-#define TensorProperty(TENSOR, TYPE, PARENT)                                               \
-    TProperty(TYPE, PARENT) {                                                              \
-        tensor::type operator[](size_t i) const { return parent->TENSOR[i]; }              \
-        tensor::type& operator[](size_t i) { return parent->TENSOR[i]; }                   \
-        tensor::type operator()(size_t i, size_t j) const { return parent->TENSOR(i, j); } \
-        tensor::type& operator()(size_t i, size_t j) { return parent->TENSOR(i, j); }      \
-        auto elements() const { return parent->TENSOR.elements(); }                        \
-        auto dim(uint i) const { return parent->TENSOR.dim(i); }                           \
-        auto ndims() const { return parent->TENSOR.ndims(); }                              \
-        const auto& shape() const { return parent->TENSOR.shape(); }                       \
-        operator bool() const { return parent->TENSOR; }                                   \
-        operator tensor() { return parent->TENSOR; }                                       \
-        operator vtensor&() { return parent->TENSOR; }                                     \
-    }
 
 struct Diff1 : public Diff {
-    Diff1(PDiff a) : a(a) {}
+    Diff1(PDiff a) : a(a), va(a->v), ga(a->g) {}
     vector<PDiff> Inputs() override { return {a}; }
     PDiff a;
-
-    TensorProperty(a->v, AV, Diff1) va;
-    TensorProperty(a->g, AG, Diff1) ga;
+    vtensor& va;
+    vtensor& ga;
 };
 
 struct Diff2 : public Diff1 {
-    Diff2(PDiff a, PDiff b) : Diff1(a), b(b) {}
+    Diff2(PDiff a, PDiff b) : Diff1(a), b(b), vb(b->v), gb(b->g) {}
     vector<PDiff> Inputs() override { return {a, b}; }
     PDiff b;
-
-    TensorProperty(b->v, BV, Diff2) vb;
-    TensorProperty(b->g, BG, Diff2) gb;
+    vtensor& vb;
+    vtensor& gb;
 };
 
 struct Diff3 : public Diff2 {
-    Diff3(PDiff a, PDiff b, PDiff c) : Diff2(a, b), c(c) {}
+    Diff3(PDiff a, PDiff b, PDiff c) : Diff2(a, b), c(c), vc(c->v), gc(c->g) {}
     vector<PDiff> Inputs() override { return {a, b, c}; }
     PDiff c;
-
-    TensorProperty(b->v, CV, Diff2) vc;
-    TensorProperty(b->g, CG, Diff2) gc;
+    vtensor& vc;
+    vtensor& gc;
 };
 
 struct DiffA : public Diff1 {
@@ -251,7 +230,7 @@ struct ParametricReluT : public Diff_vv {
         EACH(gb) gb[i] += (va[i] > 0) ? 0 : (g[i] * va[i]);
     }
 };
-Declare2(ParametricRelu, ParametricReluT);
+inline PDiff ParametricRelu(PDiff a, PDiff b) { return make_shared<ParametricReluT>(a, b); }
 
 struct ELUT : public DiffA {
     ELUT(PDiff a, double k) : DiffA(a), k(k) {}
@@ -408,9 +387,9 @@ inline PDiff& operator/=(PDiff& a, tensor::type b) { return a = a / b; }
 #define RELATION(NAME, OP)                                                                            \
     struct NAME : public Diff_vv {                                                                    \
         NAME(PDiff a, PDiff b) : Diff_vv(a, b) {}                                                     \
-        void Forward(bool) override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; }                          \
+        void Forward(bool) override { EACH(v) v[i] = (va[i] OP vb[i]) ? 1 : 0; }                      \
     };                                                                                                \
-    Declare2(operator OP, NAME);                                                                      \
+    inline PDiff operator OP(PDiff a, PDiff b) { return make_shared<NAME>(a, b); }                    \
     inline auto operator OP(tensor::type a, PDiff b) { return Broadcast(Const(a), b->shape()) OP b; } \
     inline auto operator OP(PDiff a, tensor::type b) { return a OP Broadcast(Const(b), a->shape()); }
 
@@ -429,7 +408,7 @@ struct MinT : public Diff_vv {
         EACH(gb) gb[i] += (vb[i] < va[i]) * g[i];
     }
 };
-Declare2(Min, MinT);
+inline PDiff Min(PDiff a, PDiff b) { return make_shared<MinT>(a, b); }
 inline auto Min(tensor::type a, PDiff b) { return Min(Broadcast(Const(a), b->shape()), b); }
 inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->shape())); }
 
@@ -441,7 +420,7 @@ struct MaxT : public Diff_vv {
         EACH(gb) gb[i] += (vb[i] > va[i]) * g[i];
     }
 };
-Declare2(Max, MaxT);
+inline PDiff Max(PDiff a, PDiff b) { return make_shared<MaxT>(a, b); }
 inline auto Max(tensor::type a, PDiff b) { return Max(Broadcast(Const(a), b->shape()), b); }
 inline auto Max(PDiff a, tensor::type b) { return Max(a, Broadcast(Const(b), a->shape())); }
 
