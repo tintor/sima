@@ -144,11 +144,11 @@ void Model::Print() const {
             format_s(os, "%.3f|", 100.0f * ticks / total);
 
             // values
-            size_t summary = 6;
-            format_s(os, "%s|", (p->v.elements() >= summary) ? Summary(p->v) : string(p->v));
+            size_t summary = 8;
+            format_s(os, "%s|", (p->v.elements() > summary) ? Summary(p->v) : string(p->v));
 
             // gradients
-            format_s(os, "%s|", (p->g.elements() >= summary) ? Summary(p->g) : string(p->g));
+            format_s(os, "%s|", (p->g.elements() > summary) ? Summary(p->g) : string(p->g));
 
             table << os;
         }

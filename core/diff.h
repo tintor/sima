@@ -62,7 +62,8 @@ inline PDiff operator<<(PDiff a, string_view name) {
     return a;
 }
 
-#define EACH(V) for (auto i : range(V.elements()))
+#define FOR(i, END) for (auto i : range(END))
+#define EACH(V) FOR(i, V.elements())
 
 #define Declare1(Func) \
     inline PDiff Func(PDiff a) { return make_shared<Func##T>(a); }
@@ -897,7 +898,7 @@ inline PDiff EpochMean(PDiff a, float init) {
 
 struct MeanSquareErrorT : public Diff2 {
     MeanSquareErrorT(PDiff a, PDiff b) : Diff2(a, b) {
-        Check(a->shape() == b->shape());
+        Check(a->shape() == b->shape(), format("%s vs %s", string(a->shape()), string(b->shape())));
         Reshape({});
     }
     void Forward(bool) override {
@@ -1094,11 +1095,17 @@ inline PDiff Bias(PDiff a) {
     return a + Param(s) << "bias";
 }
 
-inline PDiff Affine(PDiff a, uint size, shared_ptr<Init> init) {
-    auto w = Param({size, a->shape().back()}, init);
+inline PDiff Affine(PDiff a, uint channels, shared_ptr<Init> init) {
+    auto w = Param({channels, a->shape().back()}, init);
     return VecMatMul(a, w) << "affine";
 }
 
-inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> init) {
-    return Bias(Affine(a, size, init));
+inline PDiff FullyConnected(PDiff a, uint channels, shared_ptr<Init> init) {
+    return Bias(Affine(a, channels, init));
 }
+
+float ComputePolynomial(float x, cspan<float> poly);
+float ComputePolynomialDeriv(float x, cspan<float> poly);
+
+PDiff Kronecker(PDiff a);
+PDiff Polynomial(PDiff a, uint degree, uint channels, shared_ptr<Init> init);

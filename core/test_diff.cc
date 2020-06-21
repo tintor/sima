@@ -3,8 +3,6 @@
 
 #include <catch.hpp>
 
-#define FOR(i, I) for (auto i : range(I))
-
 TEST_CASE("diff: grad check Pow()", "[diff]") {
     FOR(c, 4) {
         auto a = Param((c & 1) ? dim4{3} : dim4{});
@@ -345,6 +343,9 @@ TEST_CASE("diff: learn FC perceptron, hyperplane", "[diff]") {
     });
 }
 
+// TODO train / test datasets should be fixed an not depend on seed!
+// TODO seed is for weight initialization only!
+// TODO evaluate on separate test set afterwards!
 TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
     parallel(5, [&](size_t seed) {
         auto in = Data({2}) << "in";
@@ -400,6 +401,81 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
         REQUIRE(metrics.at("accuracy") >= 0.9930);
     });
 }
+
+TEST_CASE("diff: ComputePolynomial", "[diff]") {
+    std::vector<float> poly = {0, 1, 0, -1.f/(2*3), 0, 1.f/(2*3*4*5)};
+    for (float x = 0; x <= 1; x += 0.01) {
+        const float e = std::abs(sin(x) - ComputePolynomial(x, poly));
+        REQUIRE(e <= 0.000196f);
+    }
+}
+
+TEST_CASE("diff: ComputePolynomialDeriv", "[diff]") {
+    std::vector<float> poly = {0, 1, 0, -1.f/(2*3), 0, 1.f/(2*3*4*5)};
+    for (float x = 0; x <= 1; x += 0.01) {
+        const float e = std::abs(cos(x) - ComputePolynomialDeriv(x, poly));
+        REQUIRE(e <= 0.00137f);
+    }
+}
+
+// TODO not complete!
+TEST_CASE("diff: Polynomial, learn sin(x)", "[diff_x]") {
+    const int Batch = env("batch", 100);
+    const std::vector<float> poly = {0, 1, 0, -1.f/(2*3), 0, 1.f/(2*3*4*5)};
+    parallel(1, [&](size_t seed) {
+        auto in = Data({1}) << "in";
+        auto ref = Data({1}) << "ref";
+
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(0.1f, random);
+
+        //auto out = Reshape(Polynomial(in, 5, 1, init), {}) << "out";
+        auto x = in;
+        auto out = Param({}, init) << "a";
+        //auto b = Param({}, init) << "b";
+        out += /*b **/ x;
+        out += (Param({}, init) << "c") * x * x;
+        out += (Param({}, init) << "d") * x * x * x;
+        out += (Param({}, init) << "e") * x * x * x * x;
+        out += (Param({}, init) << "f") * x * x * x * x * x;
+        //auto loss = MeanSquareError(ref, out) /*+ Sqr(b - 1)*/ << "loss";
+        auto diff = Abs(ref - out);
+        auto loss = Mean(diff * diff * diff) << "loss";
+        auto mse = MeanSquareError(ref, out) << "mse";
+
+        Model model({loss, mse});
+        model.SetBatchSize(Batch);
+        model.optimizer = std::make_shared<RMSProp>();
+        model.optimizer->alpha = env("alpha", 0.0001);
+
+        // dataset
+        UniformInit gen(-0.5, 0.5, random);
+        const dim_t Samples = RoundUp(20000, Batch);
+        vtensor data_in({Samples, 1}, 0);
+        vtensor data_ref({Samples, 1}, 0);
+        int index = 0;
+        while (index < Samples) {
+            float dx = gen.get();
+            data_in[index] = dx;
+            data_ref[index] = ComputePolynomial(dx, poly);
+
+            index += 1;
+        }
+        vector<pair<PDiff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        NormalizeDataset(data_in);
+
+        // train!
+        Metrics metrics;
+        for (auto i : range(1000)) {
+            metrics = model.Epoch(loss, mse, dataset, random, true, i);
+        }
+        model.Print();
+        //println("loss: %s", metrics.at("loss"));
+        //REQUIRE(metrics.at("loss") >= 0.0);
+    });
+}
+
+// TODO Kronecker learn x*y
 
 // Classification:
 // learn hyper plane in Nd

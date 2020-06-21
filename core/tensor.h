@@ -219,6 +219,7 @@ class Tensor {
         return s;
     }
 
+    operator cspan<T>() const { return {data(), elements()}; }
    protected:
     T* m_data;
     dim4 m_shape;
