@@ -400,27 +400,11 @@ RELATION(LessOrEqual, <=);
 
 #undef RELATION
 
-struct MinT : public Diff_vv {
-    MinT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward(bool) override { EACH(v) v[i] = min(va[i], vb[i]); }
-    void Backward() override {
-        EACH(ga) ga[i] += (va[i] < vb[i]) * g[i];
-        EACH(gb) gb[i] += (vb[i] < va[i]) * g[i];
-    }
-};
-inline PDiff Min(PDiff a, PDiff b) { return make_shared<MinT>(a, b); }
+PDiff Min(PDiff a, PDiff b);
 inline auto Min(tensor::type a, PDiff b) { return Min(Broadcast(Const(a), b->shape()), b); }
 inline auto Min(PDiff a, tensor::type b) { return Min(a, Broadcast(Const(b), a->shape())); }
 
-struct MaxT : public Diff_vv {
-    MaxT(PDiff a, PDiff b) : Diff_vv(a, b) {}
-    void Forward(bool) override { EACH(v) v[i] = max(va[i], vb[i]); }
-    void Backward() override {
-        EACH(ga) ga[i] += (va[i] > vb[i]) * g[i];
-        EACH(gb) gb[i] += (vb[i] > va[i]) * g[i];
-    }
-};
-inline PDiff Max(PDiff a, PDiff b) { return make_shared<MaxT>(a, b); }
+PDiff Max(PDiff a, PDiff b);
 inline auto Max(tensor::type a, PDiff b) { return Max(Broadcast(Const(a), b->shape()), b); }
 inline auto Max(PDiff a, tensor::type b) { return Max(a, Broadcast(Const(b), a->shape())); }
 
