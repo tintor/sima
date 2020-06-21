@@ -417,6 +417,10 @@ Diff Mean(Diff a);
 Diff Stdev(Diff a, Diff mean_a, tensor::type k = 0);
 inline Diff Stdev(Diff a) { return Stdev(a, Mean(a)); }
 
+enum class ConvType { Same, Valid };
+Diff Conv2D(Diff a, ConvType type, Diff b);
+inline Diff Conv2D(Diff a, ConvType type, dim4 b_shape, shared_ptr<Init> init) { return Conv2D(a, type, Param(b_shape, init)); }
+
 // TODO Unary horizontal Min and Max!
 
 Diff RunningAverage(Diff a, float k);

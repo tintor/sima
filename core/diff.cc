@@ -481,6 +481,91 @@ struct Deconv1D : public Diff2 {
     Deconv1D(Diff a, Diff b) : Diff2(a, b) {}
 };
 
+// ----------------------
+
+template<bool valid>
+struct Conv2DT : public Diff2 {
+    static dim_t Valid(dim_t a, dim_t b) {
+        if (!valid) return a;
+        Check(a >= b);
+        return a - b + 1;
+    }
+
+    Conv2DT(Diff a, Diff b) : Diff2(a, b) {
+        const dim_t w = Valid(a->dim(1), b->dim(1));
+        const dim_t h = Valid(a->dim(2), b->dim(2));
+        Reshape({a->dim(0), w, h, b->dim(0), 'b', 'w', 'h', 'c'});
+    }
+    void Forward(bool) override {
+        const dim_t Batch = dim(0);
+        const dim_t W = dim(1);
+        const dim_t H = dim(2);
+        const dim_t C = dim(3);
+
+        const dim_t AW = a->dim(1);
+        const dim_t AH = a->dim(2);
+        const dim_t AC = a->dim(3);
+        const dim_t BW = b->dim(1);
+        const dim_t BH = b->dim(2);
+
+        // TODO optimize order of for loops
+        // TODO slice q and c to reduce amount of inner computation
+        FOR(q, Batch) FOR(x, W) FOR(y, H) FOR(c, C) {
+            tensor::type s = 0;
+            // TODO unroll inner loop for common values of KW KH AC
+            FOR(i, BW) FOR(j, BH) FOR(e, AC) {
+                dim_t xx = valid ? x + i : (x - BW / 2 + i);
+                dim_t yy = valid ? y + j : (y - BH / 2 + j);
+                if (valid || (xx < AW && yy < AH)) s += va(q, xx, yy, e) * vb(c, i, j, e);
+            }
+            v(q, x, y, c) = s;
+        }
+    }
+    void Backward() override {
+        const dim_t Batch = dim(0);
+        const dim_t W = dim(1);
+        const dim_t H = dim(2);
+        const dim_t C = dim(3);
+
+        const dim_t AW = a->dim(1);
+        const dim_t AH = a->dim(2);
+        const dim_t AC = a->dim(3);
+        const dim_t BW = b->dim(1);
+        const dim_t BH = b->dim(2);
+
+        if (ga) {
+            FOR(q, Batch) FOR(x, W) FOR(y, H) FOR(c, C) {
+                FOR(i, BW) FOR(j, BH) FOR(e, AC) {
+                    dim_t xx = valid ? x + i : (x - BW / 2 + i);
+                    dim_t yy = valid ? y + j : (y - BH / 2 + j);
+                    if (valid || (xx < AW && yy < AH)) ga(q, xx, yy, e) += g(q, x, y, c) * vb(c, i, j, e);
+                }
+            }
+        }
+        if (gb) {
+            FOR(q, Batch) FOR(x, W) FOR(y, H) FOR(c, C) {
+                FOR(i, BW) FOR(j, BH) FOR(e, AC) {
+                    dim_t xx = valid ? x + i : (x - BW / 2 + i);
+                    dim_t yy = valid ? y + j : (y - BH / 2 + j);
+                    if (valid || (xx < AW && yy < AH)) gb(c, i, j, e) += va(q, xx, yy, e) * g(q, x, y, c);
+                }
+            }
+        }
+    }
+};
+
+Diff Conv2D(Diff a, ConvType type, Diff b) {
+    Check(a->shape().dims() == "bwhc", format("a: expected 'bwhc', but got '%s'", a->shape().dims()));
+    Check(b->shape().dims() == "iwhc", format("b: expected 'iwhc', but got '%s'", b->shape().dims()));
+    Check(a->dim(3) == b->dim(3));
+    Check(b->dim(1) % 2 == 1);
+    Check(b->dim(2) % 2 == 1);
+    switch (type) {
+        case ConvType::Same: return make_shared<Conv2DT<false>>(a, b);
+        case ConvType::Valid: return make_shared<Conv2DT<true>>(a, b);
+    }
+}
+
 // ------------------------
 
 struct MaxPool1D : public Diff1 {

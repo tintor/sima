@@ -89,6 +89,8 @@ struct dim4 {
         return s;
     }
 
+    string_view dims() const { return string_view(&n[0], ndims()); }
+
     operator string() const { return str(); }
 
 private:

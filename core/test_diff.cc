@@ -480,6 +480,140 @@ TEST_CASE("diff: Polynomial, learn sin(x)", "[diff_x]") {
     });
 }
 
+// TODO move to tensor utils
+#include <opencv2/opencv.hpp>
+
+uchar ToByte(tensor::type a) {
+    int color = std::floor(a * 255);
+    if (color > 255) color = 255;
+    if (color < 0) color = 0;
+    return color;
+}
+
+void WriteColorImage(tensor in, string path) {
+    Check(in.ndims() == 3);
+    Check(in.dim(2) == 3);
+    cv::Mat image = cv::Mat::zeros(in.dim(1), in.dim(0), CV_8UC3);
+    FOR(x, in.dim(0)) FOR(y, in.dim(1)) {
+        auto& pixel = image.at<cv::Vec3b>(y, x);
+        static_assert(sizeof(pixel) == 3);
+        pixel[0] = ToByte(in(x, y, 0));
+        pixel[1] = ToByte(in(x, y, 1));
+        pixel[2] = ToByte(in(x, y, 2));
+    }
+    imwrite(path, image);
+}
+
+void WriteGrayImage(tensor in, string path) {
+    Check(in.ndims() == 3);
+    Check(in.dim(2) == 1);
+    cv::Mat image = cv::Mat::zeros(in.dim(1), in.dim(0), CV_8UC1);
+    FOR(x, in.dim(0)) FOR(y, in.dim(1)) {
+        auto& pixel = image.at<uchar>(y, x);
+        pixel = ToByte(in(x, y, 0));
+    }
+    imwrite(path, image);
+}
+
+vtensor ReadColorImage(string path) {
+    cv::Mat image = cv::imread(path, cv::IMREAD_COLOR);
+    println("rows %s, cols %s", image.rows, image.cols);
+    vtensor out({dim_t(image.cols), dim_t(image.rows), 3, 0, 'w', 'h', 'c'});
+    Check(out.ndims() == 3);
+    Check(out.dim(2) == 3);
+    FOR(x, out.dim(0)) FOR(y, out.dim(1)) {
+        auto& pixel = image.at<cv::Vec3b>(y, x);
+        out(x, y, 0) = double(pixel[0]) / 255;
+        out(x, y, 1) = double(pixel[1]) / 255;
+        out(x, y, 2) = double(pixel[2]) / 255;
+    }
+    return out;
+}
+
+vtensor ReadGrayImage(string path) {
+    cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
+    println("rows %s, cols %s", image.rows, image.cols);
+    vtensor out({dim_t(image.cols), dim_t(image.rows), 1, 0, 'w', 'h', 'c'});
+    FOR(x, out.dim(0)) FOR(y, out.dim(1)) {
+        auto& pixel = image.at<uchar>(y, x);
+        out(x, y, 0) = double(pixel) / 255;
+    }
+    return out;
+}
+
+TEST_CASE("diff: Conv2D, testing forward", "[diff_cf]") {
+    vtensor image = ReadGrayImage("/Users/marko/Desktop/landscape.png");
+    image.reshape(image.shape().push_front(1, 'b'));
+    auto a = Param(image.shape());
+    std::swap(a->v, image);
+    auto k = Param({1, 3, 3, 1, 'i', 'w', 'h', 'c'});
+    FOR(x, 3) FOR(y, 3) k->v(0, x, y, 0) = int(x) - 1;
+    auto conv = Conv2D(a, ConvType::Same, k);
+    conv->Forward(true);
+    WriteGrayImage(conv->v.slice(0), "/Users/marko/Desktop/landscape_conv.png");
+}
+
+TEST_CASE("diff: Conv2D, find dots", "[diff_c]") {
+    const int Batch = env("batch", 10);
+    parallel(env("nets", 5), [&](size_t seed) {
+        const dim_t N = env("n", 16);
+        const dim4 s(N, N, 1, 0, 'w', 'h', 'c');
+        auto in = Data(s) << "in";
+        auto ref = Data(s) << "ref";
+
+        std::mt19937_64 random(seed);
+        auto init = make_shared<NormalInit>(env("init", 0.1), random);
+
+        auto x = Conv2D(in, ConvType::Same, {1, 3, 3, 1, 'i', 'w', 'h', 'c'}, init);
+        auto out = Logistic(x, 15);
+
+        auto loss = BinaryCrossEntropy(ref, out) << "loss";
+        auto accuracy = BinaryAccuracy(ref, out) << "accuracy";
+
+        Model model({loss, accuracy});
+        model.SetBatchSize(Batch);
+        model.optimizer = std::make_shared<Adam>();
+        model.optimizer->alpha = env("alpha", 0.01);
+
+        // dataset
+        UniformInit gen(0.0, 1.0, random);
+        const dim_t Samples = RoundUp(env<int>("samples", 1000), Batch);
+        vtensor data_in(s.push_front(Samples, 'b'), 0);
+        vtensor data_ref(s.push_front(Samples, 'b'), 0);
+        FOR(index, Samples) {
+            tensor din = data_in.slice(index);
+            FOR(x, N) FOR(y, N) din(x, y, 0) = gen.get() <= 0.05;
+            //WriteGrayImage(din, format("in/%d.png", index));
+
+            tensor dref = data_ref.slice(index);
+            FOR(x, N) FOR(y, N) {
+                bool clear = true;
+                for (int dx : {-1, 0, 1}) for (int dy : {-1, 0, 1})
+                    if (dx != 0 || dy != 0)
+                        if (0 <= int(x) + dx && int(x) + dx < N && 0 <= int(y) + dy && int(y) + dy < N)
+                            if (din(x + dx, y + dy) == 1)
+                                clear = false;
+                dref(x, y, 0) = (din(x, y, 0) == 1) && clear;
+            }
+            //WriteGrayImage(dref, format("ref/%d.png", index));
+        }
+        vector<pair<Diff, tensor>> dataset = {{in, data_in}, {ref, data_ref}};
+        NormalizeDataset(data_in);
+
+        model.Epoch(loss, accuracy, dataset, random, true, 0, false);
+        model.Print();
+
+        // train!
+        Metrics metrics;
+        for (auto i : range(env<int>("epochs", 1000))) {
+            metrics = model.Epoch(loss, accuracy, dataset, random, env<int>("verbose", 1), i);
+        }
+        model.Print();
+        println("loss: %s", metrics.at("loss"));
+        //REQUIRE(metrics.at("loss") >= 0.0);
+    });
+}
+
 // TODO Kronecker learn x*y
 
 // Classification:

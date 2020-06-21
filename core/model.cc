@@ -144,7 +144,7 @@ void Model::Print() const {
             format_s(os, "%.3f|", 100.0f * ticks / total);
 
             // values
-            size_t summary = 8;
+            size_t summary = 9;
             format_s(os, "%s|", (p->v.elements() > summary) ? Summary(p->v) : string(p->v));
 
             // gradients
@@ -243,7 +243,7 @@ Model::Model(std::initializer_list<Diff> heads) : m_nodes(TopoSort(heads)) {
     }
 }
 
-Metrics Model::Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch) {
+Metrics Model::Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, std::mt19937_64& random, bool verbose, uint epoch, bool backward) {
     Check(data.size() > 0);
     const dim_t B = data[0].first->dim(0);
     const dim_t N = data[0].second.dim(0);
@@ -271,11 +271,11 @@ Metrics Model::Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, s
 
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
-            for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(m_samples[i + j]));
+            FOR(j, B) key->v.slice(j).copy_from(value.slice(m_samples[i + j]));
         }
 
         f_ticks += Duration([&]() { Forward(true); });
-        b_ticks += Duration([&]() { Backward(loss); });
+        if (backward) b_ticks += Duration([&]() { Backward(loss); });
         a_f_ticks << f_ticks;
         a_b_ticks << b_ticks;
 

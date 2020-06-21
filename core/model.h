@@ -29,7 +29,7 @@ class Model {
 
     void Iterate(size_t iterations, Diff loss);
 
-    Metrics Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
+    Metrics Epoch(Diff loss, Diff accuracy, cspan<pair<Diff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0, bool backward = true);
 
     void SetBatchSize(uint batch) {
         for (auto p : m_nodes) p->SetBatchSize(batch);
