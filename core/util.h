@@ -3,7 +3,8 @@
 
 #include <algorithm>
 
-inline double env(const char* name, double def) {
+template<typename T = double>
+inline T env(const char* name, T def) {
     const char* v = std::getenv(name);
     return v ? std::atof(v) : def;
 }
