@@ -15,10 +15,23 @@ vector<PDiff> TopoSort(const cspan<PDiff> heads) {
     return out;
 }
 
+void Model::BeginEpoch(bool training) {
+    for (auto p : m_begin_epoch_nodes) p->BeginEpoch(training);
+}
+
 void Model::Forward(bool training) {
-    for (auto p : m_forward_nodes) {
+    if (training) {
+        for (auto p : m_forward_nodes) {
+            Timestamp ts;
+            p->Forward(true);
+            p->forward_ticks += ts.elapsed();
+        }
+        return;
+    }
+
+    for (auto p : m_forward_nodes) if (p->inference) {
         Timestamp ts;
-        p->Forward(training);
+        p->Forward(false);
         p->forward_ticks += ts.elapsed();
     }
 }
@@ -44,6 +57,10 @@ void Model::Backward(PDiff loss) {
     }
 
     optimizer->Optimize(span<ParamT*>(m_params));
+}
+
+void Model::EndEpoch(bool training) {
+    for (auto p : m_end_epoch_nodes) p->EndEpoch(training);
 }
 
 bool Bounded(cspan<PDiff> nodes, const tensor::type limit) {
@@ -171,6 +188,15 @@ void Model::Print() const {
     PrintTable(table, '|', " ", {4, 5, 6});
 }
 
+void Model::Iterate(size_t iterations, PDiff loss) {
+    for (size_t i : range(iterations)) {
+        BeginEpoch(true);
+        Forward(true);
+        Backward(loss);
+        EndEpoch(true);
+    }
+}
+
 bool HasBackward(PDiff p) {
     // BinaryCrossEntropyT has Check() which fails for empty gradients
     if (dynamic_cast<BinaryCrossEntropyT*>(p.get())) return true;
@@ -204,7 +230,13 @@ Model::Model(std::initializer_list<PDiff> heads) : m_nodes(TopoSort(heads)) {
 
     for (PDiff p : m_nodes) {
         Diff::has_overload = true;
-        p->EndEpoch();
+        p->BeginEpoch(false);
+        if (Diff::has_overload) m_begin_epoch_nodes.push_back(p.get());
+    }
+
+    for (PDiff p : m_nodes) {
+        Diff::has_overload = true;
+        p->EndEpoch(false);
         if (Diff::has_overload) m_end_epoch_nodes.push_back(p.get());
     }
 
@@ -237,6 +269,9 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
     Accumulator<float> a_f_ticks, a_b_ticks;
     ulong f_ticks = 0, b_ticks = 0;
     ulong message_ticks = 0;
+
+    for (Diff* p : m_begin_epoch_nodes) p->BeginEpoch(true);
+
     for (size_t i = 0; i < N; i += B) {
         for (const auto& [key, value] : data) {
             for (size_t j = 0; j < B; j++) key->v.slice(j).copy_from(value.slice(m_samples[i + j]));
@@ -267,7 +302,7 @@ Metrics Model::Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data
         }
     }
 
-    for (Diff* p : m_end_epoch_nodes) p->EndEpoch();
+    for (Diff* p : m_end_epoch_nodes) p->EndEpoch(true);
 
     if (verbose) {
         for (char& c : msg) c = '\r';

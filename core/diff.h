@@ -23,9 +23,10 @@ struct Diff {
     virtual vector<PDiff> Inputs() { return {}; }
 
     static thread_local bool has_overload;
+    virtual void BeginEpoch(bool training) { has_overload = false; }
     virtual void Forward(bool training) { has_overload = false; }
     virtual void Backward() { has_overload = false; }
-    virtual void EndEpoch() { has_overload = false; }
+    virtual void EndEpoch(bool training) { has_overload = false; }
 
     void SetBatchSize(uint batch) {
         if (batched()) {
@@ -48,6 +49,7 @@ struct Diff {
     auto elements() const { return v.elements(); }
     bool batched() const { return ndims() > 0 && shape().name(0) == 'b'; }
 
+    bool inference = true;
     string name;
     vtensor v, g;
 
@@ -488,10 +490,45 @@ struct Mul_vv : public Diff_vv {
     }
 };
 
+struct Mul_mv : public Diff2 {
+    Mul_mv(PDiff a, PDiff b) : Diff2(a, b) {
+        Check(a->shape().pop_front() == b->shape(),
+            format("a:%s b:%s a.pop_front:%s", string(a->shape()), string(b->shape()), string(a->shape().pop_front())));
+        Reshape(a->shape());
+    }
+    void Forward(bool) override {
+        for (auto j : range<size_t>(0, va.elements(), vb.elements())) {
+            EACH(vb) v[j + i] = va[j + i] * vb[i];
+        }
+    }
+    void Backward() override {
+        if (ga && gb) {
+            for (auto j : range<size_t>(0, va.elements(), vb.elements())) {
+                EACH(vb) {
+                    ga[j + i] += g[j + i] * vb[i];
+                    gb[i] += g[j + i] * va[j + i];
+                }
+            }
+        } else if (ga) {
+            for (auto j : range<size_t>(0, va.elements(), vb.elements())) {
+                EACH(vb) ga[j + i] += g[j + i] * vb[i];
+            }
+        } else if (gb) {
+            for (auto j : range<size_t>(0, va.elements(), vb.elements())) {
+                EACH(vb) gb[i] += g[j + i] * va[j + i];
+            }
+        }
+    }
+};
+
 inline PDiff operator*(PDiff a, PDiff b) {
     if (a->elements() == 1 && !a->batched()) return make_shared<Mul_vs>(b, a);
     if (b->elements() == 1 && !b->batched()) return make_shared<Mul_vs>(a, b);
-    return make_shared<Mul_vv>(a, b);
+    if (a->shape() == b->shape()) return make_shared<Mul_vv>(a, b);
+    if (a->ndims() > b->ndims()) return make_shared<Mul_mv>(a, b);
+    if (b->ndims() > a->ndims()) return make_shared<Mul_mv>(b, a);
+    Fail(format("Incompatible shapes: %s vs %s", string(a->shape()), string(b->shape())));
+    return nullptr;
 }
 
 inline PDiff operator*(tensor::type a, PDiff b) {
@@ -764,6 +801,25 @@ struct MeanT : public Diff1 {
 
 Declare1(Mean);
 
+struct StdevT : public Diff2 {
+    StdevT(PDiff a, PDiff b, tensor::type k) : Diff2(a, b), k(k) {
+        Check(b->elements() == 1 && !b->batched());
+        Reshape({});
+    }
+    void Forward(bool) override {
+        double s = 0;
+        EACH(v) s += sqr(double(va[i] - vb[0]));
+        v[0] = std::sqrt(s / a->elements() + k);
+    }
+    void Backward() override {
+        const tensor::type d = g[0] / (a->elements() * v[0]);
+        EACH(ga) ga[i] += (va[i] - vb[0]) * d;
+    }
+    tensor::type k;
+};
+
+inline PDiff Stdev(PDiff a, PDiff mean_a, tensor::type k) { return std::make_shared<StdevT>(a, mean_a, k); }
+
 // TODO Unary horizontal Min and Max!
 
 struct RunningAverageT : public Diff1 {
@@ -781,7 +837,7 @@ struct EpochMeanT : public Diff1 {
         EACH(va) sum += va[i];
         count += va.elements();
     }
-    void EndEpoch() override {
+    void EndEpoch(bool) override {
         v[0] = sum / count;
         sum = 0;
         count = 0;
@@ -860,7 +916,7 @@ struct GradCmpT : public DiffA {
         EACH(ga) ga[i] = g[i];
         EACH(g) CheckEqualFP(g[i], other->g[i]);
     }
-    void EndEpoch() override {
+    void EndEpoch(bool) override {
         if (counter != other->counter) Fail(format("%s != %s", counter, other->counter));
     }
 
@@ -940,26 +996,67 @@ inline PDiff Softmax(PDiff a) {
     return e / Sum(e) << "softmax";
 }
 
+struct TrainEpochAverageT : public DiffA {
+    TrainEpochAverageT(PDiff a) : DiffA(a) { s.reshape(a->shape()); }
+    void BeginEpoch(bool training) override {
+        if (training) {
+            EACH(s) s[i] = 0;
+            count = 0;
+            divided = false;
+        } else {
+            if (!divided) {
+                EACH(s) s[i] /= count;
+                divided = true;
+            }
+            EACH(s) v[i] = s[i];
+        }
+    }
+    void Forward(bool training) override {
+        if (training) {
+            EACH(va) s[i] += va[i];
+            EACH(va) v[i] = va[i];
+            count += 1;
+        }
+    }
+    void Backward() override {
+        EACH(ga) ga[i] += g[i];
+    }
+
+    vtensor s;
+    uint count;
+    bool divided;
+};
+
+Declare1(TrainEpochAverage);
+
 inline PDiff BatchNorm(PDiff a, tensor::type k) {
     auto mean = Mean(a) << "bn_mean";
-    auto stdev = Sqrt(Mean(Sqr(a - mean))) + k << "bn_stdev";
+    auto stdev = Stdev(a, mean, k) << "bn_stdev";
 
-    auto scale = 1 / stdev << "bn_scale";
-    auto shift = mean / stdev << "bn_shift";
-    auto norm = a * scale - shift << "bn_norm";
+    mean->inference = false;
+    stdev->inference = false;
 
-    auto gamma = Param(a->shape(), 1) << "bn_gamma";
-    auto beta = Param(a->shape(), 0) << "bn_beta";
-    return norm * gamma + beta << "bn";
+    auto imean = TrainEpochAverage(mean) << "bn_imean";
+    auto istdev = TrainEpochAverage(stdev) << "bn_istdev";
+    auto norm = (a - imean) / istdev << "bn_norm";
+
+    const dim4 s = a->batched() ? a->shape().pop_front() : a->shape();
+    auto gamma = Param(s, 1) << "bn_gamma";
+    auto beta = Param(s) << "bn_beta";
+
+    return (norm * gamma + beta) << "bn";
 }
 
-inline PDiff FullyConnectedNB(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
-    auto w = Param({size, a->shape().back()}, w_init) << "fc_w";
-    return VecMatMul(a, w) << "fc";
+inline PDiff Bias(PDiff a) {
+    const dim4 s = a->batched() ? a->shape().pop_front() : a->shape();
+    return a + Param(s) << "bias";
 }
 
-inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> w_init = make_shared<Init>()) {
-    auto w = Param({size, a->shape().back()}, w_init) << "fc_w";
-    auto b = Param({size}) << "fc_b";
-    return VecMatMul(a, w) + b << "fc";
+inline PDiff Affine(PDiff a, uint size, shared_ptr<Init> init) {
+    auto w = Param({size, a->shape().back()}, init);
+    return VecMatMul(a, w) << "affine";
+}
+
+inline PDiff FullyConnected(PDiff a, uint size, shared_ptr<Init> init) {
+    return Bias(Affine(a, size, init));
 }

@@ -232,7 +232,8 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
         auto accuracy = BinaryAccuracy(ref, out);
         Model model({loss, accuracy});
         model.SetBatchSize(24);
-        model.optimizer->alpha = 0.1;
+        model.optimizer = std::make_shared<RMSProp>();
+        model.optimizer->alpha = 0.001;
 
         // dataset
         UniformInit gen(-1, 1, random);
@@ -262,7 +263,7 @@ TEST_CASE("diff: learn two layer network, circle in 2d", "[diff]") {
         Metrics metrics;
         for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
-        REQUIRE(metrics.at("accuracy") >= 0.9922);
+        REQUIRE(metrics.at("accuracy") >= 0.9943);
     });
 }
 
@@ -328,12 +329,13 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
         auto ref = Data({}) << "ref";
 
         std::mt19937_64 random(seed);
-        auto init = make_shared<NormalInit>(1, random);
+        auto init_1 = make_shared<NormalInit>(0.333f, random);
+        auto init_2 = make_shared<NormalInit>(1, random);
 
         auto x = in;
-        x = FullyConnected(x, 3, init) << "fc";
-        x = Logistic(x, 15);
-        x = FullyConnected(x, 1, init);
+        x = FullyConnected(x, 3, init_1) << "fc";
+        x = Tanh(x);
+        x = FullyConnected(x, 1, init_2);
         x = Logistic(x, 15);
 
         auto out = Reshape(x, {}) << "out";
@@ -342,7 +344,8 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
 
         Model model({loss, accuracy});
         model.SetBatchSize(24);
-        model.optimizer->alpha = 0.1;
+        model.optimizer = std::make_shared<RMSProp>();
+        model.optimizer->alpha = 0.001;
 
         // dataset
         UniformInit gen(-1, 1, random);
@@ -372,7 +375,7 @@ TEST_CASE("diff: learn FC two layer network, circle in 2d", "[diff]") {
         Metrics metrics;
         for (auto i : range(1000)) metrics = model.Epoch(loss, accuracy, dataset, random, false, i);
         println("accuracy: %s", metrics.at("accuracy"));
-        REQUIRE(metrics.at("accuracy") >= 0.9617);
+        REQUIRE(metrics.at("accuracy") >= 0.9930);
     });
 }
 

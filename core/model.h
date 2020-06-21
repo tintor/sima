@@ -20,16 +20,14 @@ class Model {
     Model() {}
     explicit Model(std::initializer_list<PDiff> heads);
 
+    void BeginEpoch(bool training);
     void Forward(bool training);
     void Backward(PDiff loss);
+    void EndEpoch(bool training);
+
     void Print() const;
 
-    void Iterate(size_t iterations, PDiff loss) {
-        for (size_t i : range(iterations)) {
-            Forward(true);
-            Backward(loss);
-        }
-    }
+    void Iterate(size_t iterations, PDiff loss);
 
     Metrics Epoch(PDiff loss, PDiff accuracy, cspan<pair<PDiff, tensor>> data, std::mt19937_64& random, bool verbose = true, uint epoch = 0);
 
@@ -39,7 +37,7 @@ class Model {
 
    private:
     vector<PDiff> m_nodes;
-    vector<Diff*> m_forward_nodes, m_backward_nodes, m_end_epoch_nodes;
+    vector<Diff*> m_begin_epoch_nodes, m_forward_nodes, m_backward_nodes, m_end_epoch_nodes;
     vector<ParamT*> m_params;
     vector<uint> m_samples;
 };
