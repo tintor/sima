@@ -808,48 +808,33 @@ struct MonteCarloAgent : public Agent {
 
     bool neural;
     const uint batch;
-    PDiff in, ref, loss;
-    Model train_model;
-
-    PDiff inf_in;
-    PDiff inf_out;
-    Model inf_model;
+    Diff in, ref, out, loss;
+    Model model;
 
     MonteCarloAgent(double eps_greedy, bool neural, uint batch) : eps_greedy(eps_greedy), neural(neural), batch(batch), lost_games("lost_games.txt") {
-        in = Data({batch, BoardBits}) << "input";
-        ref = Data({batch, 1}) << "reference";
+        in = Data({BoardBits}) << "input";
+        ref = Data({}) << "reference";
         auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), g_random);
-        PDiff w1, b1;
-        auto fc1 = FullyConnected(in, 10, w_init, &w1, &b1) << "fc1";
+        auto fc1 = FullyConnected(in, 1, w_init) << "fc1";
         auto act1 = Tanh(fc1);
-        PDiff w2, b2;
-        auto fc2 = FullyConnected(act1, 1, w_init, &w2, &b2) << "fc2";
+        auto fc2 = FullyConnected(act1, 1, w_init) << "fc2";
         auto out = Logistic(fc2, 15);
         loss = MeanSquareError(ref, out);
-        train_model = Model({loss});
-        train_model.Print();
-        auto opt = train_model.optimizer = std::make_shared<Optimizer>();
-        opt->alpha = 0.01;
-
-        inf_in = Data({1, BoardBits}) << "input";
-        println("w1.shape %s, b1.shape %s", string(w1->shape), string(b1->shape));
-        println("mul.shape %s", string(VecMatMul(inf_in, w1)->shape));
-        auto inf_fc1 = VecMatMul(inf_in, w1) + b1 << "fc1";
-        auto inf_act1 = Tanh(inf_fc1);
-        println("w2.shape %s, b2.shape %s", string(w2->shape), string(b2->shape));
-        auto inf_fc2 = VecMatMul(inf_act1, w2) + b2 << "fc2";
-        inf_out = Logistic(inf_fc2, 15) << "out";
-        inf_model = Model({inf_out});
-        inf_model.Print();
+        model = Model({loss});
+        model.Print();
+        model.optimizer = std::make_shared<Optimizer>();
+        model.optimizer->alpha = 0.01;
     }
 
     float Predict(const Board& board) {
-        Serialize(board, inf_in->v);
-        inf_model.Forward();
-        return inf_out->v[0];
+        model.SetBatchSize(1);
+        Serialize(board, in->v);
+        model.Forward(false);
+        return out->v[0];
     }
 
     void Train() {
+        model.SetBatchSize(batch);
         vector<uint> samples;
         samples.resize(values.Size());
         for (auto i : range(values.Size())) samples[i] = i;
@@ -862,11 +847,13 @@ struct MonteCarloAgent : public Agent {
                 Serialize(sample.first, in->v.slice(i));
                 ref->v[0] = sample.second.Value();
             }
-            train_model.Forward();
-            train_model.Backward(loss);
+            // TODO begin epoch
+            model.Forward(true);
+            model.Backward(loss);
+            // TODO end epoch
         }
         if (episodes % 100 == 0) {
-            train_model.Print();
+            model.Print();
             double s = 0;
             for(const auto& e : values)
                 s += std::pow(double(e.second.Value()) - double(Predict(e.first)), 2);
@@ -940,6 +927,50 @@ struct RandomAgent : public Agent {
 struct GreedyAgent : public Agent {
     Action Play(const Board& board) override { return AutoGreedy(board); }
 };
+
+// Plan:
+// - value function is based on the entire turn (1 or more actions of same player)
+// - play both as player1 and player2
+// - keep accumulating experience (and save it to file)
+// - play games in parallel
+// - after every 1000 games train new network (from scratch?) (using all previous experience)
+// - if new network plays worse after 1000 games -> discard it
+// - port to carbide!
+
+// Network architecture:
+// - board is 5x5x7 bits without any extra bits
+// : layer0
+// - Conv2D 3x3 with 10 channels
+// - BatchNorm
+// - Relu
+// : layer1
+// - Concat(in)
+// - Conv2D 3x3 with 10 channels
+// - BatchNorm
+// - Relu
+// : layer2
+// - Concat(in, layer1)
+// - Conv2D 3x3 with 10 channels
+// - BatchNorm
+// - Relu
+// : layer3
+// - Concat(in, layer1, layer2)
+// - Conv2D 3x3 with 10 channels
+// - BatchNorm
+// - Relu
+// : layer4
+// - Concat(in, layer1, layer2, layer3)
+// - Valid Conv2D 3x3 with 10 channels -> 3x3xM
+// - BatchNorm
+// - Relu
+// : layer5
+// - Flatten
+// - Dense
+// - BatchNorm
+// - Relu
+// - Dense
+// - Sigmoid
+
 
 void Learn() {
     MonteCarloAgent agent_a(0.01, true, 100);

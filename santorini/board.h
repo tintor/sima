@@ -135,9 +135,9 @@ inline float* Serialize(float* v, const Board& board) {
 }
 
 void Serialize(const Board& board, tensor out) {
-    Check(out.rank == 1);
-    Check(out.size == BoardBits);
-    Check(Serialize(out.data(), board) == out.data() + out.size);
+    Check(out.ndims() == 1);
+    Check(out.elements() == BoardBits);
+    Check(Serialize(out.data(), board) == out.data() + out.elements());
 }
 
 class Values {
