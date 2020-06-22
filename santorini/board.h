@@ -94,57 +94,37 @@ int Count(const Board& board, const Fn& fn) {
 }
 
 // Network input description:
-// Board (28 + 25xCell):
-// 1 - setup
-// 25 - which figure moved (if any)
-// 1 - built
-// 1 - player
-// 25x - cell
-
-// Cell (7):
+// Board (5x5xCell):
+// Cell:
 // 4 - level
 // 1 - dome
-// 1 - player1
-// 1 - player2
+// 1 - ego
+// 1 - opponent
 
 constexpr int CellBits = 4 + 3;
-constexpr int BoardBits = 3 + 25 * (1 + CellBits);
+constexpr int BoardBits = 25 * CellBits;
 
-using std::ostream;
-
-inline float Bit(bool a) { return a ? 1 : 0; }
-
-inline float* Serialize(float* v, Cell cell) {
-    *v++ = Bit(cell.level == 0);
-    *v++ = Bit(cell.level == 1);
-    *v++ = Bit(cell.level == 2);
-    *v++ = Bit(cell.level == 3);
-    *v++ = Bit(cell.figure == Figure::Dome);
-    *v++ = Bit(cell.figure == Figure::Player1);
-    *v++ = Bit(cell.figure == Figure::Player2);
-    return v;
-}
-
-inline float* Serialize(float* v, const Board& board) {
-    *v++ = Bit(board.setup);
-    for (Coord e : kAll) *v++ = Bit(board.moved && *board.moved == e);
-    *v++ = Bit(board.built);
-    *v++ = Bit(board.player == Figure::Player1);
-    for (Coord e : kAll) v = Serialize(v, board(e));
-    return v;
-}
-
-void Serialize(const Board& board, tensor out) {
-    Check(out.ndims() == 1);
-    Check(out.elements() == BoardBits);
-    Check(Serialize(out.data(), board) == out.data() + out.elements());
+void ToTensor(const Board& board, tensor out) {
+    Check(out.shape() == dim4(5, 5, 7));
+    const auto other = Other(board.player);
+    FOR(x, 5) FOR(y, 5) {
+        tensor::type* s = out.data() + out.offset(x, y);
+        auto cell = board.cell[y * 5 + x];
+        s[0] = cell.level == 0;
+        s[1] = cell.level == 1;
+        s[2] = cell.level == 2;
+        s[3] = cell.level == 3;
+        s[4] = cell.figure == Figure::Dome;
+        s[5] = cell.figure == other;
+        s[6] = cell.figure == board.player;
+    }
 }
 
 class Values {
    public:
-    struct Wins {
-        uint32_t player1, player2;
-        float Value() const { return player1 / double(player1 + player2); }
+    struct Score {
+        uint32_t wins, games;
+        float Value() const { return wins / float(games); }
     };
 
     size_t Size() const { return m_data.size(); }
@@ -164,48 +144,43 @@ class Values {
         return *it;
     }
 
-    void Add(const Board& board, uint32_t wins1, uint32_t wins2) {
-        auto result = m_data.emplace(Normalize(board), Wins{0, 0});
-        auto& wins = result.first->second;
-        wins.player1 += wins1;
-        wins.player2 += wins2;
+    void Add(const Board& board, uint32_t wins, uint32_t games) {
+        auto result = m_data.emplace(Normalize(board), Score{0, 0});
+        auto& score = result.first->second;
+        score.wins += wins;
+        score.games += games;
     }
 
-    const Wins* Lookup(const Board& board) const {
+    const Score* Lookup(const Board& board) const {
         auto it = m_data.find(Normalize(board));
         if (it == m_data.end()) return nullptr;
         return &it->second;
     }
 
-    double Value(const Board& board) const {
+    float Value(const Board& board) const {
         auto it = m_data.find(Normalize(board));
-        if (it == m_data.end()) return 0.5;
+        if (it == m_data.end()) return 0.5f;
         return it->second.Value();
     }
 
-    void Export(string_view filename, int wmin) {
-        // std::ofstream os((string(filename)));
-        vector<Board> outs;
-        for (const auto& [board, wins] : m_data) {
-            if (wins.player1 + wins.player2 < wmin) continue;
-            outs.clear();
-            double w = wins.player1 / double(wins.player1 + wins.player2);
-            for (int transform = 0; transform < 8; transform++) {
-                // TODO(Marko) deduplicate
-                Board out;
-                out.cell = Transform(board.cell, transform);
-                if (!contains(outs, out)) outs << out;
+    void Export(string_view filename) {
+        vtensor out({5, 5, 7});
+        std::ofstream os(filename);
+        for (const auto& [board, score] : m_data) {
+            ToTensor(board, out);
+            FOR(x, 5) FOR(y, 5) {
+                tensor::type* s = out.data() + out.offset(x, y);
+                char b = 0;
+                FOR(i, 7) if (s[i] > 0) b |= 1 << i;
+                os.put(b);
             }
-            for (const auto& out : outs) {
-                Print(out);
-                println("wins: %s %s", wins.player1, wins.player2);
-                // os << out << ' ' << std::setprecision(10) << w << '\n';
-            }
+            os.write(reinterpret_cast<const char*>(&score.wins), sizeof(score.wins));
+            os.write(reinterpret_cast<const char*>(&score.games), sizeof(score.games));
         }
     }
 
    private:
-    using Data = absl::flat_hash_map<Board, Wins>;
+    using Data = absl::flat_hash_map<Board, Score>;
     Data m_data;
     mutable size_t m_last_buckets = 0;
     mutable Data::const_iterator m_last_iterator;

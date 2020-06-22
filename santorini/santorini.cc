@@ -828,7 +828,7 @@ struct MonteCarloAgent : public Agent {
 
     float Predict(const Board& board) {
         model.SetBatchSize(1);
-        Serialize(board, in->v);
+        ToTensor(board, in->v);
         model.Forward(false);
         return out->v[0];
     }
@@ -844,7 +844,7 @@ struct MonteCarloAgent : public Agent {
             // Epoch
             for(auto i : range(batch)) {
                 const auto& sample = values.Sample(g_random);
-                Serialize(sample.first, in->v.slice(i));
+                ToTensor(sample.first, in->v.slice(i));
                 ref->v[0] = sample.second.Value();
             }
             // TODO begin epoch
