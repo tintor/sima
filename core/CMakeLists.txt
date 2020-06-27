@@ -24,6 +24,7 @@ add_executable(core_test
 	test_range.cc
 	test_sparse_matrix.cc
 	test_tensor.cc
+	test_thread.cc
 	test_util.cc
 	test_string_util.cc
 	test_zip.cc

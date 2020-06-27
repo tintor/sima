@@ -39,6 +39,31 @@ inline void parallel_for(size_t count, size_t max_threads, const std::function<v
     });
 }
 
+// MapFn: Result()
+// ReduceFn: void(Result& acc, const Result& in)
+
+template<typename Result, typename MapFn, typename ReduceFn>
+inline Result parallel_map_reduce(const MapFn& map_fn, const ReduceFn& reduce_fn) {
+    std::mutex mutex;
+    std::optional<Result> result;
+    parallel([&]() {
+        std::optional<Result> my_result = map_fn();
+
+        std::unique_lock lock(mutex);
+        while (result.has_value()) {
+            std::optional<Result> local_result;
+            std::swap(local_result, result);
+
+            // TODO make unlocking exception safe
+            lock.unlock();
+            reduce_fn(my_result.value(), local_result.value());
+            lock.lock();
+        }
+        result = std::move(my_result);
+    });
+    return result.value();
+}
+
 inline void parallel_for(size_t count, const std::function<void(size_t)>& func) {
     parallel_for(count, thread::hardware_concurrency(), func);
 }
