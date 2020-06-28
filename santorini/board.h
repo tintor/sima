@@ -168,9 +168,23 @@ struct Score {
     void operator+=(Score o) { *this = *this + o; }
 };
 
+template<typename Key, typename Value, size_t Shards>
+class sharded_flat_hash_map {
+};
+
 class Values {
     static constexpr int Shards = 64;
    public:
+    Values() {}
+
+    Values(std::filesystem::path filename) {
+        vtensor out({5, 5, 7});
+        std::ifstream is(filename);
+        while (is) {
+
+        }
+    }
+
     size_t Size() const { return Sum<size_t>(m_shard, [](const auto& e) { std::unique_lock lock(e._mutex); return e.data.size(); }); }
 
     /*const auto& Sample(std::mt19937_64& random) const {
@@ -203,7 +217,7 @@ class Values {
         FOR(i, Shards) {
             Shard& shard = m_shard[i];
             const Shard& o_shard = values.m_shard[i];
-                
+
             std::unique_lock lock(shard._mutex);
             std::unique_lock lock2(o_shard._mutex);
 
@@ -252,7 +266,7 @@ class Values {
         Data data;
         mutable mutex _mutex;
     } m_shard[Shards];
-    
+
     //mutable size_t m_last_buckets = 0;
     //mutable Data::const_iterator m_last_iterator;
 

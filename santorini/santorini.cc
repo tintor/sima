@@ -1090,6 +1090,41 @@ void Learn() {
     }*/
 }
 
+void print_section() {
+
+}
+
+void Browse() {
+    Values values("random_vs_random.values");
+    vector<Board> stack = { Board() };
+    while (true) {
+        println();
+        Render(stack.back());
+        vector<Action> temp;
+        vector<Board> options;
+        AllValidActionSequences(stack.back(), temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
+            options.push_back(new_board);
+            return true;
+        });
+
+        int id = 0;
+        for (const Board& b : options) {
+            auto score = values.Lookup(b);
+            if (score) println("[%s] -> %s %s", id, score->p1, score->p2); else println("[%s]", id);
+            id += 1;
+            Render(b);
+        }
+        while (true) {
+            print("> ");
+            std::cin >> id;
+            if (-1 <= id && id < int(options.size())) break;
+        }
+
+        if (id == -1 && stack.size() > 1) stack.pop_back();
+        if (id >= 0) stack.push_back(options[id]);
+    }
+}
+
 int main(int argc, char** argv) {
     println("Main!");
     InitSegvHandler();
@@ -1097,6 +1132,11 @@ int main(int argc, char** argv) {
 
     if (argc > 1 && argv[1] == "learn"s) {
         Learn();
+        return 0;
+    }
+
+    if (argc > 1 && argv[1] == "browse"s) {
+        Browse();
         return 0;
     }
 
