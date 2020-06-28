@@ -38,6 +38,28 @@ ostream& operator<<(ostream& os, const Board& board) {
 
 void Print(const Board& board) { cout << board; }
 
+void Render(const Board& board) {
+    const std::string color[4] = { "\033[0m", "\033[0;34m", "\033[0;33m", "\033[1;31m" };
+    const char* tower = ".#xo";
+
+    for (int row = 0; row < 5; row++) {
+        for (int col = 0; col < 5; col++) {
+            const auto c = board.cell[row * 5 + col];
+            // Color
+            cout << color[c.level];
+            // Figure
+            if (c.figure == Figure::Dome) cout << '*';
+            else if (c.figure == Figure::Player1) cout << 'A';
+            else if (c.figure == Figure::Player2) cout << 'B';
+            else if (c.figure == Figure::None) cout << tower[c.level];
+            else cout << char(c.figure);
+            cout << ' ';
+        }
+        cout << endl;
+    }
+    // Reset color
+    cout << "\033[0m";
+}
 
 bool Less(const Cells& a, const Cells& b) {
     for (int i = 0; i < 25; i++) {
@@ -73,12 +95,25 @@ size_t Hash(const Cells& cell) {
     return h.seed;
 }
 
+std::array<size_t, 7> zorbist[25];
+struct InitZorbist {
+    InitZorbist() {
+        std::mt19937_64 re(0);
+        FOR(i, 25) for (auto& e : zorbist[i]) e = re();
+    }
+} init_zorbist;
+
 size_t Hash(const Board& a) {
-    hash h;
-    h << a.setup << int(a.player) << a.moved.has_value();
-    if (a.moved.has_value()) h << a.moved->v;
-    h << a.built << Hash(a.cell);
-    return h.seed;
+    size_t hash = 0;
+    for (int i = 0; i < 25; i++) {
+        const auto& z = zorbist[i];
+        auto c = a.cell[i];
+        hash ^= z[c.level];
+        if (c.figure == Figure::Dome) hash ^= z[4];
+        if (c.figure == Figure::Player1) hash ^= z[5];
+        if (c.figure == Figure::Player2) hash ^= z[6];
+    }
+    return hash;
 }
 
 namespace std {
@@ -105,7 +140,7 @@ constexpr int CellBits = 4 + 3;
 constexpr int BoardBits = 25 * CellBits;
 
 void ToTensor(const Board& board, tensor out) {
-    Check(out.shape() == dim4(5, 5, 7));
+    if (out.shape() != dim4(5, 5, 7)) Fail(string(out.shape()));
     const auto other = Other(board.player);
     FOR(x, 5) FOR(y, 5) {
         tensor::type* s = out.data() + out.offset(x, y);
@@ -120,13 +155,19 @@ void ToTensor(const Board& board, tensor out) {
     }
 }
 
+struct Score {
+    uint p1 = 0, p2 = 0;
+    Score() {}
+    Score(uint p1, uint p2) : p1(p1), p2(p2) { }
+    Score(Figure w) : p1((w == Figure::Player1) ? 1 : 0), p2((w == Figure::Player2) ? 1 : 0) {}
+
+    float ValueP1() const { return p1 / float(p1 + p2); }
+    Score operator+(Score o) { return {p1 + o.p1, p2 + o.p2}; }
+    void operator+=(Score o) { *this = *this + o; }
+};
+
 class Values {
    public:
-    struct Score {
-        uint32_t wins, games;
-        float Value() const { return wins / float(games); }
-    };
-
     size_t Size() const { return m_data.size(); }
 
     auto begin() const { return m_data.begin(); }
@@ -144,11 +185,12 @@ class Values {
         return *it;
     }
 
-    void Add(const Board& board, uint32_t wins, uint32_t games) {
-        auto result = m_data.emplace(Normalize(board), Score{0, 0});
-        auto& score = result.first->second;
-        score.wins += wins;
-        score.games += games;
+    void Add(const Board& board, Score score) {
+        m_data.emplace(Normalize(board), Score()).first->second += score;
+    }
+
+    void Merge(const Values& values) {
+        for (const auto& e : values.m_data) Add(e.first, e.second);
     }
 
     const Score* Lookup(const Board& board) const {
@@ -157,10 +199,10 @@ class Values {
         return &it->second;
     }
 
-    float Value(const Board& board) const {
+    float ValueP1(const Board& board) const {
         auto it = m_data.find(Normalize(board));
         if (it == m_data.end()) return 0.5f;
-        return it->second.Value();
+        return it->second.ValueP1();
     }
 
     void Export(string_view filename) {
@@ -174,8 +216,8 @@ class Values {
                 FOR(i, 7) if (s[i] > 0) b |= 1 << i;
                 os.put(b);
             }
-            os.write(reinterpret_cast<const char*>(&score.wins), sizeof(score.wins));
-            os.write(reinterpret_cast<const char*>(&score.games), sizeof(score.games));
+            os.write(reinterpret_cast<const char*>(&score.p1), sizeof(score.p1));
+            os.write(reinterpret_cast<const char*>(&score.p2), sizeof(score.p2));
         }
     }
 

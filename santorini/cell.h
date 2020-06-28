@@ -16,7 +16,7 @@ inline bool Less(Cell a, Cell b) {
     return a.figure < b.figure;
 }
 
-inline size_t Hash(Cell a) { return int(a.figure) + (a.level << 2); }
+inline size_t Hash(Cell a) { return (int(a.figure) << 2) + a.level; }
 
 inline Figure Other(Figure player) { return (player == Figure::Player1) ? Figure::Player2 : Figure::Player1; }
 

@@ -4,6 +4,8 @@
 #include <core/model.h>
 #include <core/thread.h>
 #include <core/util.h>
+#include <core/thread.h>
+#include <core/timestamp.h>
 #include <santorini/action.h>
 #include <santorini/board.h>
 #include <view/font.h>
@@ -812,18 +814,22 @@ struct MonteCarloAgent : public Agent {
     Model model;
 
     MonteCarloAgent(double eps_greedy, bool neural, uint batch) : eps_greedy(eps_greedy), neural(neural), batch(batch), lost_games("lost_games.txt") {
-        in = Data({BoardBits}) << "input";
-        ref = Data({}) << "reference";
+        in = Data({5, 5, 7}) << "input";
+        ref = Data({1}) << "reference";
         auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), g_random);
-        auto fc1 = FullyConnected(in, 1, w_init) << "fc1";
-        auto act1 = Tanh(fc1);
-        auto fc2 = FullyConnected(act1, 1, w_init) << "fc2";
-        auto out = Logistic(fc2, 15);
+
+        auto x = in;
+        x = Conv2D(x, ConvType::Same, dim4(32, 3, 3, 7, 'i', 'w', 'h', 'c'), w_init);
+        x = Relu(x);
+        x = Conv2D(x, ConvType::Valid, dim4(64, 3, 3, 32, 'i', 'w', 'h', 'c'), w_init);
+        x = Relu(x);
+        x = Conv2D(x, ConvType::Valid, dim4(1, 3, 3, 64, 'i', 'w', 'h', 'c'), w_init);
+        auto out = Logistic(x, 15);
         loss = MeanSquareError(ref, out);
         model = Model({loss});
         model.Print();
         model.optimizer = std::make_shared<Optimizer>();
-        model.optimizer->alpha = 0.01;
+        model.optimizer->alpha = env("alpha", 0.01);
     }
 
     float Predict(const Board& board) {
@@ -845,7 +851,7 @@ struct MonteCarloAgent : public Agent {
             for(auto i : range(batch)) {
                 const auto& sample = values.Sample(g_random);
                 ToTensor(sample.first, in->v.slice(i));
-                ref->v[0] = sample.second.Value();
+                ref->v[0] = sample.second.ValueP1();
             }
             // TODO begin epoch
             model.Forward(true);
@@ -856,7 +862,7 @@ struct MonteCarloAgent : public Agent {
             model.Print();
             double s = 0;
             for(const auto& e : values)
-                s += std::pow(double(e.second.Value()) - double(Predict(e.first)), 2);
+                s += std::pow(double(e.second.ValueP1()) - double(Predict(e.first)), 2);
             s /= values.Size();
             println("dataset loss:%.4f accuracy:%.04f", s, std::sqrt(s));
         }
@@ -867,46 +873,54 @@ struct MonteCarloAgent : public Agent {
         history.clear();
     }
 
-    // vector<Action> temp;
-    Action Play(const Board& board) override {
-        Action best_action;
+    vector<Action> temp;
+    vector<Action> next_actions;
+
+    void GenerateActions(const Board& board) {
+        vector<Action> best_actions = std::move(next_actions);
         float best_value;
         Board best_board;
         ReservoirSampler sampler;
         bool explore = RandomDouble(g_random) < eps_greedy;
 
-        /*AllValidActionSequences(board, temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
-            auto value = values.Value(board);
-
-        });*/
-
-        AllValidActions(board, [&](const Board& new_board, const Action& action) {
+        AllValidActionSequences(board, temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
+            // TODO safe exploration: only use the top half based on value (to avoid worst moves)
             float value = -1;
-            if (!explore) {
+            /*if (!explore) {
                 auto w = values.Lookup(new_board);
                 value = w ? w->Value() : ((neural) ? Predict(new_board) : 0.5);
-            }
+            }*/
             if (sampler.count == 0 || value > best_value) {
                 sampler.count = 1;
-                best_action = action;
+                best_actions = actions;
                 best_value = value;
                 best_board = new_board;
             } else if (value == best_value && sampler(g_random)) {
                 sampler.count += 1;
-                best_action = action;
+                best_actions = actions;
                 best_value = value;
                 best_board = new_board;
             }
             return true;
         });
 
+        Check(sampler.count > 0);
         history << Entry{best_board, best_value, int(sampler.count)};
-        return best_action;
+
+        next_actions = std::move(best_actions);
+        std::reverse(next_actions.begin(), next_actions.end());
+    }
+
+    Action Play(const Board& board) override {
+        if (next_actions.empty()) GenerateActions(board);
+        Action a = next_actions.back();
+        next_actions.pop_back();
+        return a;
     }
 
     void EndEpisode(bool victory) override {
         episodes += 1;
-        if (!victory) {
+        /*if (!victory) {
             for (const auto& e : history) {
                 if (e.board.built) {
                     lost_games << e.board << format("value %.4f, sampler_count %s\n", e.value, e.sampler_count);
@@ -914,17 +928,20 @@ struct MonteCarloAgent : public Agent {
                 }
             }
             lost_games << endl;
-        }
-        for (const Entry& e : history) values.Add(e.board, victory ? 1 : 0, victory ? 0 : 1);
-        if (neural && episodes % 100 == 0) Train();
+        }*/
+        for (const Entry& e : history) values.Add(e.board, Score(victory ? 1 : 0, victory ? 0 : 1));
+        //if (neural && episodes % 100 == 0) Train();
     }
 };
 
-struct RandomAgent : public Agent {
+struct StatelessAgent : public Agent {
+};
+
+struct RandomAgent : public StatelessAgent {
     Action Play(const Board& board) override { return AutoRandom(board); }
 };
 
-struct GreedyAgent : public Agent {
+struct GreedyAgent : public StatelessAgent {
     Action Play(const Board& board) override { return AutoGreedy(board); }
 };
 
@@ -971,46 +988,107 @@ struct GreedyAgent : public Agent {
 // - Dense
 // - Sigmoid
 
+Figure PlayOneGame(Agent& agent_a, Agent& agent_b, Values& values, vector<Board>& history) {
+    history.clear();
+    Board board;
+
+    agent_a.BeginEpisode(Figure::Player1);
+    agent_b.BeginEpisode(Figure::Player2);
+    Figure w = Winner(board);
+    while (w == Figure::None) {
+        Agent& agent = (board.player == Figure::Player1) ? static_cast<Agent&>(agent_a) : static_cast<Agent&>(agent_b);
+        auto action = agent.Play(board);
+        auto s = Execute(board, action);
+        if (s != nullopt) Fail(format("invalid action %s", s));
+        w = Winner(board);
+        if (std::holds_alternative<NextAction>(action) || w != Figure::None) history << board;
+    }
+    agent_a.EndEpisode(w == Figure::Player1);
+    agent_b.EndEpisode(w == Figure::Player2);
+
+    Figure p = Figure::Player1;
+    for (const Board& board : history) {
+        values.Add(board, Score(w));
+        p = board.player;
+    }
+    return w;
+}
+
+Values Merge(Values a, Values b) {
+    if (a.Size() >= b.Size()) {
+        a.Merge(b);
+        return a;
+    }
+    b.Merge(a);
+    return b;
+}
+
+auto PlayManyGames(StatelessAgent& agent_a, StatelessAgent& agent_b, const size_t tasks, const size_t task_size) {
+    atomic<size_t> next = 0, completed = 0;
+
+    using Result = pair<Values, Score>;
+    return parallel_map_reduce<Result>([&]() -> Result {
+        Values local_values;
+        vector<Board> history;
+        Score score;
+        for (size_t task = next++; task < tasks; task = next++) {
+            FOR(i, task_size) {
+                auto w = PlayOneGame(agent_a, agent_b, local_values, history);
+                if (w == Figure::Player1) score.p1 += 1;
+                if (w == Figure::Player2) score.p2 += 1;
+            }
+            println("started %s, finished %s", next.load(), ++completed);
+        }
+        return {local_values, score};
+    }, [](Result a, Result b) -> Result {
+        return {Merge(a.first, b.first), a.second + b.second};
+    }, false);
+}
 
 void Learn() {
-    MonteCarloAgent agent_a(0.01, true, 100);
+    RandomAgent agent_a;
+    //MonteCarloAgent agent_a(0.01, true, 100);
+
     //MonteCarloAgent agent_b(0.01, false, 1000);
     RandomAgent agent_b;
     //GreedyAgent agent_b;
 
     std::ofstream stats("stats.txt");
 
-    // self-play
-    double ratio = 0.5;
-    for (auto game : range(1000000)) {
-        Board board;
+    Timestamp begin;
+    auto r = PlayManyGames(agent_a, agent_b, 1000, 1000);
+    Timestamp end;
+    println("elapsed %s", begin.elapsed_s(end));
 
-        agent_a.BeginEpisode(Figure::Player1);
-        agent_b.BeginEpisode(Figure::Player2);
-        Figure w = Winner(board);
-        size_t actions = 0;
-        while (w == Figure::None) {
-            Agent& agent = (board.player == Figure::Player1) ? static_cast<Agent&>(agent_a) : static_cast<Agent&>(agent_b);
-            auto action = agent.Play(board);
-            actions += 1;
-            auto s = Execute(board, action);
-            if (s != nullopt) Fail(format("faul %s", s));
-            w = Winner(board);
+    // self-play
+/*    double ratio = 0.5;
+    Values values;
+    vector<Board> history;
+    size_t db = 0;
+    while (true) {
+        auto winner = PlayOneGame(agent_a, agent_b, history);
+
+        Figure p = Figure::Player1;
+        for (const Board& board : history) {
+            values.Add(board, (winner == p) ? 1 : 0, 1);
+            p = board.player;
         }
-        agent_a.EndEpisode(w == Figure::Player1);
-        agent_b.EndEpisode(w == Figure::Player2);
 
         constexpr double q = 0.0025;
-        ratio = ratio * (1 - q) + (w == Figure::Player1 ? 1 : 0) * q;
-        auto msg = format("Game %s (wins %.4f, actions %s)", game + 1, ratio, actions);
-        if ((game + 1) % 100 == 0) cout << msg << endl;
-        if ((game + 1) % 2000 == 0) stats << msg << endl;
-    }
+        ratio = ratio * (1 - q) + (winner == Figure::Player1 ? 1 : 0) * q;
+        if ((game + 1) % 10000 == 0) println("Game %s (wins %.4f, values %s)", game + 1, ratio, values.Size());
+
+        if ((game + 1) % 100000 == 0) {
+            println("Saving after %s games", game + 1);
+            values.Export(format("db_%s.values", ++db));
+        }
+    }*/
 }
 
 int main(int argc, char** argv) {
     println("Main!");
     InitSegvHandler();
+    Timestamp::init();
 
     if (argc > 1 && argv[1] == "learn"s) {
         Learn();
