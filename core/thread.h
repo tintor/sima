@@ -40,26 +40,30 @@ inline void parallel_for(size_t count, size_t max_threads, const std::function<v
 }
 
 // MapFn: Result()
-// ReduceFn: void(Result& acc, const Result& in)
+// ReduceFn: Result(Result a, Result b)
 
 template<typename Result, typename MapFn, typename ReduceFn>
-inline Result parallel_map_reduce(const MapFn& map_fn, const ReduceFn& reduce_fn) {
+inline Result parallel_map_reduce(const MapFn& map_fn, const ReduceFn& reduce_fn, bool linear_reduce) {
     std::mutex mutex;
     std::optional<Result> result;
     parallel([&]() {
         std::optional<Result> my_result = map_fn();
 
         std::unique_lock lock(mutex);
-        while (result.has_value()) {
-            std::optional<Result> local_result;
-            std::swap(local_result, result);
+        if (linear_reduce) {
+            result = result.has_value() ? reduce_fn(std::move(result.value()), std::move(my_result.value())) : my_result;
+        } else {
+            while (result.has_value()) {
+                std::optional<Result> local_result;
+                std::swap(local_result, result);
 
-            // TODO make unlocking exception safe
-            lock.unlock();
-            reduce_fn(my_result.value(), local_result.value());
-            lock.lock();
+                // TODO make unlocking exception safe
+                lock.unlock();
+                my_result.value() = reduce_fn(std::move(my_result.value()), std::move(local_result.value()));
+                lock.lock();
+            }
+            result = std::move(my_result);
         }
-        result = std::move(my_result);
     });
     return result.value();
 }
