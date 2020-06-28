@@ -168,8 +168,60 @@ struct Score {
     void operator+=(Score o) { *this = *this + o; }
 };
 
+// TODO move to core/sharded_flat_hash_map.h
 template<typename Key, typename Value, size_t Shards>
 class sharded_flat_hash_map {
+public:    
+    size_t size() const { return Sum<size_t>(m_shard, [](const auto& e) { std::unique_lock lock(e._mutex); return e.data.size(); }); }
+
+    void clear() {
+        for (auto& e : m_shard) {
+            std::unique_lock lock(e._mutex);
+            e.data.clear();
+        }
+    }
+
+    void increment(const Key& key, const Value& zero, const Value& value) {
+        Shard& shard = m_shard[std::hash<Key>()(key) % Shards];
+        std::unique_lock lock(shard._mutex);
+        shard.data.emplace(key, zero).first->second += value;
+    }
+
+    void merge(const sharded_flat_hash_map& o) {
+        FOR(i, Shards) {
+            Shard& shard = m_shard[i];
+            const Shard& o_shard = o.m_shard[i];
+
+            std::unique_lock lock(shard._mutex);
+            std::unique_lock lock2(o_shard._mutex);
+
+            for (const auto& e : o_shard.data) {
+                shard.data.emplace(e.first, Score()).first->second += e.second;
+            }
+        }
+    }
+    
+    optional<Value> lookup(const Key& key) const {
+        const Shard& shard = m_shard[std::hash<Key>()(key) % Shards];
+        std::unique_lock lock(shard._mutex);
+        auto it = shard.data.find(key);
+        if (it == shard.data.end()) return nullopt;
+        return it->second;
+    }
+
+    template<typename Visitor>
+    void each_locked(const Visitor& visitor) {
+        for (auto& shard : m_shard) {
+            std::unique_lock lock(shard._mutex);
+            for (const auto& e : shard.data) visitor(e);
+        }
+    }
+
+private:    
+    struct Shard {
+        absl::flat_hash_map<Key, Value> data;
+        mutable mutex _mutex;
+    } m_shard[Shards];
 };
 
 class Values {
@@ -185,7 +237,7 @@ class Values {
         }
     }
 
-    size_t Size() const { return Sum<size_t>(m_shard, [](const auto& e) { std::unique_lock lock(e._mutex); return e.data.size(); }); }
+    size_t Size() const { return m_data.size(); }
 
     /*const auto& Sample(std::mt19937_64& random) const {
         Check(m_data.size() > 0);
@@ -199,75 +251,40 @@ class Values {
         return *it;
     }*/
 
-    void Clear() {
-        for (auto& e : m_shard) {
-            std::unique_lock lock(e._mutex);
-            e.data.clear();
-        }
-    }
+    void Clear() { m_data.clear(); }
 
     void Add(const Board& board, Score score) {
-        const Board b = Normalize(board);
-        Shard& shard = m_shard[b.hash() % Shards];
-        std::unique_lock lock(shard._mutex);
-        shard.data.emplace(b, Score()).first->second += score;
+        m_data.increment(Normalize(board), Score(), score);
     }
 
-    void Merge(const Values& values) {
-        FOR(i, Shards) {
-            Shard& shard = m_shard[i];
-            const Shard& o_shard = values.m_shard[i];
+    void Merge(const Values& values) { m_data.merge(values.m_data); }
 
-            std::unique_lock lock(shard._mutex);
-            std::unique_lock lock2(o_shard._mutex);
-
-            for (const auto& e : o_shard.data) {
-                shard.data.emplace(e.first, Score()).first->second += e.second;
-            }
-        }
-    }
-
-    const Score* Lookup(const Board& board) const {
-        const Board b = Normalize(board);
-        const Shard& shard = m_shard[b.hash() % Shards];
-        std::unique_lock lock(shard._mutex);
-        auto it = shard.data.find(b);
-        if (it == shard.data.end()) return nullptr;
-        return &it->second;
+    optional<Score> Lookup(const Board& board) const {
+        return m_data.lookup(Normalize(board));
     }
 
     float ValueP1(const Board& board) const {
         auto score = Lookup(board);
-        return score ? score->ValueP1() : 0.5f;
+        return score.has_value() ? score->ValueP1() : 0.5f;
     }
 
     void Export(std::filesystem::path filename) {
         vtensor out({5, 5, 7});
         std::ofstream os(filename);
-        for (auto& shard : m_shard) {
-            std::unique_lock lock(shard._mutex);
-            for (const auto& [board, score] : shard.data) {
-                ToTensor(board, out);
-                FOR(x, 5) FOR(y, 5) {
-                    tensor::type* s = out.data() + out.offset(x, y);
-                    char b = 0;
-                    FOR(i, 7) if (s[i] > 0) b |= 1 << i;
-                    os.put(b);
-                }
-                os.write(reinterpret_cast<const char*>(&score.p1), sizeof(score.p1));
-                os.write(reinterpret_cast<const char*>(&score.p2), sizeof(score.p2));
+        m_data.each_locked([&](const pair<Board, Score>& e) {
+            auto [board, score] = e;
+            ToTensor(board, out);
+            FOR(x, 5) FOR(y, 5) {
+                tensor::type* s = out.data() + out.offset(x, y);
+                char b = 0;
+                FOR(i, 7) if (s[i] > 0) b |= 1 << i;
+                os.put(b);
             }
-        }
+            os.write(reinterpret_cast<const char*>(&score.p1), sizeof(score.p1));
+            os.write(reinterpret_cast<const char*>(&score.p2), sizeof(score.p2));
+        });
     }
 
    private:
-    using Data = absl::flat_hash_map<Board, Score>;
-    struct Shard {
-        Data data;
-        mutable mutex _mutex;
-    } m_shard[Shards];
-
-    //mutable size_t m_last_buckets = 0;
-    //mutable Data::const_iterator m_last_iterator;
-
+    sharded_flat_hash_map<Board, Score, 64> m_data;
 };
