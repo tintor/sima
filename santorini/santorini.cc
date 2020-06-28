@@ -144,8 +144,16 @@ Figure Winner(const Board& board) {
 // Computer interface
 // ==================
 
-std::random_device rd;
-thread_local std::mt19937_64 g_random(1);
+std::mt19937_64& Random() {
+    static atomic<size_t> seed = 0;
+    thread_local bool initialized = false;
+    thread_local std::mt19937_64 random;
+    if (!initialized) {
+        random = std::mt19937_64(seed++);
+        initialized = true;
+    }
+    return random;
+}
 
 int RandomInt(int count, std::mt19937_64& random) { return std::uniform_int_distribution<int>(0, count - 1)(random); }
 
@@ -172,7 +180,7 @@ Coord MyRandomFigure(const Board& board, std::mt19937_64& random) {
 }
 
 Action RandomAction(const Board& board) {
-    std::mt19937_64& random = g_random;
+    std::mt19937_64& random = Random();
     if (board.setup) {
         int c = RandomInt(1 + 8, random);
         if (c == 0) return NextAction{};
@@ -254,7 +262,7 @@ Action AutoRandom(const Board& board) {
 }
 
 Action AutoGreedy(const Board& board) {
-    auto& random = g_random;
+    auto& random = Random();
     vector<Action> temp;
     Action choice;
     ReservoirSampler sampler;
@@ -284,7 +292,7 @@ double ClimbRank(Figure player, const Board& board) {
 }
 
 Action AutoClimber(const Board& board) {
-    auto& random = g_random;
+    auto& random = Random();
     vector<Action> temp;
     Action choice;
     ReservoirSampler sampler;
@@ -313,7 +321,7 @@ Action AutoClimber(const Board& board) {
 }
 
 size_t Rollout(Figure player, Board board) {
-    auto& random = g_random;
+    auto& random = Random();
     while (true) {
         // Select action uniformly out of all possible actions!
         Action random_action;
@@ -390,7 +398,7 @@ size_t MCTS_Iteration(size_t N, Figure player, std::unique_ptr<Node>& node) {
     Expand(node->board, node->children);
     Check(node->children.size() > 0);
 
-    auto& child = node->children[RandomInt(node->children.size(), g_random)];
+    auto& child = node->children[RandomInt(node->children.size(), Random())];
     size_t e = MCTS_Iteration(N, player, child);
     node->w += e;
     node->n += 1;
@@ -468,7 +476,7 @@ Action AutoMiniMax(const Board& board, const int depth) {
     });
     if (count == 1) return best_action;
 
-    auto& random = g_random;
+    auto& random = Random();
     double best_score = -1e100;
     ReservoirSampler sampler;
     AllValidActions(board, [&](const Board& new_board, const Action& action) {
@@ -816,7 +824,7 @@ struct MonteCarloAgent : public Agent {
     MonteCarloAgent(double eps_greedy, bool neural, uint batch) : eps_greedy(eps_greedy), neural(neural), batch(batch), lost_games("lost_games.txt") {
         in = Data({5, 5, 7}) << "input";
         ref = Data({1}) << "reference";
-        auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), g_random);
+        auto w_init = make_shared<NormalInit>(1 / sqrt(BoardBits), Random());
 
         auto x = in;
         x = Conv2D(x, ConvType::Same, dim4(32, 3, 3, 7, 'i', 'w', 'h', 'c'), w_init);
@@ -844,12 +852,12 @@ struct MonteCarloAgent : public Agent {
         vector<uint> samples;
         samples.resize(values.Size());
         for (auto i : range(values.Size())) samples[i] = i;
-        std::shuffle(samples.begin(), samples.end(), g_random);
+        std::shuffle(samples.begin(), samples.end(), Random());
 
         for (auto i : range(10)) {
             // Epoch
             for(auto i : range(batch)) {
-                const auto& sample = values.Sample(g_random);
+                const auto& sample = values.Sample(Random());
                 ToTensor(sample.first, in->v.slice(i));
                 ref->v[0] = sample.second.ValueP1();
             }
@@ -881,7 +889,7 @@ struct MonteCarloAgent : public Agent {
         float best_value;
         Board best_board;
         ReservoirSampler sampler;
-        bool explore = RandomDouble(g_random) < eps_greedy;
+        bool explore = RandomDouble(Random()) < eps_greedy;
 
         AllValidActionSequences(board, temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
             // TODO safe exploration: only use the top half based on value (to avoid worst moves)
@@ -895,7 +903,7 @@ struct MonteCarloAgent : public Agent {
                 best_actions = actions;
                 best_value = value;
                 best_board = new_board;
-            } else if (value == best_value && sampler(g_random)) {
+            } else if (value == best_value && sampler(Random())) {
                 sampler.count += 1;
                 best_actions = actions;
                 best_value = value;
