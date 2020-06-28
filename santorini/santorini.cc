@@ -1048,7 +1048,7 @@ Score PlayManyGames(StatelessAgent& agent_a, StatelessAgent& agent_b, const size
     return score;
 }
 
-void Learn() {
+void Learn(Values& values) {
     RandomAgent agent_a;
     //MonteCarloAgent agent_a(0.01, true, 100);
 
@@ -1059,11 +1059,9 @@ void Learn() {
     std::ofstream stats("stats.txt");
 
     Timestamp begin;
-    Values values;
-    Score score = PlayManyGames(agent_a, agent_b, 10000, 2000, values);
+    Score score = PlayManyGames(agent_a, agent_b, 100, 2000, values);
     Timestamp end;
     println("elapsed %s, states %s", begin.elapsed_s(end), values.Size());
-    values.Export("random_vs_random_20m.values");
 
     // self-play
 /*    double ratio = 0.5;
@@ -1090,12 +1088,7 @@ void Learn() {
     }*/
 }
 
-void print_section() {
-
-}
-
-void Browse() {
-    Values values("random_vs_random.values");
+void Browse(const Values& values) {
     vector<Board> stack = { Board() };
     while (true) {
         println();
@@ -1103,17 +1096,21 @@ void Browse() {
         vector<Action> temp;
         vector<Board> options;
         AllValidActionSequences(stack.back(), temp, [&](vector<Action>& actions, const Board& new_board, auto winner) {
-            options.push_back(new_board);
+            if (values.Lookup(new_board).has_value()) options.push_back(new_board);
             return true;
         });
 
         int id = 0;
         for (const Board& b : options) {
             auto score = values.Lookup(b);
-            if (score) println("[%s] -> %s %s", id, score->p1, score->p2); else println("[%s]", id);
+            column_section(10, 15);
+            println("[%s]", id);
+            if (score) println("%s %s", score->p1, score->p2); else println();
             id += 1;
             Render(b);
         }
+        end_column_section();
+
         while (true) {
             print("> ");
             std::cin >> id;
@@ -1131,12 +1128,22 @@ int main(int argc, char** argv) {
     Timestamp::init();
 
     if (argc > 1 && argv[1] == "learn"s) {
-        Learn();
+        Values values;        
+        Learn(values);
+        values.Export("random_vs_random.values");
         return 0;
     }
 
     if (argc > 1 && argv[1] == "browse"s) {
-        Browse();
+        Values values("random_vs_random.values");
+        Browse(values);
+        return 0;
+    }
+    
+    if (argc > 1 && argv[1] == "combo"s) {
+        Values values;        
+        Learn(values);
+        Browse(values);
         return 0;
     }
 

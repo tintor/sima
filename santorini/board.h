@@ -18,17 +18,9 @@ struct InitZorbist {
     }
 } init_zorbist;
 
-struct Board {
-    bool setup = true;
-    Figure player = Figure::Player1;
-    optional<Coord> moved;
-    bool built = false;
-
+struct MiniBoard {
     Cells cell;
-
-    const Cell& operator()(Coord c) const { return cell[c.v]; }
-    Cell& operator()(Coord c) { return cell[c.v]; }
-
+    
     size_t hash() const {
         if (hash_code != 0) return hash_code;
 
@@ -45,11 +37,27 @@ struct Board {
         return h;
     }
 
+    bool operator==(const MiniBoard& b) const { return cell == b.cell; }
+
 private:
     mutable size_t hash_code = 0;
 };
 
-ostream& operator<<(ostream& os, const Board& board) {
+struct Board : public MiniBoard {
+    bool setup = true;
+    Figure player = Figure::Player1;
+    optional<Coord> moved;
+    bool built = false;
+
+    const Cell& operator()(Coord c) const { return cell[c.v]; }
+    Cell& operator()(Coord c) { return cell[c.v]; }
+
+    bool operator==(const Board& b) const {
+        return setup == b.setup && player == b.player && moved == b.moved && built == b.built && cell == b.cell;
+    }
+};
+
+ostream& operator<<(ostream& os, const MiniBoard& board) {
     for (int row = 0; row < 5; row++) {
         for (int col = 0; col < 5; col++) {
             const Cell c = board.cell[row * 5 + col];
@@ -57,6 +65,11 @@ ostream& operator<<(ostream& os, const Board& board) {
         }
         os << endl;
     }
+    return os;
+}
+
+ostream& operator<<(ostream& os, const Board& board) {
+    os << static_cast<MiniBoard>(board);
     char p[2] = {char(board.player), 0};
     os << format("setup %s, player %s", board.setup, p);
     if (board.moved) os << format(" moved %s%s", board.moved->x(), board.moved->y());
@@ -64,9 +77,11 @@ ostream& operator<<(ostream& os, const Board& board) {
     return os;
 }
 
-void Print(const Board& board) { cout << board; }
+void Print(const Board& board) { *fos << board; }
 
-void Render(const Board& board) {
+void Print(const MiniBoard& board) { *fos << board; }
+
+void Render(const MiniBoard& board) {
     const std::string color[4] = { "\033[0m", "\033[0;34m", "\033[0;33m", "\033[1;31m" };
     const char* tower = ".#xo";
 
@@ -74,19 +89,19 @@ void Render(const Board& board) {
         for (int col = 0; col < 5; col++) {
             const auto c = board.cell[row * 5 + col];
             // Color
-            cout << color[c.level];
+            *fos << color[c.level];
             // Figure
-            if (c.figure == Figure::Dome) cout << '*';
-            else if (c.figure == Figure::Player1) cout << 'A';
-            else if (c.figure == Figure::Player2) cout << 'B';
-            else if (c.figure == Figure::None) cout << tower[c.level];
-            else cout << char(c.figure);
-            cout << ' ';
+            if (c.figure == Figure::Dome) *fos << '*';
+            else if (c.figure == Figure::Player1) *fos << 'A';
+            else if (c.figure == Figure::Player2) *fos << 'B';
+            else if (c.figure == Figure::None) *fos << tower[c.level];
+            else *fos << char(c.figure);
+            *fos << ' ';
         }
-        cout << endl;
+        // Reset color
+        *fos << "\033[0m";
+        *fos << endl;
     }
-    // Reset color
-    cout << "\033[0m";
 }
 
 bool Less(const Cells& a, const Cells& b) {
@@ -103,9 +118,9 @@ Cells Transform(const Cells& cell, int transform) {
 }
 
 // Returns the same board for all symmetry variations!
-Board Normalize(const Board& board) {
+MiniBoard Normalize(const MiniBoard& board) {
     // generate all 8 transforms and return the smallest one
-    Board out = board;
+    MiniBoard out = board;
     for (int transform = 1; transform < 8; transform++) {
         Cells m = Transform(board.cell, transform);
         if (Less(m, out.cell)) out.cell = m;
@@ -113,14 +128,17 @@ Board Normalize(const Board& board) {
     return out;
 }
 
-bool operator==(const Board& a, const Board& b) {
-    return a.setup == b.setup && a.player == b.player && a.moved == b.moved && a.built == b.built && a.cell == b.cell;
-}
-
 namespace std {
 template <>
 struct hash<Board> {
     size_t operator()(const Board& b) const { return b.hash(); }
+};
+}  // namespace std
+
+namespace std {
+template <>
+struct hash<MiniBoard> {
+    size_t operator()(const MiniBoard& b) const { return b.hash(); }
 };
 }  // namespace std
 
@@ -140,9 +158,8 @@ int Count(const Board& board, const Fn& fn) {
 constexpr int CellBits = 4 + 3;
 constexpr int BoardBits = 25 * CellBits;
 
-void ToTensor(const Board& board, tensor out) {
+void ToTensor(const MiniBoard& board, tensor out) {
     if (out.shape() != dim4(5, 5, 7)) Fail(string(out.shape()));
-    const auto other = Other(board.player);
     FOR(x, 5) FOR(y, 5) {
         tensor::type* s = out.data() + out.offset(x, y);
         auto cell = board.cell[y * 5 + x];
@@ -151,9 +168,26 @@ void ToTensor(const Board& board, tensor out) {
         s[2] = cell.level == 2;
         s[3] = cell.level == 3;
         s[4] = cell.figure == Figure::Dome;
-        s[5] = cell.figure == other;
-        s[6] = cell.figure == board.player;
+        s[5] = cell.figure == Figure::Player1;
+        s[6] = cell.figure == Figure::Player2;
     }
+}
+
+MiniBoard FromTensor(tensor out) {
+    if (out.shape() != dim4(5, 5, 7)) Fail(string(out.shape()));
+    MiniBoard board;
+    FOR(x, 5) FOR(y, 5) {
+        tensor::type* s = out.data() + out.offset(x, y);
+        auto& cell = board.cell[y * 5 + x];
+        if (s[0]) cell.level = 0;
+        if (s[1]) cell.level = 1;
+        if (s[2]) cell.level = 2;
+        if (s[3]) cell.level = 3;
+        if (s[4]) cell.figure = Figure::Dome;
+        if (s[5]) cell.figure = Figure::Player1;
+        if (s[6]) cell.figure = Figure::Player2;
+    }
+    return board;
 }
 
 struct Score {
@@ -233,7 +267,16 @@ class Values {
         vtensor out({5, 5, 7});
         std::ifstream is(filename);
         while (is) {
-
+            FOR(x, 5) FOR(y, 5) {
+                tensor::type* s = out.data() + out.offset(x, y);
+                char b;
+                if (!is.get(b)) return;
+                FOR(i, 7) s[i] = (b & (1 << i)) ? 1 : 0;
+            }
+            Score score;
+            if (!is.read(reinterpret_cast<char*>(&score.p1), sizeof(score.p1))) return;
+            if (!is.read(reinterpret_cast<char*>(&score.p2), sizeof(score.p2))) return;
+            m_data.increment(FromTensor(out), Score(), score);
         }
     }
 
@@ -253,17 +296,17 @@ class Values {
 
     void Clear() { m_data.clear(); }
 
-    void Add(const Board& board, Score score) {
+    void Add(const MiniBoard& board, Score score) {
         m_data.increment(Normalize(board), Score(), score);
     }
 
     void Merge(const Values& values) { m_data.merge(values.m_data); }
 
-    optional<Score> Lookup(const Board& board) const {
+    optional<Score> Lookup(const MiniBoard& board) const {
         return m_data.lookup(Normalize(board));
     }
 
-    float ValueP1(const Board& board) const {
+    float ValueP1(const MiniBoard& board) const {
         auto score = Lookup(board);
         return score.has_value() ? score->ValueP1() : 0.5f;
     }
@@ -271,7 +314,7 @@ class Values {
     void Export(std::filesystem::path filename) {
         vtensor out({5, 5, 7});
         std::ofstream os(filename);
-        m_data.each_locked([&](const pair<Board, Score>& e) {
+        m_data.each_locked([&](const pair<MiniBoard, Score>& e) {
             auto [board, score] = e;
             ToTensor(board, out);
             FOR(x, 5) FOR(y, 5) {
@@ -286,5 +329,5 @@ class Values {
     }
 
    private:
-    sharded_flat_hash_map<Board, Score, 64> m_data;
+    sharded_flat_hash_map<MiniBoard, Score, 64> m_data;
 };
