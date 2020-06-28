@@ -585,23 +585,23 @@ template <typename... Args>
 
 template <typename... Args>
 void print(string_view fmt, const Args&... args) {
-    cout << format(fmt, args...);
+    *fos << format(fmt, args...);
 }
 
 template <typename... Args>
 void println(string_view fmt, const Args&... args) {
-    cout << format(fmt, args...) << endl;
+    *fos << format(fmt, args...) << endl;
 }
 
 template <typename... Args>
 void lock_println(string_view fmt, const Args&... args) {
     std::unique_lock lock(g_cout_mutex);
-    cout << format(fmt, args...) << endl;
+    *fos << format(fmt, args...) << endl;
 }
 
-inline void println() { cout << endl; }
+inline void println() { *fos << endl; }
 
 template <typename... Args>
 void dprint(string_view fmt, const Args&... args) {
-    if (debug) cout << format(fmt, args...);
+    if (debug) *fos << format(fmt, args...);
 }

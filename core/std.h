@@ -102,6 +102,12 @@ overloaded(Ts...)->overloaded<Ts...>;  // not needed as of C++20
 constexpr double PI = M_PI;
 constexpr double INF = numeric_limits<double>::infinity();
 
+extern std::ostream* fos;
+void column_section(int width, int count);
+void end_column_section();
+
+#define FOR(i, END) for (auto i : range(END))
+
 extern std::mutex g_cout_mutex;
 
 void Check(bool value, string_view message = "", const char* file = __builtin_FILE(),

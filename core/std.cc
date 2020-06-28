@@ -1,6 +1,8 @@
 #include <core/std.h>
 #include <core/callstack.h>
+#include <core/range.h>
 #include <mutex>
+#include <sstream>
 
 std::mutex g_cout_mutex;
 
@@ -28,4 +30,80 @@ void Fail(string_view message, const char* file, unsigned line, const char* func
         cout.flush();
     }
     exit(0);
+}
+
+std::ostream* fos = &cout;
+
+std::stringstream column;
+std::vector<std::string> columns;
+int column_section_width = 0;
+int column_count = 0;
+
+bool extract_line(std::string& line, std::string& column) {
+    int chars = 0;
+    // TODO optimize
+    while (chars < column_section_width && column.size() > 0) {
+        if (column.substr(0, 2) == "\033[") {
+            // scan until m
+            auto i = column.find('m', 2);
+            if (i == std::string::npos) break;
+            line += column.substr(0, i + 1);
+            column.erase(0, i + 1);
+        } else if (column[0] == '\n') {
+            column.erase(0, 1);
+            break;
+        } else {
+            line += column[0];
+            column.erase(0, 1);
+            chars += 1;
+        }
+    }
+    bool result = chars > 0;
+    while (chars < column_section_width) {
+        line += ' ';
+        chars += 1;
+    }
+    line += ' ';
+    return result;
+}
+
+bool is_space_only(const std::string& a) {
+    for (char c : a) if (c != ' ') return false;
+    return true;
+}
+
+void flush_columns() {
+    std::string line;
+    while(true) {
+        bool empty = true, empty2 = true;
+        FOR(i, column_count) {
+            if (i >= columns.size()) break;
+            if (columns[i].size() > 0) empty = false;
+            if (extract_line(line, columns[i])) empty2 = false;
+        }
+        if (empty) break;
+        if (!empty2) cout << line << endl;
+        line.clear();
+    }
+    if (columns.size() <= column_count) columns.clear(); else columns.erase(columns.begin(), columns.begin() + column_count);
+}
+
+void column_section(int width, int count) {
+    if (column.str().size() > 0) {
+        columns.push_back(std::move(column.str()));
+        column = std::stringstream();
+    }
+    if (columns.size() >= column_count) flush_columns();
+    column_section_width = width;
+    column_count = count;
+    fos = column_section_width ? &column : &cout;
+}
+
+void end_column_section() {
+    column_section(column_section_width, column_count);
+    if (columns.size() > 0) flush_columns();
+    columns.clear();
+    column_section_width = 0;
+    column_count = 0;
+    fos = &cout;
 }

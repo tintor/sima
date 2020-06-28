@@ -59,7 +59,6 @@ inline Diff operator<<(Diff a, string_view name) {
     return a;
 }
 
-#define FOR(i, END) for (auto i : range(END))
 #define EACH(V) FOR(i, V.elements())
 
 #define Declare1(Func) \
