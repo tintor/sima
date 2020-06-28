@@ -41,24 +41,22 @@ int column_count = 0;
 
 bool extract_line(std::string& line, std::string& column) {
     int chars = 0;
-    // TODO optimize
     size_t read = 0;
     while (chars < column_section_width && read < column.size()) {
-        if (column.substr(read, 2) == "\033[") {
-            // scan until m
+        if (column[read] == '\033' && column.substr(read, 2) == "\033[") {
             auto i = column.find('m', read + 2);
             if (i == std::string::npos) break;
-            line += column.substr(read, i + 1 - read);
             read = i + 1;
         } else if (column[read] == '\n') {
             read += 1;
             break;
         } else {
-            line += column[read];
             read += 1;
             chars += 1;
         }
     }
+    line += column.substr(0, read);
+    if (line.size() > 0 && line.back() == '\n') line.pop_back();
     column.erase(0, read);
     
     bool result = chars > 0;
