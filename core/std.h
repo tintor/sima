@@ -65,9 +65,10 @@ using std::unique_ptr;
 
 using std::atomic;
 
-using namespace std::literals;
-
 #include <core/vector.h>
+using std::vector;
+
+using namespace std::literals;
 
 #ifdef NDEBUG
 constexpr bool debug = false;

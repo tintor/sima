@@ -6,6 +6,7 @@
 #include <absl/container/flat_hash_map.h>
 
 #include <fstream>
+#include <filesystem>
 
 using Cells = array<Cell, 25>;
 
@@ -205,7 +206,7 @@ class Values {
         return it->second.ValueP1();
     }
 
-    void Export(string_view filename) {
+    void Export(std::filesystem::path filename) {
         vtensor out({5, 5, 7});
         std::ofstream os(filename);
         for (const auto& [board, score] : m_data) {

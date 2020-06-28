@@ -152,7 +152,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 if (APPLE)
 	include_directories(/usr/local/Cellar/eigen/3.3.7/include/eigen3)
 else()
-	include_directories(/usr/local/include/eigen3)
+	include_directories(/usr/include/eigen3)
 endif()
 set(LIBRARIES ${LIBRARIES} Eigen3::Eigen)
 

@@ -16,7 +16,9 @@ class matrix {
     }
 
     void fill(T value) {
-        for (T& e : _data) e = value;
+        auto s = _data.size();
+        _data.resize(0);
+        _data.resize(s, value);        
     }
 
     const T& operator()(uint a, uint b) const {
@@ -24,7 +26,7 @@ class matrix {
         return _data[b * _dim_a + a];
     }
 
-    T& operator()(uint a, uint b) {
+    typename vector<T>::reference operator()(uint a, uint b) {
         if (a >= _dim_a || b >= _dim_b) THROW(invalid_argument);
         return _data[b * _dim_a + a];
     }
