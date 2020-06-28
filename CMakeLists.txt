@@ -19,12 +19,6 @@ add_definitions(-O3 -mavx2 -mfma -ffast-math -ffp-contract=fast -DNDEBUG -Wfatal
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
 
-# OpenCV
-# ------
-find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
-set(LIBRARIES ${LIBRARIES} ${OpenCV_LIBS})
-
 # CUDA
 # ----
 if (NOT APPLE)
