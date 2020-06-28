@@ -252,6 +252,13 @@ size_t CountIf(const Iterable& iterable, const UnaryPredicate& predicate) {
     return count;
 }
 
+template <typename Result, typename Iterable, typename UnaryFn>
+Result Sum(const Iterable& iterable, const UnaryFn& unary_fn) {
+    Result sum = 0;
+    for (const auto& e : iterable) sum += unary_fn(e);
+    return sum;
+}
+
 template <typename T, typename P>
 size_t IndexOfMax(cspan<T> s, P measure) {
     auto mv = measure(s[0]);

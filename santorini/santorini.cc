@@ -854,7 +854,7 @@ struct MonteCarloAgent : public Agent {
         for (auto i : range(values.Size())) samples[i] = i;
         std::shuffle(samples.begin(), samples.end(), Random());
 
-        for (auto i : range(10)) {
+        /*for (auto i : range(10)) {
             // Epoch
             for(auto i : range(batch)) {
                 const auto& sample = values.Sample(Random());
@@ -873,7 +873,7 @@ struct MonteCarloAgent : public Agent {
                 s += std::pow(double(e.second.ValueP1()) - double(Predict(e.first)), 2);
             s /= values.Size();
             println("dataset loss:%.4f accuracy:%.04f", s, std::sqrt(s));
-        }
+        }*/
     }
 
     void BeginEpisode(Figure player) override {
@@ -1022,35 +1022,30 @@ Figure PlayOneGame(Agent& agent_a, Agent& agent_b, Values& values, vector<Board>
     return w;
 }
 
-Values Merge(Values a, Values b) {
-    if (a.Size() >= b.Size()) {
-        a.Merge(b);
-        return a;
-    }
-    b.Merge(a);
-    return b;
-}
-
-auto PlayManyGames(StatelessAgent& agent_a, StatelessAgent& agent_b, const size_t tasks, const size_t task_size) {
+Score PlayManyGames(StatelessAgent& agent_a, StatelessAgent& agent_b, const size_t tasks, const size_t task_size, Values& values) {
     atomic<size_t> next = 0, completed = 0;
+    Score score;
+    mutex score_mutex;
 
-    using Result = pair<Values, Score>;
-    return parallel_map_reduce<Result>([&]() -> Result {
+    parallel([&]() {
         Values local_values;
+        Score local_score;
         vector<Board> history;
-        Score score;
         for (size_t task = next++; task < tasks; task = next++) {
+            local_values.Clear();
             FOR(i, task_size) {
                 auto w = PlayOneGame(agent_a, agent_b, local_values, history);
-                if (w == Figure::Player1) score.p1 += 1;
-                if (w == Figure::Player2) score.p2 += 1;
+                if (w == Figure::Player1) local_score.p1 += 1;
+                if (w == Figure::Player2) local_score.p2 += 1;
             }
-            lock_println("started %s, finished %s", next.load(), ++completed);
+            values.Merge(local_values);
+            auto c = ++completed;
+            if (c % 50 == 0) lock_println("started %s, finished %s", next.load(), c);
         }
-        return {local_values, score};
-    }, [](Result a, Result b) -> Result {
-        return {Merge(a.first, b.first), a.second + b.second};
-    }, false);
+        std::unique_lock lock(score_mutex);
+        score += local_score;
+    });
+    return score;
 }
 
 void Learn() {
@@ -1064,9 +1059,11 @@ void Learn() {
     std::ofstream stats("stats.txt");
 
     Timestamp begin;
-    auto r = PlayManyGames(agent_a, agent_b, 1000, 10000);
+    Values values;
+    Score score = PlayManyGames(agent_a, agent_b, 10000, 2000, values);
     Timestamp end;
-    println("elapsed %s, states %s", begin.elapsed_s(end), r.first.Size());
+    println("elapsed %s, states %s", begin.elapsed_s(end), values.Size());
+    values.Export("random_vs_random_20m.values");
 
     // self-play
 /*    double ratio = 0.5;
