@@ -1045,7 +1045,7 @@ auto PlayManyGames(StatelessAgent& agent_a, StatelessAgent& agent_b, const size_
                 if (w == Figure::Player1) score.p1 += 1;
                 if (w == Figure::Player2) score.p2 += 1;
             }
-            println("started %s, finished %s", next.load(), ++completed);
+            lock_println("started %s, finished %s", next.load(), ++completed);
         }
         return {local_values, score};
     }, [](Result a, Result b) -> Result {
@@ -1064,9 +1064,9 @@ void Learn() {
     std::ofstream stats("stats.txt");
 
     Timestamp begin;
-    auto r = PlayManyGames(agent_a, agent_b, 1000, 1000);
+    auto r = PlayManyGames(agent_a, agent_b, 1000, 10000);
     Timestamp end;
-    println("elapsed %s", begin.elapsed_s(end));
+    println("elapsed %s, states %s", begin.elapsed_s(end), r.first.Size());
 
     // self-play
 /*    double ratio = 0.5;
